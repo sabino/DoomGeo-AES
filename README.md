@@ -1,8 +1,7 @@
 # NGRayEx
 
 A real-time, first-person raycaster demonstration for the SNK Neo Geo AES, written
-in C. Wolfenstein-style 3D on hardware that has no framebuffer, no polygon
-rasteriser, and no floating-point unit — running on a 12 MHz 68000 from 1990.
+in C.
 
 This was made purely for research purposes to understand the complexities of rendering realtime "3D"
 on the Neo Geo. The code is unoptimized and could be built to run much faster. 
@@ -61,6 +60,4 @@ I've only tested this with gngeo. It may not render correctly on real hardware
 
 Built against the [ngdevkit](https://github.com/dciabrin/ngdevkit) toolchain.
 Hardware details cross-referenced from the
-[Neo Geo Development Wiki](https://wiki.neogeodev.org). Raycasting math follows
-the classic Lode Vandevenne approach, adapted to fixed point and to hardware
-sprite scaling instead of a framebuffer.
+[Neo Geo Development Wiki](https://wiki.neogeodev.org).  
