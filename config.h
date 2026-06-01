@@ -17,7 +17,7 @@
  
 #define BG_SPLIT  7
 
-#define WALL_WIN 16                 /* tiles in the wall sprite window       */
+#define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #define WALLH    224                /* projection scale: wall height @ dist 1 */
 #define MAX_H    SCRH               /* clamp so top>=0 (avoids Y-wrap bug)    */
 
