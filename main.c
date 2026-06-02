@@ -165,6 +165,7 @@ static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
+static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
@@ -303,6 +304,10 @@ static u8 thing_is_barrel(u16 thing_type) {
     return thing_type == 2035;
 }
 
+static u8 thing_is_explosion(u16 thing_type) {
+    return thing_type == 9000;
+}
+
 static u8 thing_is_shootable(u16 thing_type) {
     return thing_is_monster(thing_type) || thing_is_barrel(thing_type);
 }
@@ -421,7 +426,9 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     if (!thing_is_shootable(runtime_thing_type(thing_index))) return 0;
     if (enemy_dead[thing_index]) return 0;
     if (thing_is_barrel(runtime_thing_type(thing_index))) {
-        enemy_dead[thing_index] = 1;
+        thing_type_override[thing_index] = 9000;
+        explosion_timer[thing_index] = 12;
+        enemy_dead[thing_index] = 0;
         enemy_hp[thing_index] = 0;
         enemy_hit_flash[thing_index] = 0;
         enemy_awake[thing_index] = 0;
@@ -558,6 +565,13 @@ static void damage_shotgun_spread(void) {
 static void update_enemy_hit_flash(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
+        if (explosion_timer[i]) {
+            explosion_timer[i]--;
+            if (!explosion_timer[i]) {
+                enemy_dead[i] = 1;
+                thing_type_override[i] = 0;
+            }
+        }
     }
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         if (enemy_slot_flash[slot]) enemy_slot_flash[slot]--;
@@ -1273,6 +1287,7 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     else if (h > 30) idx = 3;
     else idx = 4;
     if (thing_is_pickup(thing_type) && idx > 1) idx = 1;
+    if (thing_is_explosion(thing_type) && idx > 2) idx = 2;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
 
@@ -1331,7 +1346,7 @@ static int select_visible_things(int found, u8 want_monsters) {
         int sx, h, dist_q8;
         int score;
         int insert_at;
-        u8 is_monster = thing_is_monster(runtime_thing_type(i)) || thing_is_barrel(runtime_thing_type(i));
+        u8 is_monster = thing_is_monster(runtime_thing_type(i)) || thing_is_barrel(runtime_thing_type(i)) || thing_is_explosion(runtime_thing_type(i));
         if (enemy_dead[i]) continue;
         if (want_monsters != is_monster) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
@@ -1410,6 +1425,7 @@ static void restart_level(void) {
         enemy_hp[i] = 0;
         enemy_hit_flash[i] = 0;
         enemy_awake[i] = 0;
+        explosion_timer[i] = 0;
         thing_type_override[i] = 0;
     }
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {

@@ -97,7 +97,8 @@ Kills also add a small capped score counter on the fix-layer HUD, giving combat
 a persistent reward loop without spending sprite slots. Explosive barrel thing
 type `2035` is converted from the WAD, rendered with the `BAR1` sprite, and can
 be shot to apply compact radius damage to nearby monsters, barrels, and the
-player. A tiny fix-layer center marker gives the player a stable aim point
+player; detonated barrels briefly swap to a precomposed `BEXP` sprite before
+disappearing. A tiny fix-layer center marker gives the player a stable aim point
 without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
