@@ -672,10 +672,17 @@ def hud_face_tiles(iwad, zip_member, face_names, palette):
         stbar = stbar_with_face(wad, face_name.upper())
         for row in range(HUD_FACE_ROWS):
             for col in range(HUD_FACE_COLS):
+                src_slot = row * HUD_FACE_COLS + col
+                if src_slot == 1:
+                    src_slot = 2
+                elif src_slot == 2:
+                    src_slot = 1
+                src_row = src_slot // HUD_FACE_COLS
+                src_logical_col = src_slot % HUD_FACE_COLS
                 tile = [[0] * 16 for _ in range(16)]
-                src_col = HUD_FACE_COL + (HUD_FACE_COLS - 1 - col)
+                src_col = HUD_FACE_COL + (HUD_FACE_COLS - 1 - src_logical_col)
                 for y in range(16):
-                    sy = row * 16 + y
+                    sy = src_row * 16 + y
                     for x in range(16):
                         sx = src_col * 16 + (15 - x)
                         if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):

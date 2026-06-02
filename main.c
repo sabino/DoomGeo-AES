@@ -1734,10 +1734,10 @@ static void draw_weapon_status(void) {
 }
 
 static void draw_face_debug_indices(void) {
-    fix_poke(18, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 0));
-    fix_poke(20, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 1));
-    fix_poke(18, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
-    fix_poke(20, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 3));
+    fix_poke(16, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 0));
+    fix_poke(18, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 1));
+    fix_poke(20, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
+    fix_poke(22, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 3));
 }
 
 static void update_status_numbers(u8 pressed) {
