@@ -10,6 +10,7 @@
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
+static u8 bonus_flash = 0;
 static u8 palette_effect = 0;
 static u8 face_pain_timer = 0;
 static u8 face_evil_timer = 0;
@@ -111,6 +112,49 @@ static void set_muzzle_palettes(void) {
     set_muzzle_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
 }
 
+static void set_bonus_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
+    for (int b = 0; b < DEPTH_BANDS; b++) {
+        int fn = 300 - (b * 145) / (DEPTH_BANDS - 1);
+        for (int s = 0; s < 2; s++) {
+            int sf = s ? 170 : 260;
+            u16 pal = (u16)(base + s * DEPTH_BANDS + b);
+            for (u16 i = 0; i < colors; i++) {
+                int r = rgb[i][0] * fn / 256 * sf / 256 + 6;
+                int g = rgb[i][1] * fn / 256 * sf / 256 + 5;
+                int bl = rgb[i][2] * fn / 256 * sf / 256;
+                pal_set(pal, (u16)(i + 1), RGB(clamp31(r), clamp31(g), clamp31(bl)));
+            }
+        }
+    }
+}
+
+static void set_bonus_palettes(void) {
+    for (u16 row = 0; row < BG_SPLIT; row++) {
+        u16 ceiling_scale = (u16)(94 + row * 18);
+        u16 floor_scale = (u16)(118 + row * 28);
+        set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
+        set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
+    }
+    for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
+        u8 r = clamp31(g_hud_palette_rgb[i][0] + 5);
+        u8 g = clamp31(g_hud_palette_rgb[i][1] + 4);
+        u8 b = g_hud_palette_rgb[i][2];
+        pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
+    }
+    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
+        u8 r = clamp31(g_weapon_palette_rgb[i][0] + 5);
+        u8 g = clamp31(g_weapon_palette_rgb[i][1] + 4);
+        u8 b = g_weapon_palette_rgb[i][2];
+        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
+    }
+    set_bonus_depth_palette_range(PAL_DEPTH_BASE, g_wall_palette_rgb, WALL_PALETTE_COLORS);
+    for (u16 alt = 0; alt < WALL_ALT_TEXTURE_COUNT; alt++) {
+        u16 base = (u16)(PAL_WALL_ALT_DEPTH_BASE + alt * PAL_WALL_ALT_DEPTH_STRIDE);
+        set_bonus_depth_palette_range(base, g_wall_alt_palette_rgb[alt], WALL_ALT_PALETTE_COLORS);
+    }
+    set_bonus_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
+}
+
 static void restore_weapon_palette(void) {
     for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(g_weapon_palette_rgb[i][0], g_weapon_palette_rgb[i][1], g_weapon_palette_rgb[i][2]));
@@ -199,6 +243,12 @@ static void update_hurt_flash(void) {
             palette_effect = 1;
         }
         hurt_flash--;
+    } else if (bonus_flash) {
+        if (palette_effect != 3) {
+            set_bonus_palettes();
+            palette_effect = 3;
+        }
+        bonus_flash--;
     } else if (muzzle_flash) {
         if (palette_effect != 2) {
             set_muzzle_palettes();
@@ -1171,6 +1221,7 @@ static u8 apply_pickup(u16 thing_type) {
         shown_keys = 0xFF;
         pickup_message_type = 1;
         pickup_message_timer = 35;
+        bonus_flash = 10;
         return 1;
     }
 
@@ -1284,6 +1335,7 @@ static u8 apply_pickup(u16 thing_type) {
         return 0;
     }
     pickup_message_timer = 35;
+    bonus_flash = 10;
     return 1;
 }
 
@@ -2282,6 +2334,7 @@ static void restart_level(void) {
     player_secrets = 0;
     hurt_flash = 0;
     muzzle_flash = 0;
+    bonus_flash = 0;
     palette_effect = 0;
     face_pain_timer = 0;
     face_evil_timer = 0;

@@ -43,9 +43,9 @@ letting the lower rows disappear into the HUD edge.
 The pistol animates when B is pressed; walking and strafing nudge the strips
 with a small hardware-position bob so movement feels less static without adding
 any sprite slots. Real shots also pulse the weapon palette for a few frames,
-and briefly brighten the wall/floor/ceiling depth palettes, giving muzzle
-feedback through cheap palette updates while the project still uses the null
-sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
+briefly brighten the wall/floor/ceiling depth palettes, and successful pickups
+add a short warm bonus flash, giving muzzle and item feedback through cheap
+palette updates while the project still uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
 the renderer projects up to three visible monster candidates with the same camera
 math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Active monster projectiles
