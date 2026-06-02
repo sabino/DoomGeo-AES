@@ -74,6 +74,7 @@
 #define FIX_EXIT_BASE 13            /* 13..16 = EXIT message glyphs          */
 #define FIX_DEAD_D 17               /* 17,18 plus EXIT's E draw DEAD         */
 #define FIX_DEAD_A 18
+#define FIX_KEY_BASE 19             /* 19..21 = B/R/Y key HUD glyphs         */
 
  
 #define MAP_FIX_COL 1             

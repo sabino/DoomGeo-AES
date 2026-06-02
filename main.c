@@ -59,7 +59,6 @@ static void init_palettes(void) {
     for (int i = 1; i < 16; i++) {
         pal_set(PAL_MAP_PLAYER, (u16)i, RGB(4, 31, 8)); /* player + HUD digits */
     }
-
     for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
         u8 r = g_hud_palette_rgb[i][0];
         u8 g = g_hud_palette_rgb[i][1];
@@ -156,6 +155,7 @@ static volatile u16 player_ammo = 50;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
+static u8 shown_keys = 0xFF;
 
 typedef struct EnemyDraw {
     int thing_index;
@@ -443,6 +443,7 @@ static void apply_pickup(u16 thing_type) {
     u8 key = key_bit_for_thing(thing_type);
     if (key) {
         player_keys |= key;
+        shown_keys = 0xFF;
         return;
     }
 
@@ -579,10 +580,26 @@ static void update_status_numbers(void) {
         draw_number3(33, 26, armor, PAL_MAP_PLAYER);
         shown_armor = armor;
     }
+    if (player_keys != shown_keys) {
+        fix_poke(36, 26, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
+        fix_poke(37, 26, (player_keys & 2) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 1));
+        fix_poke(38, 26, (player_keys & 4) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 2));
+        shown_keys = player_keys;
+    }
 }
 
 static void draw_crosshair(void) {
     fix_poke(SCRW / 16, HORIZON / 8, PAL_MAP_PLAYER, FIX_AIM);
+}
+
+static void force_fix_hud_redraw(void) {
+    shown_health = 0xFFFF;
+    shown_ammo = 0xFFFF;
+    shown_armor = 0xFFFF;
+    shown_keys = 0xFF;
+    update_status_numbers();
+    draw_crosshair();
+    update_center_message();
 }
 
 static void draw_minimap(void) {
@@ -897,8 +914,7 @@ int main(void) {
     init_hud();
     init_weapon();
     hide_enemies();
-    update_status_numbers();
-    draw_crosshair();
+    force_fix_hud_redraw();
     rc_init();
     init_runtime_things();
 
@@ -939,6 +955,7 @@ int main(void) {
                 map_on = !map_on;
                 if (map_on) { draw_minimap(); prev_px = -1; }  /* -1 forces marker repaint */
                 else          clear_minimap();
+                force_fix_hud_redraw();
             }
             c_prev = c_now;
         }
