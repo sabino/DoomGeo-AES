@@ -98,6 +98,9 @@ share the three projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar using large Doom `STTNUM` digit art
 quantized into the `STBAR` palette instead of debug-green minimap colors.
+The status bar also overlays compact `1`-`4` weapon indicators in the Doom
+`ARMS` area: unowned slots stay dim, owned slots use the HUD palette, and the
+active weapon is highlighted so weapon cycling is readable during play.
 The center face is now generated from Doom's straight, left/right turn,
 `STFOUCH`, `STFEVL`, and death face windows in C-ROM. It swaps by health band,
 cycles the straight face variants, glances while turning, briefly shows the

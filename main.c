@@ -292,6 +292,7 @@ static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
 static u8 shown_keys = 0xFF;
+static u8 shown_weapon_status = 0xFF;
 
 enum {
     PLAYER_MAX_BULLETS = 200,
@@ -1631,6 +1632,24 @@ static u16 weapon_ammo(void) {
     return player_ammo;
 }
 
+static u8 weapon_status_bits(void) {
+    u8 bits = 1; /* pistol */
+    if (player_has_shotgun) bits |= 2;
+    if (player_has_chaingun) bits |= 4;
+    if (player_has_rocket_launcher) bits |= 8;
+    return (u8)(bits | (current_weapon << 4));
+}
+
+static void draw_weapon_status(void) {
+    u8 bits = weapon_status_bits() & 0x0F;
+    for (u8 weapon = 0; weapon < 4; weapon++) {
+        u16 pal = (bits & (1 << weapon)) ? PAL_HUD : PAL_MAP_WALL;
+        if (weapon == current_weapon) pal = PAL_MAP_PLAYER;
+        fix_poke((u16)(12 + weapon), 26, pal, (u16)(FIX_DIGIT_BASE + weapon + 1));
+    }
+    shown_weapon_status = weapon_status_bits();
+}
+
 static void update_status_numbers(u8 pressed) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
@@ -1654,6 +1673,7 @@ static void update_status_numbers(u8 pressed) {
         fix_poke(38, 26, (player_keys & 4) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 2));
         shown_keys = player_keys;
     }
+    if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
 }
 
 static void draw_crosshair(void) {
@@ -1665,6 +1685,7 @@ static void force_fix_hud_redraw(void) {
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
     shown_keys = 0xFF;
+    shown_weapon_status = 0xFF;
     hud_face_frame = 0xFF;
     update_status_numbers(0);
     draw_crosshair();
