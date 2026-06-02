@@ -213,6 +213,7 @@ static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
+static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
 static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
 static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
@@ -621,6 +622,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         enemy_hp[thing_index] = 0;
         enemy_hit_flash[thing_index] = 0;
         enemy_awake[thing_index] = 0;
+        enemy_attack_cooldown[thing_index] = 0;
         explode_barrel_at(thing_index, thing_x_q8[thing_index], thing_y_q8[thing_index]);
         return 1;
     }
@@ -656,6 +658,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                     }
                     enemy_hit_flash[i] = 0;
                     enemy_awake[i] = 0;
+                    enemy_attack_cooldown[i] = 0;
                     if (!score_awarded && player_score <= 999) {
                         u16 value = monster_score_value(source_type);
                         player_score = (u16)(player_score + value > 999 ? 999 : player_score + value);
@@ -664,6 +667,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                     killed = 1;
                 } else {
                     enemy_hit_flash[i] = 30;
+                    enemy_attack_cooldown[i] = 24;
                 }
             }
         }
@@ -859,12 +863,14 @@ static void alert_monsters_by_sound(void) {
         if (range > 2816) continue;
         if (range > 1024 && !line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
         enemy_awake[i] = 1;
+        enemy_attack_cooldown[i] = 28;
     }
 }
 
 static void update_enemy_hit_flash(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
+        if (enemy_attack_cooldown[i]) enemy_attack_cooldown[i]--;
         if (explosion_timer[i]) {
             explosion_timer[i]--;
             if (!explosion_timer[i]) {
@@ -927,9 +933,9 @@ static u16 monster_projectile_type(u16 thing_type) {
     }
 }
 
-static void spawn_monster_projectile(int thing, u16 type, u8 damage) {
+static u8 spawn_monster_projectile(int thing, u16 type, u8 damage) {
     int px, py, dx, dy, adx, ady, steps;
-    if (thing < 0 || projectile_active) return;
+    if (thing < 0 || projectile_active) return 0;
     rc_player_q8(&px, &py);
     projectile_x_q8 = thing_x_q8[thing];
     projectile_y_q8 = thing_y_q8[thing];
@@ -946,6 +952,7 @@ static void spawn_monster_projectile(int thing, u16 type, u8 damage) {
     projectile_type = type;
     projectile_damage = damage;
     projectile_active = 1;
+    return 1;
 }
 
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer) {
@@ -1001,18 +1008,25 @@ static void update_monster_damage(void) {
         if (thing < 0) continue;
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
+        if (enemy_attack_cooldown[thing]) continue;
         if (enemies[slot].dist_q8 < 300) {
             player_take_damage(4);
-            hurt_timer = 24;
+            enemy_attack_cooldown[thing] = 32;
+            hurt_timer = 18;
             return;
         }
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
             u16 projectile = monster_projectile_type(runtime_thing_type(thing));
-            if (projectile) spawn_monster_projectile(thing, projectile, ranged_damage);
-            else player_take_damage(ranged_damage);
-            hurt_timer = projectile ? 32 : 48;
+            if (projectile) {
+                if (!spawn_monster_projectile(thing, projectile, ranged_damage)) continue;
+                enemy_attack_cooldown[thing] = 72;
+                return;
+            }
+            player_take_damage(ranged_damage);
+            enemy_attack_cooldown[thing] = 64;
+            hurt_timer = 32;
             return;
         }
     }
@@ -1078,6 +1092,7 @@ static void update_monster_ai(void) {
             if (adx + ady > 2304) continue;
             if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
             enemy_awake[i] = 1;
+            enemy_attack_cooldown[i] = 28;
         }
 
         move_monster_toward(i, dx, dy, adx, ady);
@@ -2086,6 +2101,7 @@ static void restart_level(void) {
         enemy_hp[i] = 0;
         enemy_hit_flash[i] = 0;
         enemy_awake[i] = 0;
+        enemy_attack_cooldown[i] = 0;
         explosion_timer[i] = 0;
         death_drop_timer[i] = 0;
         thing_type_override[i] = 0;

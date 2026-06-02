@@ -137,6 +137,10 @@ Former humans and shotgun guys still apply compact hitscan-style ranged damage,
 while imps and Barons now launch projected Doom fireball sprites (`BAL1`/`BAL7`)
 that travel toward the player and deal damage on impact. This gives the player
 visible pressure to move, aim, and use doors instead of only avoiding contact.
+Each live monster also keeps a tiny attack cooldown: waking, getting hit, melee
+swipes, hitscan attacks, and projectile launches all pace their next attack
+independently, so combat pressure is readable instead of every visible enemy
+sharing one abrupt global damage rhythm.
 Combat uses a compact line-of-sight
 sample against the converted map, so closed doors and walls block player shots,
 shotgun spread targets, monster ranged damage, and monster chase wake-up. Damage
