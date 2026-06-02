@@ -731,6 +731,22 @@ static void damage_shotgun_spread(void) {
     damage_visible_enemy(targets[2], 1);
 }
 
+static void alert_monsters_by_sound(void) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        int dx, dy, range;
+        if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
+        if (enemy_awake[i]) continue;
+        dx = iabs16(px - thing_x_q8[i]);
+        dy = iabs16(py - thing_y_q8[i]);
+        range = dx + dy;
+        if (range > 2816) continue;
+        if (range > 1024 && !line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
+        enemy_awake[i] = 1;
+    }
+}
+
 static void update_enemy_hit_flash(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
@@ -1585,6 +1601,7 @@ static void update_weapon(u8 pressed) {
                 player_ammo--;
                 fire_timer = 4;
                 chaingun_flash ^= 1;
+                alert_monsters_by_sound();
                 damage_best_visible_enemy(1);
             } else if (!fire_prev) {
                 ammo_message_timer = 45;
@@ -1592,15 +1609,18 @@ static void update_weapon(u8 pressed) {
         } else if (!fire_prev && current_weapon == 3 && player_has_rocket_launcher && player_rockets > 0) {
             player_rockets--;
             fire_timer = 20;
+            alert_monsters_by_sound();
             damage_rocket_target();
         } else if (!fire_prev && current_weapon == 1 && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
+            alert_monsters_by_sound();
             damage_shotgun_spread();
         } else if (!fire_prev && current_weapon == 0 && player_ammo > 0) {
             current_weapon = 0;
             player_ammo--;
             fire_timer = 12;
+            alert_monsters_by_sound();
             damage_best_visible_enemy(1);
         } else if (!fire_prev) {
             ammo_message_timer = 45;

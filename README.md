@@ -119,7 +119,10 @@ Combat uses a compact line-of-sight
 sample against the converted map, so closed doors and walls block player shots,
 shotgun spread targets, monster ranged damage, and monster chase wake-up. Damage
 briefly tints the playfield red by swapping palettes during vblank, giving clear
-feedback without spending additional sprite slots.
+feedback without spending additional sprite slots. Firing a real shot now also
+wakes nearby monsters with a compact sound-alert pass, so rooms escalate more
+like Doom instead of only reacting to the single enemy currently under the
+crosshair.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
