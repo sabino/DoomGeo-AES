@@ -83,6 +83,7 @@ static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
+static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
 
 typedef struct EnemyDraw {
     int thing_index;
@@ -300,6 +301,7 @@ static void hide_enemy_slot(u16 slot) {
     enemies[slot].thing_index = -1;
     enemies[slot].screen_w = 0;
     enemies[slot].screen_h = 0;
+    enemy_tile_key[slot] = -1;
 }
 
 static void hide_enemies(void) {
@@ -367,7 +369,13 @@ static void update_enemy(void) {
             if (idx >= def->scale_count) idx = def->scale_count - 1;
             meta = &g_enemy_scales[def->first_scale + idx];
 
-            set_enemy_tiles(slot, meta);
+            {
+                int tile_key = def_idx * 8 + idx;
+                if (enemy_tile_key[slot] != tile_key) {
+                    set_enemy_tiles(slot, meta);
+                    enemy_tile_key[slot] = tile_key;
+                }
+            }
             enemies[slot].screen_x = sx - meta->width / 2;
             enemies[slot].screen_w = meta->width;
             {
