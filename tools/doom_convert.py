@@ -391,6 +391,74 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
     return cell_x + 0.5, cell_y + 0.5
 
 
+MONSTER_TYPES = {
+    9,
+    58,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    71,
+    84,
+    3001,
+    3002,
+    3003,
+    3004,
+    3005,
+    3006,
+}
+
+def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, by: float) -> bool:
+    steps = max(1, int(math.hypot(bx - ax, by - ay) * 8))
+    for i in range(1, steps):
+        t = i / steps
+        x = ax + (bx - ax) * t
+        y = ay + (by - ay) * t
+        ix = int(math.floor(x))
+        iy = int(math.floor(y))
+        if iy < 0 or ix < 0 or iy >= len(grid) or ix >= len(grid[0]) or grid[iy][ix]:
+            return False
+    return True
+
+
+def runtime_things(
+    things: list[Thing],
+    grid: list[list[int]],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+    start_x: float,
+    start_y: float,
+    angle: int,
+) -> list[tuple[int, int, int, int]]:
+    angle_rad = math.radians(angle)
+    dir_x = math.cos(angle_rad)
+    dir_y = -math.sin(angle_rad)
+    rows: list[tuple[float, int, int, int, int]] = []
+    for thing in things:
+        if thing.type not in MONSTER_TYPES:
+            continue
+        gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
+        cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
+        if abs((cell_x + 0.5) - gx) > 2.5 or abs((cell_y + 0.5) - gy) > 2.5:
+            continue
+        gx = cell_x + 0.5
+        gy = cell_y + 0.5
+        dx = gx - start_x
+        dy = gy - start_y
+        forward = dx * dir_x + dy * dir_y
+        lateral = abs(dx * (-dir_y) + dy * dir_x)
+        dist = math.hypot(dx, dy)
+        los_bonus = -8.0 if forward > 0.25 and line_of_sight_grid(grid, start_x, start_y, gx, gy) else 0.0
+        score = dist + lateral * 0.35 + (0.0 if forward > 0 else 8.0) + los_bonus
+        rows.append((score, int(round(gx * 256)), int(round(gy * 256)), thing.type, thing.flags))
+    rows.sort(key=lambda row: row[0])
+    return [(x, y, typ, flags) for _score, x, y, typ, flags in rows]
+
+
 def emit_header(
     out_path: str,
     grid: list[list[int]],
@@ -400,6 +468,7 @@ def emit_header(
     source_name: str,
     map_name: str,
     stats: dict[str, int],
+    things: list[tuple[int, int, int, int]],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     angle_rad = math.radians(angle)
@@ -430,12 +499,18 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_NODES {stats['nodes']}\n")
         f.write(f"#define DOOM_CONVERTED_REJECT_BYTES {stats['reject_bytes']}\n")
         f.write(f"#define DOOM_CONVERTED_BLOCKMAP_WORDS {stats['blockmap_words']}\n")
-        f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n\n")
+        f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n")
+        f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
+        f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for row in grid:
             f.write("    {")
             f.write(",".join(str(cell) for cell in row))
             f.write("},\n")
+        f.write("};\n\n")
+        f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
+        for x_q8, y_q8, typ, flags in things:
+            f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
         f.write("};\n\n")
         f.write("static inline int map_at(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
@@ -648,6 +723,7 @@ def convert(args: argparse.Namespace) -> None:
     sx, sy = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
+    converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle)
 
     emit_header(
         args.out,
@@ -671,6 +747,7 @@ def convert(args: argparse.Namespace) -> None:
             "blockmap_words": len(blockmap),
             "things": len(things),
         },
+        converted_things,
     )
     if args.assets_header and args.assets_source:
         emit_assets(

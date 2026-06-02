@@ -88,11 +88,26 @@ static u8  map_on = 0;              /* minimap visible?                       */
 static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
-static u8  enemy_alive = 1;
+static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
+static int enemy_active = -1;
 static int enemy_screen_x = SCRW / 2;
 static int enemy_screen_w = 0;
 
 static void hide_enemy(void);
+
+static void kill_active_enemy(void) {
+    if (enemy_active < 0 || enemy_active >= NG_RUNTIME_THING_COUNT) return;
+    {
+        short x = g_runtime_things[enemy_active].x_q8;
+        short y = g_runtime_things[enemy_active].y_q8;
+        for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+            if (g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
+                enemy_dead[i] = 1;
+            }
+        }
+    }
+    hide_enemy();
+}
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
@@ -219,10 +234,7 @@ static void update_weapon(u8 pressed) {
     u8 b_now = pressed & B;
     if (b_now && !b_prev && fire_timer == 0) {
         fire_timer = 12;
-        if (enemy_alive) {
-            enemy_alive = 0;
-            hide_enemy();
-        }
+        kill_active_enemy();
     }
     b_prev = b_now;
 
@@ -256,6 +268,7 @@ static void hide_enemy(void) {
         scb4(spr, 0);
     }
     enemy_screen_w = 0;
+    enemy_active = -1;
 }
 
 static void set_enemy_tiles(const DoomSpriteScale *meta) {
@@ -276,14 +289,23 @@ static void set_enemy_tiles(const DoomSpriteScale *meta) {
 }
 
 static void update_enemy(void) {
-    enum { ENEMY_X_Q8 = 3 * 256 + 64, ENEMY_Y_Q8 = 15 * 256 + 51 };
     int sx, h, dist_q8;
     int idx;
+    int best = -1;
     const DoomSpriteScale *meta;
-    if (!enemy_alive || !rc_project_point(ENEMY_X_Q8, ENEMY_Y_Q8, &sx, &h, &dist_q8)) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        const NgRuntimeThing *thing = &g_runtime_things[i];
+        if (enemy_dead[i]) continue;
+        if (rc_project_point(thing->x_q8, thing->y_q8, &sx, &h, &dist_q8)) {
+            best = i;
+            break;
+        }
+    }
+    if (best < 0) {
         hide_enemy();
         return;
     }
+    enemy_active = best;
 
     if (h > 110) idx = 0;
     else if (h > 76) idx = 1;
@@ -298,6 +320,7 @@ static void update_enemy(void) {
     enemy_screen_w = meta->width;
     {
         int bottom = (GAME_H + h) / 2;
+        if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
         int top = bottom - meta->height;
         if (top < 0) top = 0;
         for (u16 i = 0; i < ENEMY_COUNT; i++) {

@@ -6,7 +6,7 @@ in C.
 This was made purely for research purposes to understand the complexities of rendering realtime "3D"
 on the Neo Geo. The code is unoptimized and could be built to run much faster. 
 
-<img width="960" height="672" alt="Current Neo Geo Doom prototype with textured floor and ceiling, pistol HUD, and an imp target" src="docs/screenshots/doom-neogeo-current.png" />
+<img width="960" height="672" alt="Current Neo Geo Doom prototype with textured floor and ceiling, pistol HUD, and a WAD-derived monster target" src="docs/screenshots/doom-neogeo-current.png" />
 
 ## How it works
 
@@ -23,10 +23,12 @@ player-start sector and packed into preprojected sprite-strip phase banks; the
 68000 swaps backdrop tile IDs as the player moves so the planes scroll without
 a framebuffer span renderer. Doom pistol frames are rendered as a centered
 sprite-strip overlay above the bottom 32-pixel `STBAR` status bar and animate
-when B is pressed. A first Doom monster sprite is projected from world space
-using the same camera math as the wall renderer, with the pistol clearing the
-visible target as the initial combat proof of concept. The optional minimap is
-drawn on the fix (text) layer, which always composites over sprites.
+when B is pressed. The converter emits a compact grid-space runtime list from
+WAD `THINGS`; the renderer projects the first visible monster candidate with
+the same camera math as the wall renderer, and the pistol clears overlapping
+thing variants at that coordinate as the initial combat proof of concept. The
+optional minimap is drawn on the fix (text) layer, which always composites over
+sprites.
 
 All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
 renderer writes only a few control words per column per frame; the expensive
