@@ -1378,7 +1378,7 @@ static void toggle_weapon(void) {
 
 static void set_weapon_position(signed char bob_x, signed char bob_y) {
     u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
-    int top = GAME_H - WEAPON_WIN * 16 + bob_y;
+    int top = GAME_H - WEAPON_WIN * 16 + WEAPON_Y_OFFSET + bob_y;
     if (bob_x == weapon_bob_x && bob_y == weapon_bob_y) return;
     for (u16 i = 0; i < WEAPON_COUNT; i++) {
         u16 spr = WEAPON_BASE + i;
@@ -1455,7 +1455,7 @@ static void update_weapon(u8 pressed) {
 
 static void init_weapon(void) {
     u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
-    int top = GAME_H - WEAPON_WIN * 16;
+    int top = GAME_H - WEAPON_WIN * 16 + WEAPON_Y_OFFSET;
     for (u16 i = 0; i < WEAPON_COUNT; i++) {
         u16 spr = WEAPON_BASE + i;
         scb2(spr, 0x0F, 0xFF);

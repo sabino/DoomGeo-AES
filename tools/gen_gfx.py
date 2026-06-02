@@ -524,6 +524,10 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
                         patch[dy][dx] = color
     palette_src = list(patch)
     if patch_name == "STBAR":
+        for face_name in HUD_FACE_FRAMES:
+            face_ids = wad.by_name.get(face_name)
+            if face_ids:
+                palette_src.extend(decode_patch(wad.lump_data(face_ids[0])))
         for digit in range(10):
             digit_ids = wad.by_name.get(f"STTNUM{digit}")
             if digit_ids:
