@@ -10,6 +10,7 @@
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 static u8 hurt_flash = 0;
 static u8 hurt_flash_on = 0;
+static u8 face_pain_timer = 0;
 
 /* ---- palette setup --------------------------------------------------- */
 static u8 shade_channel(u8 value, u16 scale) {
@@ -737,6 +738,7 @@ static void update_enemy_hit_flash(void) {
 }
 
 static void player_take_damage(u16 amount) {
+    u16 original_amount = amount;
     if (amount && player_armor && player_armor_class) {
         u16 saved = player_armor_class >= 2 ? (amount >> 1) : (amount / 3);
         if (saved > player_armor) saved = player_armor;
@@ -747,6 +749,7 @@ static void player_take_damage(u16 amount) {
     hurt_flash = 5;
     if (amount >= player_health) player_health = 0;
     else player_health = (u16)(player_health - amount);
+    if (original_amount && player_health) face_pain_timer = 18;
 }
 
 static u8 monster_ranged_damage(u16 thing_type) {
@@ -1280,6 +1283,7 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
 
 static u8 face_frame_for_health(void);
 static void set_hud_face_frame(u8 frame);
+static void update_hud_face(void);
 
 static u16 weapon_ammo(void) {
     if (current_weapon == 1 && player_has_shotgun) return player_shells;
@@ -1293,9 +1297,9 @@ static void update_status_numbers(void) {
     u16 armor = player_armor;
     if (health != shown_health) {
         draw_number3(11, 24, health, PAL_HUD);
-        set_hud_face_frame(face_frame_for_health());
         shown_health = health;
     }
+    update_hud_face();
     if (ammo != shown_ammo) {
         draw_number3(5, 24, ammo, PAL_HUD);
         shown_ammo = ammo;
@@ -1462,13 +1466,18 @@ static void init_walls(void) {
     }
 }
 
-static u8 face_frame_for_health(void) {
-    if (player_health == 0) return 5;
+static u8 face_health_band(void) {
     if (player_health >= 80) return 0;
     if (player_health >= 60) return 1;
     if (player_health >= 40) return 2;
     if (player_health >= 20) return 3;
     return 4;
+}
+
+static u8 face_frame_for_health(void) {
+    if (player_health == 0) return 10;
+    if (face_pain_timer) return (u8)(5 + face_health_band());
+    return face_health_band();
 }
 
 static void set_hud_face_frame(u8 frame) {
@@ -1482,6 +1491,11 @@ static void set_hud_face_frame(u8 frame) {
         }
     }
     hud_face_frame = frame;
+}
+
+static void update_hud_face(void) {
+    set_hud_face_frame(face_frame_for_health());
+    if (face_pain_timer) face_pain_timer--;
 }
 
 static void init_hud(void) {
@@ -1843,6 +1857,7 @@ static void restart_level(void) {
     player_score = 0;
     hurt_flash = 0;
     hurt_flash_on = 0;
+    face_pain_timer = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
