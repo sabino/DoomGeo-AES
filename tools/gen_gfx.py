@@ -70,9 +70,9 @@ WEAPON_ROWS = 7
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
 WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
 SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
-# Bake weapon psprites slightly higher than the Neo Geo sprite top so Doom's
-# pistol frames are not pre-clipped before the status bar masks their bottom.
-WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16 + 8
+# Must match main.c/config.h's weapon sprite-chain top. If this differs, the
+# correct Doom psprite is baked into the wrong part of the visible tile window.
+WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16 - 24
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
@@ -850,7 +850,7 @@ def main():
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
     ap.add_argument("--face-frames", default=",".join(HUD_FACE_FRAMES), help="Comma-separated Doom status face patch frames")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
-    ap.add_argument("--monster-sprites", default="3004:POSSA1,9:SPOSA1,3001:TROOA1,3002:SARGA1,58:SARGA1,3003:BOSSA1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
+    ap.add_argument("--monster-sprites", default="3004:POSSA1,9:SPOSA1,3001:TROOA1,3002:SARGA1,58:SARGA1,3003:BOSSA1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
 

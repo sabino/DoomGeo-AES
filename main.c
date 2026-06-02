@@ -323,6 +323,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2010:
     case 2011:
     case 2012:
+    case 2013:
     case 2014:
     case 2015:
     case 2018:
@@ -359,6 +360,7 @@ static u8 pickup_is_collectible(u16 thing_type) {
     case 2011: /* stimpack */
     case 2012: /* medikit */
         return player_health < 100;
+    case 2013: /* supercharge */
     case 2014: /* health bonus */
         return player_health < 200;
     case 2015: /* armor bonus */
@@ -1081,6 +1083,11 @@ static u8 apply_pickup(u16 thing_type) {
     case 2012: /* medikit */
         if (player_health >= 100) return 0;
         player_health = (u16)(player_health + 25 > 100 ? 100 : player_health + 25);
+        pickup_message_type = 4;
+        break;
+    case 2013: /* supercharge */
+        if (player_health >= 200) return 0;
+        player_health = (u16)(player_health + 100 > 200 ? 200 : player_health + 100);
         pickup_message_type = 4;
         break;
     case 2014: /* health bonus */

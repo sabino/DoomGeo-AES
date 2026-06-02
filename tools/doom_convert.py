@@ -448,6 +448,7 @@ PICKUP_TYPES = {
     2010,  # rocket
     2011,  # stimpack
     2012,  # medikit
+    2013,  # supercharge / soulsphere
     2014,  # health bonus
     2015,  # armor bonus
     2018,  # green armor

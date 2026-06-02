@@ -109,6 +109,11 @@ empty selected weapon first auto-selects another owned weapon with usable ammo.
 Backpacks now convert from Doom thing type `8`, use `BPAK` art, double the
 compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
 `2048` now uses the correct `AMMO` box art instead of backpack art.
+Supercharge pickups now convert from Doom thing type `2013`, use `SOUL` art,
+and raise health toward 200 through the existing status-face and health path.
+The weapon psprite bake now uses the same top position as the runtime Neo Geo
+sprite chain, so the original Doom hand/gun patches land in the intended
+screen-space window instead of being shifted upward into the play view.
 Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
 green armor absorbs roughly one third of incoming damage and blue armor absorbs
 roughly half.
