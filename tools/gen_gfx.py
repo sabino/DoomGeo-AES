@@ -27,6 +27,7 @@ WALL_MIP_TILE = 1
 SOLID_TILE = 2
 WALL_ATLAS_BASE = 3
 WALL_ATLAS_TILES = 64
+SPRITE_CACHE_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
 
 
 def encode_tile(px):
@@ -195,11 +196,55 @@ def wall_texture_tiles(iwad, zip_member, texture_name):
     return tiles, texture_name.upper()
 
 
+def sprite_scale_tiles(iwad, zip_member, sprite_name, scales):
+    if not iwad:
+        return [], []
+
+    wad = Wad(read_wad(iwad, zip_member))
+    sprite_name = sprite_name.upper()
+    lump_ids = wad.by_name.get(sprite_name)
+    if not lump_ids:
+        raise ValueError(f"sprite frame {sprite_name!r} not found in WAD")
+    patch = decode_patch(wad.lump_data(lump_ids[0]))
+    luma = playpal_luma(wad)
+    src_h = len(patch)
+    src_w = len(patch[0])
+
+    tiles = []
+    meta = []
+    next_tile = SPRITE_CACHE_BASE
+    for scale in scales:
+        dst_w = max(1, int(round(src_w * scale)))
+        dst_h = max(1, int(round(src_h * scale)))
+        strips = (dst_w + 15) // 16
+        rows = (dst_h + 15) // 16
+        meta.append((sprite_name, scale, next_tile, strips, rows, dst_w, dst_h))
+        for row in range(rows):
+            for strip in range(strips):
+                tile = [[0] * 16 for _ in range(16)]
+                for y in range(16):
+                    dy = row * 16 + y
+                    if dy >= dst_h:
+                        continue
+                    sy = min(src_h - 1, int(dy / scale))
+                    for x in range(16):
+                        dx = strip * 16 + x
+                        if dx >= dst_w:
+                            continue
+                        sx = min(src_w - 1, int(dx / scale))
+                        tile[y][x] = quantize_color(patch[sy][sx], luma)
+                tiles.append(tile)
+        next_tile += strips * rows
+    return tiles, meta
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--iwad", help="Path to a WAD or Freedoom release zip for offline texture conversion")
     ap.add_argument("--zip-member", help="WAD member inside a zip archive")
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
+    ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
+    ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
 
     here = os.path.dirname(os.path.abspath(__file__))
@@ -207,8 +252,10 @@ def main():
     os.makedirs(out, exist_ok=True)
 
     wall_tiles, wall_source = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
-    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:]
-    assert len(tiles) == WALL_ATLAS_BASE + WALL_ATLAS_TILES
+    scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
+    sprite_tiles, sprite_meta = sprite_scale_tiles(args.iwad, args.zip_member, args.sprite_frame, scales)
+    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + sprite_tiles
+    assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
     c1, c2 = bytearray(), bytearray()
     for t in tiles:
         a, b = encode_tile(t)
@@ -242,6 +289,8 @@ def main():
         print(f"  {name:8} {len(data):#8x} bytes")
 
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1}")
+    for name, scale, base, strips, rows, width, height in sprite_meta:
+        print(f"  sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
     print(f"  tiles encoded: blank wall-cache solid "
           f"({len(tiles)*128} C-ROM bytes used)")
 

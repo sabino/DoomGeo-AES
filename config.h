@@ -36,6 +36,8 @@
 #define TILE_BLANK 0
 #define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
+#define TILE_WALL_ATLAS_BASE 3
+#define TILE_SPRITE_CACHE_BASE 67
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
