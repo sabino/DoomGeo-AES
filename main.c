@@ -723,14 +723,6 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
     }
 }
 
-static u8 enemy_coord_selected(int count, short x, short y) {
-    for (int slot = 0; slot < count; slot++) {
-        int thing = enemies[slot].thing_index;
-        if (thing >= 0 && thing_x_q8[thing] == x && thing_y_q8[thing] == y) return 1;
-    }
-    return 0;
-}
-
 static u8 enemy_obscured_by_weapon(int sx, int h) {
     return h < 80 && sx > (SCRW / 2 - 40) && sx < (SCRW / 2 + 40);
 }
@@ -786,18 +778,54 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     }
 }
 
+typedef struct ThingCandidate {
+    int thing_index;
+    int sx;
+    int h;
+    int dist_q8;
+    int score;
+} ThingCandidate;
+
+static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, short x, short y) {
+    for (int slot = 0; slot < count; slot++) {
+        int thing = candidates[slot].thing_index;
+        if (thing >= 0 && thing_x_q8[thing] == x && thing_y_q8[thing] == y) return 1;
+    }
+    return 0;
+}
+
 static int select_visible_things(int found, u8 want_monsters) {
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT && found < ENEMY_VISIBLE_COUNT; i++) {
+    ThingCandidate candidates[ENEMY_VISIBLE_COUNT];
+    int count = 0;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) candidates[slot].thing_index = -1;
+
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         const NgRuntimeThing *thing = &g_runtime_things[i];
         int sx, h, dist_q8;
+        int score;
+        int insert_at;
         u8 is_monster = thing_is_monster(thing->type);
         if (enemy_dead[i]) continue;
         if (want_monsters != is_monster) continue;
-        if (enemy_coord_selected(found, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
         if (enemy_obscured_by_weapon(sx, h)) continue;
 
-        render_thing_slot((u16)found, i, sx, h, dist_q8);
+        score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
+        insert_at = count;
+        while (insert_at > 0 && score < candidates[insert_at - 1].score) insert_at--;
+        if (insert_at >= ENEMY_VISIBLE_COUNT) continue;
+        for (int j = ENEMY_VISIBLE_COUNT - 1; j > insert_at; j--) candidates[j] = candidates[j - 1];
+        candidates[insert_at].thing_index = i;
+        candidates[insert_at].sx = sx;
+        candidates[insert_at].h = h;
+        candidates[insert_at].dist_q8 = dist_q8;
+        candidates[insert_at].score = score;
+        if (count < ENEMY_VISIBLE_COUNT) count++;
+    }
+
+    for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
+        render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
         found++;
     }
     return found;
