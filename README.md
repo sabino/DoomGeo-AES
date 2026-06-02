@@ -65,11 +65,10 @@ share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar. Clips and shells are tracked
 separately; shotgun guys now drop a shotgun pickup, and collecting one equips
-Doom's shotgun frames, adds shells, and makes B fire a stronger
-shell-consuming shot until the player toggles back or runs dry. Trying to fire
-empty flashes a compact fix-layer `AMMO` message instead of failing silently.
-Close visible monsters apply a first-pass contact-damage tick with armor
-absorption.
+Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
+can hit a second visible target for reduced damage. Trying to fire empty
+flashes a compact fix-layer `AMMO` message instead of failing silently. Close
+visible monsters apply a first-pass contact-damage tick with armor absorption.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
 are visible and close enough, so the player has pressure to move, aim, and use
 doors instead of only avoiding contact. Damage briefly tints the playfield red
@@ -80,10 +79,10 @@ over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
 closest to the crosshair instead of damaging every visible target at once.
 Surviving monsters flash briefly when hit, making shots readable without
-spending extra sprite slots. Former humans and shotgun guys turn into clip or
-shell pickups when killed, reusing the existing projected pickup path instead
-of adding corpse sprites. A tiny fix-layer center marker gives the player a
-stable aim point without spending any sprite slots.
+spending extra sprite slots. Former humans turn into clip pickups and shotgun
+guys turn into shotgun pickups when killed, reusing the existing projected
+pickup path instead of adding corpse sprites. A tiny fix-layer center marker
+gives the player a stable aim point without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. When health reaches zero,

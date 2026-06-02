@@ -379,9 +379,24 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     return killed;
 }
 
-static void damage_best_visible_enemy(u8 damage) {
+static void flash_visible_enemy(int thing_index) {
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        if (enemies[slot].thing_index == thing_index) {
+            enemy_slot_flash[slot] = 30;
+            load_enemy_hit_palette(slot);
+            return;
+        }
+    }
+}
+
+static void damage_visible_enemy(int thing_index, u8 damage) {
+    if (thing_index < 0) return;
+    if (damage_enemy_at(thing_index, damage)) hide_enemies();
+    else flash_visible_enemy(thing_index);
+}
+
+static int best_visible_enemy(void) {
     int best_thing = -1;
-    int best_slot = -1;
     int best_score = 9999;
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int sx, h, dist_q8;
@@ -395,21 +410,47 @@ static void damage_best_visible_enemy(u8 damage) {
             best_thing = thing;
         }
     }
-    (void)best_score;
-    if (best_thing < 0) return;
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        if (enemies[slot].thing_index == best_thing) {
-            best_slot = slot;
-            break;
+    return best_thing;
+}
+
+static void damage_best_visible_enemy(u8 damage) {
+    damage_visible_enemy(best_visible_enemy(), damage);
+}
+
+static void damage_shotgun_spread(void) {
+    int targets[ENEMY_VISIBLE_COUNT] = {-1, -1};
+    int scores[ENEMY_VISIBLE_COUNT] = {9999, 9999};
+
+    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+        int sx, h, dist_q8;
+        int lateral;
+        int score;
+        int insert_at;
+        if (!thing_is_monster(runtime_thing_type(thing))) continue;
+        if (enemy_dead[thing]) continue;
+        if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
+
+        lateral = iabs16(sx - SCRW / 2);
+        if (lateral > 54 && h < 100) continue;
+        score = lateral + (dist_q8 >> 8);
+        insert_at = ENEMY_VISIBLE_COUNT;
+        for (u16 i = 0; i < ENEMY_VISIBLE_COUNT; i++) {
+            if (score < scores[i]) {
+                insert_at = i;
+                break;
+            }
         }
-    }
-    if (damage_enemy_at(best_thing, damage)) hide_enemies();
-    else {
-        if (best_slot >= 0) {
-            enemy_slot_flash[best_slot] = 30;
-            load_enemy_hit_palette((u16)best_slot);
+        if (insert_at >= ENEMY_VISIBLE_COUNT) continue;
+        for (int i = ENEMY_VISIBLE_COUNT - 1; i > insert_at; i--) {
+            targets[i] = targets[i - 1];
+            scores[i] = scores[i - 1];
         }
+        targets[insert_at] = thing;
+        scores[insert_at] = score;
     }
+
+    damage_visible_enemy(targets[0], 5);
+    damage_visible_enemy(targets[1], 2);
 }
 
 static void update_enemy_hit_flash(void) {
@@ -878,7 +919,7 @@ static void update_weapon(u8 pressed) {
         if (current_weapon && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
-            damage_best_visible_enemy(5);
+            damage_shotgun_spread();
         } else if (player_ammo > 0) {
             current_weapon = 0;
             player_ammo--;
