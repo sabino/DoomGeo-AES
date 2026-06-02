@@ -58,6 +58,10 @@ static inline u16 wall_tile(u8 tex_x, int row) {
     return (u16)(TILE_WALL_ATLAS_BASE + tex_y * TILE_WALL_ATLAS_COLS + (tex_x % TILE_WALL_ATLAS_COLS));
 }
 
+static inline int projected_height(fix dist) {
+    return (int)(((s32)WALLH * recip(dist)) >> FBITS);
+}
+
 void rc_init(void) {
     init_recip_lut();
     for (int c = 0; c < NUM_COLS; c++) {
@@ -130,7 +134,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     if (transformY < (FONE >> 3)) return 0;
 
     int sx = (SCRW / 2) + (int)(((int64_t)(SCRW / 2) * transformX) / transformY);
-    int h = (int)(((int64_t)WALLH << FBITS) / transformY);
+    int h = projected_height(transformY);
     if (h < 1) return 0;
     if (h > GAME_H) h = GAME_H;
 
@@ -183,7 +187,7 @@ void rc_render(void) {
             texbuf[x] = (u8)tex_x;
         }
 
-        int h =  (int)(((int64_t)WALLH << FBITS) / perp);  /* slice height px */
+        int h = projected_height(perp);     /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
 

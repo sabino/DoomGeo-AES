@@ -51,6 +51,9 @@ pixel work is offloaded to the scaler hardware.
 Turning is tuned deliberately slower than the original raycaster demo so the
 projected Doom targets can be lined up with keyboard or arcade-stick input.
 
+The wall and sprite projection heights use the raycaster's reciprocal lookup
+table instead of doing a 64-bit divide for each projected column.
+
 ## Building
 
 The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under
