@@ -192,6 +192,7 @@ static u8  player_keys = 0;
 static u8  player_has_shotgun = 0;
 static u8  player_has_chaingun = 0;
 static u8  player_has_rocket_launcher = 0;
+static u8  player_has_backpack = 0;
 static u8  current_weapon = 0;
 static u8  pickup_message_weapon = 0;
 static u8  chaingun_flash = 0;
@@ -214,6 +215,9 @@ static u8 player_armor_class = 0;
 static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
 static volatile u16 player_rockets = 0;
+static u16 player_max_bullets = 200;
+static u16 player_max_shells = 50;
+static u16 player_max_rockets = 50;
 static u16 player_score = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
@@ -306,6 +310,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     switch (thing_type) {
     case 5:
     case 6:
+    case 8:
     case 13:
     case 38:
     case 39:
@@ -336,19 +341,21 @@ static u8 pickup_is_collectible(u16 thing_type) {
 
     switch (thing_type) {
     case 2001: /* shotgun */
-        return !player_has_shotgun || player_shells < PLAYER_MAX_SHELLS;
+        return !player_has_shotgun || player_shells < player_max_shells;
     case 2002: /* chaingun */
-        return !player_has_chaingun || player_ammo < PLAYER_MAX_BULLETS;
+        return !player_has_chaingun || player_ammo < player_max_bullets;
     case 2003: /* rocket launcher */
-        return !player_has_rocket_launcher || player_rockets < PLAYER_MAX_ROCKETS;
+        return !player_has_rocket_launcher || player_rockets < player_max_rockets;
+    case 8:    /* backpack */
+        return !player_has_backpack || player_ammo < player_max_bullets || player_shells < player_max_shells || player_rockets < player_max_rockets;
     case 2007: /* clip */
     case 2048: /* ammo box */
-        return player_ammo < PLAYER_MAX_BULLETS;
+        return player_ammo < player_max_bullets;
     case 2008: /* shells */
-        return player_shells < PLAYER_MAX_SHELLS;
+        return player_shells < player_max_shells;
     case 2010: /* rocket */
     case 2046: /* box of rockets */
-        return player_rockets < PLAYER_MAX_ROCKETS;
+        return player_rockets < player_max_rockets;
     case 2011: /* stimpack */
     case 2012: /* medikit */
         return player_health < 100;
@@ -1010,46 +1017,60 @@ static u8 apply_pickup(u16 thing_type) {
     }
 
     switch (thing_type) {
+    case 8:    /* backpack */
+        if (player_has_backpack && player_ammo >= player_max_bullets && player_shells >= player_max_shells && player_rockets >= player_max_rockets) return 0;
+        if (!player_has_backpack) {
+            player_has_backpack = 1;
+            player_max_bullets = 400;
+            player_max_shells = 100;
+            player_max_rockets = 100;
+        }
+        add_capped_u16(&player_ammo, 10, player_max_bullets);
+        add_capped_u16(&player_shells, 4, player_max_shells);
+        add_capped_u16(&player_rockets, 1, player_max_rockets);
+        shown_ammo = 0xFFFF;
+        pickup_message_type = 3;
+        break;
     case 2001: /* shotgun */
-        if (player_has_shotgun && player_shells >= PLAYER_MAX_SHELLS) return 0;
+        if (player_has_shotgun && player_shells >= player_max_shells) return 0;
         player_has_shotgun = 1;
         current_weapon = 1;
-        add_capped_u16(&player_shells, 8, PLAYER_MAX_SHELLS);
+        add_capped_u16(&player_shells, 8, player_max_shells);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 2;
         pickup_message_type = 2;
         break;
     case 2002: /* chaingun */
-        if (player_has_chaingun && player_ammo >= PLAYER_MAX_BULLETS) return 0;
+        if (player_has_chaingun && player_ammo >= player_max_bullets) return 0;
         player_has_chaingun = 1;
         current_weapon = 2;
-        add_capped_u16(&player_ammo, 20, PLAYER_MAX_BULLETS);
+        add_capped_u16(&player_ammo, 20, player_max_bullets);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 3;
         pickup_message_type = 2;
         break;
     case 2003: /* rocket launcher */
-        if (player_has_rocket_launcher && player_rockets >= PLAYER_MAX_ROCKETS) return 0;
+        if (player_has_rocket_launcher && player_rockets >= player_max_rockets) return 0;
         player_has_rocket_launcher = 1;
         current_weapon = 3;
-        add_capped_u16(&player_rockets, 2, PLAYER_MAX_ROCKETS);
+        add_capped_u16(&player_rockets, 2, player_max_rockets);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 4;
         pickup_message_type = 2;
         break;
     case 2007: /* clip */
-        if (!add_capped_u16(&player_ammo, 10, PLAYER_MAX_BULLETS)) return 0;
+        if (!add_capped_u16(&player_ammo, 10, player_max_bullets)) return 0;
         pickup_message_type = 3;
         break;
     case 2008: /* shells */
-        if (!add_capped_u16(&player_shells, 4, PLAYER_MAX_SHELLS)) return 0;
+        if (!add_capped_u16(&player_shells, 4, player_max_shells)) return 0;
         pickup_message_type = 3;
         break;
     case 2010: /* rocket */
-        if (!add_capped_u16(&player_rockets, 1, PLAYER_MAX_ROCKETS)) return 0;
+        if (!add_capped_u16(&player_rockets, 1, player_max_rockets)) return 0;
         pickup_message_type = 3;
         break;
     case 2011: /* stimpack */
@@ -1086,11 +1107,11 @@ static u8 apply_pickup(u16 thing_type) {
         pickup_message_type = 5;
         break;
     case 2046: /* box of rockets */
-        if (!add_capped_u16(&player_rockets, 5, PLAYER_MAX_ROCKETS)) return 0;
+        if (!add_capped_u16(&player_rockets, 5, player_max_rockets)) return 0;
         pickup_message_type = 3;
         break;
     case 2048: /* ammo box */
-        if (!add_capped_u16(&player_ammo, 50, PLAYER_MAX_BULLETS)) return 0;
+        if (!add_capped_u16(&player_ammo, 50, player_max_bullets)) return 0;
         pickup_message_type = 3;
         break;
     default:
@@ -1936,6 +1957,7 @@ static void restart_level(void) {
     player_has_shotgun = 0;
     player_has_chaingun = 0;
     player_has_rocket_launcher = 0;
+    player_has_backpack = 0;
     current_weapon = 0;
     pickup_message_weapon = 0;
     chaingun_flash = 0;
@@ -1945,6 +1967,9 @@ static void restart_level(void) {
     player_ammo = 50;
     player_shells = 0;
     player_rockets = 0;
+    player_max_bullets = PLAYER_MAX_BULLETS;
+    player_max_shells = PLAYER_MAX_SHELLS;
+    player_max_rockets = PLAYER_MAX_ROCKETS;
     player_score = 0;
     hurt_flash = 0;
     hurt_flash_on = 0;

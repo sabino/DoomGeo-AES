@@ -433,6 +433,7 @@ MONSTER_TYPES = {
 }
 
 PICKUP_TYPES = {
+    8,     # backpack
     5,     # blue keycard
     6,     # yellow keycard
     13,    # red keycard

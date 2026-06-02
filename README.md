@@ -106,6 +106,9 @@ bullets and shells, and apply compact splash damage around the auto-aimed
 target or a traced wall impact when no visible target is selected. Trying to fire empty flashes
 a compact fix-layer `AMMO` message instead of failing silently, and firing an
 empty selected weapon first auto-selects another owned weapon with usable ammo.
+Backpacks now convert from Doom thing type `8`, use `BPAK` art, double the
+compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
+`2048` now uses the correct `AMMO` box art instead of backpack art.
 Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
 green armor absorbs roughly one third of incoming damage and blue armor absorbs
 roughly half.
