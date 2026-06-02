@@ -1744,14 +1744,58 @@ static void force_fix_hud_redraw(void) {
     update_center_message();
 }
 
+static u8 minimap_has_closed_door(int mx, int my) {
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
+        if (g_runtime_door_open[i]) continue;
+        if (g_runtime_doors[i].x == mx && g_runtime_doors[i].y == my) return 1;
+    }
+    return 0;
+}
+
+static u8 minimap_has_exit(int mx, int my) {
+    for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
+        if ((g_runtime_exits[i].x_q8 >> 8) == mx && (g_runtime_exits[i].y_q8 >> 8) == my) return 1;
+    }
+    return 0;
+}
+
+static u8 minimap_has_pickup(int mx, int my) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
+        if ((thing_x_q8[i] >> 8) == mx && (thing_y_q8[i] >> 8) == my) return 1;
+    }
+    return 0;
+}
+
+static u8 minimap_has_threat(int mx, int my) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type = runtime_thing_type(i);
+        if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type))) continue;
+        if ((thing_x_q8[i] >> 8) == mx && (thing_y_q8[i] >> 8) == my) return 1;
+    }
+    return 0;
+}
+
+static void draw_minimap_cell(int mx, int my) {
+    if (minimap_has_threat(mx, my)) {
+        map_cell(mx, my, PAL_MAP_PLAYER, FIX_DEAD_A);
+    } else if (minimap_has_pickup(mx, my)) {
+        map_cell(mx, my, PAL_HUD, (u16)(FIX_DIGIT_BASE + 2));
+    } else if (minimap_has_exit(mx, my)) {
+        map_cell(mx, my, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    } else if (minimap_has_closed_door(mx, my)) {
+        map_cell(mx, my, PAL_HUD, FIX_DEAD_D);
+    } else if (map_at(mx, my)) {
+        map_cell(mx, my, PAL_MAP_WALL, FIX_SOLID);
+    } else {
+        map_cell(mx, my, 0, FIX_BLANK);
+    }
+}
+
 static void draw_minimap(void) {
     for (int my = 0; my < MAP_H; my++)
-        for (int mx = 0; mx < MAP_W; mx++) {
-            if (map_at(mx, my))
-                map_cell(mx, my, PAL_MAP_WALL, FIX_SOLID);
-            else
-                map_cell(mx, my, 0, FIX_BLANK);
-        }
+        for (int mx = 0; mx < MAP_W; mx++)
+            draw_minimap_cell(mx, my);
 }
 
 /* blank just the minimap's fix region */
@@ -1768,8 +1812,7 @@ static void update_marker(void) {
     rc_player_cell(&px, &py);
     if (px == prev_px && py == prev_py) return;
     if (prev_px >= 0) {                 /* repaint old cell as its map content */
-        if (map_at(prev_px, prev_py)) map_cell(prev_px, prev_py, PAL_MAP_WALL, FIX_SOLID);
-        else                          map_cell(prev_px, prev_py, 0, FIX_BLANK);
+        draw_minimap_cell(prev_px, prev_py);
     }
     map_cell(px, py, PAL_MAP_PLAYER, FIX_SOLID);
     prev_px = px; prev_py = py;

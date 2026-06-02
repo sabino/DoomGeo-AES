@@ -62,7 +62,8 @@ sprites or adding visible sprite slots. Unsupported later-Doom IDs do not
 silently fall back to the wrong enemy art. The pistol clears
 the currently rendered target set as the initial combat proof of concept. The
 optional minimap is drawn on the fix (text) layer, which always composites over
-sprites.
+sprites; it now overlays compact markers for live threats, pickups, closed
+doors, and exits so the converted map is more useful for actual navigation.
 
 All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
 renderer writes only a few control words per column per frame; the expensive
