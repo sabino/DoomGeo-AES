@@ -436,6 +436,7 @@ PICKUP_TYPES = {
     2018,  # green armor
     2019,  # blue armor
     2048,  # ammo box
+    2035,  # explosive barrel
 }
 
 RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES

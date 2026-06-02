@@ -207,6 +207,9 @@ static int iabs16(int value) {
     return value < 0 ? -value : value;
 }
 
+static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
+static void player_take_damage(u16 amount);
+
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
     int dy = by - ay;
@@ -294,6 +297,14 @@ static u8 thing_is_pickup(u16 thing_type) {
     default:
         return 0;
     }
+}
+
+static u8 thing_is_barrel(u16 thing_type) {
+    return thing_type == 2035;
+}
+
+static u8 thing_is_shootable(u16 thing_type) {
+    return thing_is_monster(thing_type) || thing_is_barrel(thing_type);
 }
 
 static u8 key_bit_for_thing(u16 thing_type) {
@@ -407,7 +418,16 @@ static void load_enemy_hit_palette(u16 slot) {
 static u8 damage_enemy_at(int thing_index, u8 damage) {
     u8 killed = 0;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
-    if (!thing_is_monster(runtime_thing_type(thing_index))) return 0;
+    if (!thing_is_shootable(runtime_thing_type(thing_index))) return 0;
+    if (enemy_dead[thing_index]) return 0;
+    if (thing_is_barrel(runtime_thing_type(thing_index))) {
+        enemy_dead[thing_index] = 1;
+        enemy_hp[thing_index] = 0;
+        enemy_hit_flash[thing_index] = 0;
+        enemy_awake[thing_index] = 0;
+        explode_barrel_at(thing_index, thing_x_q8[thing_index], thing_y_q8[thing_index]);
+        return 1;
+    }
     {
         short x = thing_x_q8[thing_index];
         short y = thing_y_q8[thing_index];
@@ -446,6 +466,19 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     return killed;
 }
 
+static void explode_barrel_at(int thing_index, short x_q8, short y_q8) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    if (iabs16(px - x_q8) + iabs16(py - y_q8) < 520) player_take_damage(12);
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type = runtime_thing_type(i);
+        if (i == thing_index || enemy_dead[i] || !thing_is_shootable(type)) continue;
+        if (iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8) < 520) {
+            damage_enemy_at(i, thing_is_barrel(type) ? 1 : 5);
+        }
+    }
+}
+
 static void flash_visible_enemy(int thing_index) {
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         if (enemies[slot].thing_index == thing_index) {
@@ -468,7 +501,7 @@ static int best_visible_enemy(void) {
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int sx, h, dist_q8;
         int score;
-        if (!thing_is_monster(runtime_thing_type(thing))) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
         if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
@@ -494,7 +527,7 @@ static void damage_shotgun_spread(void) {
         int lateral;
         int score;
         int insert_at;
-        if (!thing_is_monster(runtime_thing_type(thing))) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
         if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
@@ -585,7 +618,7 @@ static void update_monster_damage(void) {
 static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (i == self) continue;
-        if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
+        if (enemy_dead[i] || (!thing_is_monster(runtime_thing_type(i)) && !thing_is_barrel(runtime_thing_type(i)))) continue;
         if (iabs16(x_q8 - thing_x_q8[i]) < 128 && iabs16(y_q8 - thing_y_q8[i]) < 128) return 1;
     }
     return 0;
@@ -1298,7 +1331,7 @@ static int select_visible_things(int found, u8 want_monsters) {
         int sx, h, dist_q8;
         int score;
         int insert_at;
-        u8 is_monster = thing_is_monster(runtime_thing_type(i));
+        u8 is_monster = thing_is_monster(runtime_thing_type(i)) || thing_is_barrel(runtime_thing_type(i));
         if (enemy_dead[i]) continue;
         if (want_monsters != is_monster) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;

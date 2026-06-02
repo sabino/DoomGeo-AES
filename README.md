@@ -94,8 +94,11 @@ attack logic, creating a compact Doom-like pain reaction. Former humans turn
 into clip pickups and shotgun guys turn into shotgun pickups when killed,
 reusing the existing projected pickup path instead of adding corpse sprites.
 Kills also add a small capped score counter on the fix-layer HUD, giving combat
-a persistent reward loop without spending sprite slots. A tiny fix-layer center
-marker gives the player a stable aim point without spending any sprite slots.
+a persistent reward loop without spending sprite slots. Explosive barrel thing
+type `2035` is converted from the WAD, rendered with the `BAR1` sprite, and can
+be shot to apply compact radius damage to nearby monsters, barrels, and the
+player. A tiny fix-layer center marker gives the player a stable aim point
+without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. Monsters now keep a compact
