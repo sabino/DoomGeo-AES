@@ -286,7 +286,8 @@ def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> No
 
 def raster_line_value(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int, value: int) -> None:
     for x, y in line_cells(grid, x0, y0, x1, y1):
-        grid[y][x] = value
+        if value or grid[y][x] == 0:
+            grid[y][x] = value
 
 
 def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
@@ -325,7 +326,12 @@ def solid_line_texture(line: LineDef, sidedefs: list[SideDef]) -> str:
 
 
 def wall_texture_class(name: str) -> int:
-    return 1 if name == "BROWNGRN" else 0
+    classes = {
+        "BROWNGRN": 1,
+        "BROWN1": 2,
+        "SUPPORT2": 3,
+    }
+    return classes.get(name, 0)
 
 
 def nearest_open(grid: list[list[int]], sx: int, sy: int) -> tuple[int, int]:
