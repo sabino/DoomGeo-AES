@@ -141,6 +141,8 @@ static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
+static u8  key_message_timer = 0;
+static u8  key_message_visible = 0;
 static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
@@ -549,9 +551,33 @@ static void draw_dead_message(void) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_DEAD_D);
 }
 
+static void draw_key_message(void) {
+    const u16 col = (SCRW / 16) - 1;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_KEY_MSG_K);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 2));
+}
+
+static void clear_center_message(void) {
+    const u16 col = (SCRW / 16) - 2;
+    const u16 row = (GAME_H / 16) - 2;
+    for (u16 i = 0; i < 4; i++) fix_poke((u16)(col + i), row, 0, FIX_BLANK);
+}
+
 static void update_center_message(void) {
-    if (player_health == 0) draw_dead_message();
-    else if (level_complete) draw_exit_message();
+    if (player_health == 0) {
+        draw_dead_message();
+    } else if (level_complete) {
+        draw_exit_message();
+    } else if (key_message_timer) {
+        draw_key_message();
+        key_message_timer--;
+        key_message_visible = 1;
+    } else if (key_message_visible) {
+        clear_center_message();
+        key_message_visible = 0;
+    }
 }
 
 static void check_exit_reached(void) {
@@ -578,8 +604,11 @@ static void open_nearby_door(void) {
         int dx = px - ((int)door->x * 256 + 128);
         int dy = py - ((int)door->y * 256 + 128);
         if (g_runtime_door_open[i]) continue;
-        if (required_key && (player_keys & required_key) == 0) continue;
         if (iabs16(dx) <= 384 && iabs16(dy) <= 384) {
+            if (required_key && (player_keys & required_key) == 0) {
+                key_message_timer = 60;
+                return;
+            }
             g_runtime_door_open[i] = 1;
             rc_invalidate_view();
             if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);

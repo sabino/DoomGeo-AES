@@ -83,10 +83,12 @@ trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
 bits. The status bar shows compact `B`, `R`, and `Y` key indicators that brighten
 when the matching key is collected. Pressing D opens nearby converted door cells,
 with keyed door specials requiring the matching key, and affects both movement
-and raycasting through the shared `map_at()` path. Reaching the converted E1M1
-exit cell now raises a fix-layer `EXIT` message and freezes player control,
-monster movement, and monster damage. This keeps level progression behavior in
-the ROM without keeping generic WAD directory/lump metadata in the cartridge.
+and raycasting through the shared `map_at()` path. Trying a nearby keyed door
+without the matching key flashes a compact fix-layer `KEY` message so the
+blocked door has readable feedback. Reaching the converted E1M1 exit cell now
+raises a fix-layer `EXIT` message and freezes player control, monster movement,
+and monster damage. This keeps level progression behavior in the ROM without
+keeping generic WAD directory/lump metadata in the cartridge.
 
 ## Building
 
