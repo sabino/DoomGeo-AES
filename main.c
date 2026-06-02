@@ -200,7 +200,9 @@ static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
+static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
+static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
@@ -588,7 +590,12 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                 enemy_hp[i] = hp;
                 enemy_awake[i] = 1;
                 if (hp == 0) {
-                    if (drop_type) {
+                    if (drop_type && corpse_type) {
+                        thing_type_override[i] = corpse_type;
+                        death_drop_type[i] = drop_type;
+                        death_drop_timer[i] = 18;
+                        enemy_dead[i] = 0;
+                    } else if (drop_type) {
                         thing_type_override[i] = drop_type;
                         enemy_dead[i] = 0;
                     } else if (corpse_type) {
@@ -788,6 +795,14 @@ static void update_enemy_hit_flash(void) {
             if (!explosion_timer[i]) {
                 enemy_dead[i] = 1;
                 thing_type_override[i] = 0;
+            }
+        }
+        if (death_drop_timer[i]) {
+            death_drop_timer[i]--;
+            if (!death_drop_timer[i]) {
+                thing_type_override[i] = death_drop_type[i];
+                death_drop_type[i] = 0;
+                hide_enemies();
             }
         }
     }
@@ -1929,7 +1944,9 @@ static void restart_level(void) {
         enemy_hit_flash[i] = 0;
         enemy_awake[i] = 0;
         explosion_timer[i] = 0;
+        death_drop_timer[i] = 0;
         thing_type_override[i] = 0;
+        death_drop_type[i] = 0;
     }
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         enemy_palette_def[slot] = -1;
