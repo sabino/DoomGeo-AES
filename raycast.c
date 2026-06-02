@@ -39,6 +39,7 @@ static inline fix recip(fix b) {
 
 #define FBIG (1 << 28)            
 #define FMIN (FONE >> 6)          /* clamp tiny distances                   */
+#define PLAYER_RADIUS (FONE / 5)  /* Doom-ish collision body, in map cells   */
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -122,11 +123,22 @@ static void rotate(int sign) {
     rc_invalidate_view();
 }
 
+static u8 player_can_occupy(fix x, fix y) {
+    int cx = x >> FBITS;
+    int cy = y >> FBITS;
+    if (map_at(cx, cy)) return 0;
+    if (map_at((x - PLAYER_RADIUS) >> FBITS, cy)) return 0;
+    if (map_at((x + PLAYER_RADIUS) >> FBITS, cy)) return 0;
+    if (map_at(cx, (y - PLAYER_RADIUS) >> FBITS)) return 0;
+    if (map_at(cx, (y + PLAYER_RADIUS) >> FBITS)) return 0;
+    return 1;
+}
+
 static void try_move(fix dx, fix dy) {
     fix nx = posX + dx, ny = posY + dy;
     fix ox = posX, oy = posY;
-    if (!map_at(nx >> FBITS, posY >> FBITS)) posX = nx;
-    if (!map_at(posX >> FBITS, ny >> FBITS)) posY = ny;
+    if (player_can_occupy(nx, posY)) posX = nx;
+    if (player_can_occupy(posX, ny)) posY = ny;
     if (posX != ox || posY != oy) rc_invalidate_view();
 }
 

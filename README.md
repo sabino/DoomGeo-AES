@@ -62,6 +62,9 @@ pixel work is offloaded to the scaler hardware.
 
 Turning is tuned deliberately slower than the original raycaster demo so the
 projected Doom targets can be lined up with keyboard or arcade-stick input.
+Player movement keeps the original axis-separated slide feel, but collision now
+tests a small Doom-like body radius instead of only the player's center cell, so
+corners and closed doors behave less like thin grid lines.
 
 The wall and sprite projection heights use the raycaster's reciprocal lookup
 table instead of doing a 64-bit divide for each projected column.
