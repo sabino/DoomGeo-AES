@@ -530,6 +530,7 @@ static void update_monster_damage(void) {
         u8 ranged_damage;
         if (thing < 0) continue;
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
+        if (enemy_hit_flash[thing]) continue;
         if (enemies[slot].dist_q8 < 300) {
             player_take_damage(4);
             hurt_timer = 24;
@@ -574,6 +575,7 @@ static void update_monster_ai(void) {
         int dx, dy, adx, ady;
         short nx, ny;
         if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
+        if (enemy_hit_flash[i]) continue;
         dx = px - thing_x_q8[i];
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);

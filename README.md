@@ -86,10 +86,12 @@ over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
 closest to the crosshair instead of damaging every visible target at once.
 Surviving monsters flash briefly when hit, making shots readable without
-spending extra sprite slots. Former humans turn into clip pickups and shotgun
-guys turn into shotgun pickups when killed, reusing the existing projected
-pickup path instead of adding corpse sprites. A tiny fix-layer center marker
-gives the player a stable aim point without spending any sprite slots.
+spending extra sprite slots; the same short timer also pauses their chase and
+attack logic, creating a compact Doom-like pain reaction. Former humans turn
+into clip pickups and shotgun guys turn into shotgun pickups when killed,
+reusing the existing projected pickup path instead of adding corpse sprites. A
+tiny fix-layer center marker gives the player a stable aim point without
+spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. Chase movement also keeps a
