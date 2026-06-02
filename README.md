@@ -92,9 +92,10 @@ Surviving monsters flash briefly when hit, making shots readable without
 spending extra sprite slots; the same short timer also pauses their chase and
 attack logic, creating a compact Doom-like pain reaction. Former humans turn
 into clip pickups and shotgun guys turn into shotgun pickups when killed,
-reusing the existing projected pickup path instead of adding corpse sprites. A
-tiny fix-layer center marker gives the player a stable aim point without
-spending any sprite slots.
+reusing the existing projected pickup path instead of adding corpse sprites.
+Kills also add a small capped score counter on the fix-layer HUD, giving combat
+a persistent reward loop without spending sprite slots. A tiny fix-layer center
+marker gives the player a stable aim point without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. Monsters now keep a compact

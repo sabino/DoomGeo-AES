@@ -175,9 +175,11 @@ static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
+static u16 player_score = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
+static u16 shown_score = 0xFFFF;
 static u8 shown_keys = 0xFF;
 static u8 shown_weapon = 0xFF;
 
@@ -353,6 +355,22 @@ static u16 monster_drop_type(u16 thing_type) {
     }
 }
 
+static u16 monster_score_value(u16 thing_type) {
+    switch (thing_type) {
+    case 3004: /* former human */
+        return 100;
+    case 9:    /* shotgun guy */
+        return 150;
+    case 3001: /* imp */
+        return 200;
+    case 3002: /* demon */
+    case 58:   /* spectre */
+        return 400;
+    default:
+        return 100;
+    }
+}
+
 static u8 monster_hp(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (enemy_hp[thing_index] == 0) {
@@ -395,6 +413,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         short y = thing_y_q8[thing_index];
         u16 source_type = runtime_thing_type(thing_index);
         u16 drop_type = monster_drop_type(source_type);
+        u8 score_awarded = 0;
         u8 hp = monster_hp(thing_index);
         if (damage >= hp) hp = 0;
         else hp = (u8)(hp - damage);
@@ -412,6 +431,11 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                     }
                     enemy_hit_flash[i] = 0;
                     enemy_awake[i] = 0;
+                    if (!score_awarded && player_score <= 999) {
+                        u16 value = monster_score_value(source_type);
+                        player_score = (u16)(player_score + value > 999 ? 999 : player_score + value);
+                        score_awarded = 1;
+                    }
                     killed = 1;
                 } else {
                     enemy_hit_flash[i] = 30;
@@ -918,6 +942,10 @@ static void update_status_numbers(void) {
         draw_number3(33, 26, armor, PAL_MAP_PLAYER);
         shown_armor = armor;
     }
+    if (player_score != shown_score) {
+        draw_number3(24, 26, player_score, PAL_MAP_PLAYER);
+        shown_score = player_score;
+    }
     if (player_keys != shown_keys) {
         fix_poke(36, 26, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
         fix_poke(37, 26, (player_keys & 2) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 1));
@@ -934,6 +962,7 @@ static void force_fix_hud_redraw(void) {
     shown_health = 0xFFFF;
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
+    shown_score = 0xFFFF;
     shown_keys = 0xFF;
     shown_weapon = 0xFF;
     update_status_numbers();
@@ -1338,6 +1367,7 @@ static void restart_level(void) {
     player_armor = 0;
     player_ammo = 50;
     player_shells = 0;
+    player_score = 0;
     hurt_flash = 0;
     hurt_flash_on = 0;
 
