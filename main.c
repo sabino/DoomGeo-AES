@@ -216,7 +216,7 @@ static void update_monster_damage(void) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
         if (!thing_is_monster(g_runtime_things[thing].type)) continue;
-        if (enemies[slot].dist_q8 < 520 || enemies[slot].screen_h > 96) {
+        if (enemies[slot].dist_q8 < 300) {
             player_take_damage(4);
             hurt_timer = 24;
             return;
@@ -502,70 +502,80 @@ static u8 enemy_obscured_by_weapon(int sx, int h) {
     return h < 80 && sx > (SCRW / 2 - 40) && sx < (SCRW / 2 + 40);
 }
 
+static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
+    const NgRuntimeThing *thing = &g_runtime_things[thing_index];
+    int idx;
+    int def_idx = enemy_sprite_def_for_type(thing->type);
+    const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
+    const DoomSpriteScale *meta;
+
+    enemies[slot].thing_index = thing_index;
+    enemies[slot].sprite_def = def_idx;
+    enemies[slot].dist_q8 = dist_q8;
+    enemies[slot].screen_h = h;
+    load_enemy_palette(slot, def_idx);
+
+    if (h > 110) idx = 0;
+    else if (h > 76) idx = 1;
+    else if (h > 48) idx = 2;
+    else if (h > 30) idx = 3;
+    else idx = 4;
+    if (thing_is_pickup(thing->type) && idx > 1) idx = 1;
+    if (idx >= def->scale_count) idx = def->scale_count - 1;
+    meta = &g_enemy_scales[def->first_scale + idx];
+
+    {
+        int tile_key = def_idx * 8 + idx;
+        if (enemy_tile_key[slot] != tile_key) {
+            set_enemy_tiles(slot, meta);
+            enemy_tile_key[slot] = tile_key;
+        }
+    }
+    enemies[slot].screen_x = sx - meta->width / 2;
+    enemies[slot].screen_w = meta->width;
+    {
+        int bottom = (GAME_H + h) / 2;
+        if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
+        int top = bottom - meta->height;
+        if (top < 0) top = 0;
+        for (u16 j = 0; j < ENEMY_STRIPS; j++) {
+            u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
+            if (j < meta->strips) {
+                scb2(spr, 0x0F, 0xFF);
+                scb3(spr, top, 0, meta->rows);
+                scb4(spr, (u16)(enemies[slot].screen_x + j * 16));
+            } else {
+                scb2(spr, 0x0F, 0x00);
+                scb3(spr, SCRH + 32, 0, 1);
+                scb4(spr, 0);
+            }
+        }
+    }
+}
+
+static int select_visible_things(int found, u8 want_monsters) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT && found < ENEMY_VISIBLE_COUNT; i++) {
+        const NgRuntimeThing *thing = &g_runtime_things[i];
+        int sx, h, dist_q8;
+        u8 is_monster = thing_is_monster(thing->type);
+        if (enemy_dead[i]) continue;
+        if (want_monsters != is_monster) continue;
+        if (enemy_coord_selected(found, thing->x_q8, thing->y_q8)) continue;
+        if (!rc_project_point(thing->x_q8, thing->y_q8, &sx, &h, &dist_q8)) continue;
+        if (enemy_obscured_by_weapon(sx, h)) continue;
+
+        render_thing_slot((u16)found, i, sx, h, dist_q8);
+        found++;
+    }
+    return found;
+}
+
 static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        const NgRuntimeThing *thing = &g_runtime_things[i];
-        int sx, h, dist_q8;
-        if (enemy_dead[i]) continue;
-        if (enemy_coord_selected(found, thing->x_q8, thing->y_q8)) continue;
-        if (rc_project_point(thing->x_q8, thing->y_q8, &sx, &h, &dist_q8)) {
-            int idx;
-            int def_idx = enemy_sprite_def_for_type(thing->type);
-            const DoomEnemySpriteDef *def = &g_enemy_sprite_defs[def_idx];
-            const DoomSpriteScale *meta;
-            u16 slot = (u16)found;
-            if (enemy_obscured_by_weapon(sx, h)) continue;
-
-            enemies[slot].thing_index = i;
-            enemies[slot].sprite_def = def_idx;
-            enemies[slot].dist_q8 = dist_q8;
-            enemies[slot].screen_h = h;
-            load_enemy_palette(slot, def_idx);
-
-            if (h > 110) idx = 0;
-            else if (h > 76) idx = 1;
-            else if (h > 48) idx = 2;
-            else if (h > 30) idx = 3;
-            else idx = 4;
-            if (thing_is_pickup(thing->type) && idx > 1) idx = 1;
-            if (idx >= def->scale_count) idx = def->scale_count - 1;
-            meta = &g_enemy_scales[def->first_scale + idx];
-
-            {
-                int tile_key = def_idx * 8 + idx;
-                if (enemy_tile_key[slot] != tile_key) {
-                    set_enemy_tiles(slot, meta);
-                    enemy_tile_key[slot] = tile_key;
-                }
-            }
-            enemies[slot].screen_x = sx - meta->width / 2;
-            enemies[slot].screen_w = meta->width;
-            {
-                int bottom = (GAME_H + h) / 2;
-                if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
-                int top = bottom - meta->height;
-                if (top < 0) top = 0;
-                for (u16 j = 0; j < ENEMY_STRIPS; j++) {
-                    u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
-                    if (j < meta->strips) {
-                        scb2(spr, 0x0F, 0xFF);
-                        scb3(spr, top, 0, meta->rows);
-                        scb4(spr, (u16)(enemies[slot].screen_x + j * 16));
-                    } else {
-                        scb2(spr, 0x0F, 0x00);
-                        scb3(spr, SCRH + 32, 0, 1);
-                        scb4(spr, 0);
-                    }
-                }
-            }
-
-            found++;
-            if (found >= ENEMY_VISIBLE_COUNT) break;
-        }
-    }
+    found = select_visible_things(found, 1);
+    found = select_visible_things(found, 0);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
 
