@@ -119,6 +119,16 @@ AMMO_GLYPHS = (
 )
 
 
+def encode_fix_pixels(pixels):
+    data = bytearray()
+    for xa, xb in ((4, 5), (6, 7), (0, 1), (2, 3)):
+        for y in range(8):
+            pixel_a = pixels[y * 8 + xa] & 0x0F
+            pixel_b = (pixels[y * 8 + xb] & 0x0F) << 4
+            data.append(pixel_b | pixel_a)
+    return data
+
+
 def encode_fix_glyph(rows):
     pixels = [0] * 64
     for y, bits in enumerate(rows):
@@ -126,13 +136,52 @@ def encode_fix_glyph(rows):
             if bits & (0x80 >> x):
                 pixels[y * 8 + x] = 15
 
-    data = bytearray()
-    for xa, xb in ((4, 5), (6, 7), (0, 1), (2, 3)):
-        for y in range(8):
-            pixel_a = pixels[y * 8 + xa]
-            pixel_b = pixels[y * 8 + xb] << 4
-            data.append(pixel_b | pixel_a)
-    return data
+    return encode_fix_pixels(pixels)
+
+
+def encode_fix_patch_tile(patch, playpal, palette, tile_x, tile_y):
+    src_h = len(patch)
+    src_w = len(patch[0])
+    canvas = [[-1] * 16 for _ in range(16)]
+    x0 = max(0, (16 - src_w) // 2)
+    y0 = max(0, (16 - src_h) // 2)
+    for sy, row in enumerate(patch):
+        dy = y0 + sy
+        if dy >= 16:
+            break
+        for sx, color in enumerate(row):
+            dx = x0 + sx
+            if color >= 0 and 0 <= dx < 16:
+                canvas[dy][dx] = color
+
+    pixels = [0] * 64
+    for y in range(8):
+        for x in range(8):
+            pixels[y * 8 + x] = quantize_color(canvas[tile_y * 8 + y][tile_x * 8 + x], playpal, palette)
+    return encode_fix_pixels(pixels)
+
+
+def doom_status_digit_fix_tiles(iwad, zip_member, palette):
+    if not iwad:
+        tiles = []
+        for glyph in DIGIT_GLYPHS:
+            tiles.extend((bytes(32), bytes(32), encode_fix_glyph(glyph), bytes(32)))
+        return tiles
+
+    wad = Wad(read_wad(iwad, zip_member))
+    playpal = playpal_rgb(wad)
+    tiles = []
+    for digit in range(10):
+        lump_ids = wad.by_name.get(f"STTNUM{digit}")
+        if not lump_ids:
+            tiles.extend((bytes(32), bytes(32), encode_fix_glyph(DIGIT_GLYPHS[digit]), bytes(32)))
+            continue
+        patch = decode_patch(wad.lump_data(lump_ids[0]))
+        tiles.append(encode_fix_patch_tile(patch, playpal, palette, 0, 0))
+        tiles.append(encode_fix_patch_tile(patch, playpal, palette, 1, 0))
+        tiles.append(encode_fix_patch_tile(patch, playpal, palette, 0, 1))
+        tiles.append(encode_fix_patch_tile(patch, playpal, palette, 1, 1))
+    return tiles
 
 
 def tile_brick():
@@ -501,7 +550,13 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
                     dx = 143 + fx
                     if color >= 0 and 0 <= dx < len(patch[fy]):
                         patch[fy][dx] = color
-    palette = texture_palette(patch, playpal)
+    palette_src = list(patch)
+    if patch_name == "STBAR":
+        for digit in range(10):
+            digit_ids = wad.by_name.get(f"STTNUM{digit}")
+            if digit_ids:
+                palette_src.extend(decode_patch(wad.lump_data(digit_ids[0])))
+    palette = texture_palette(palette_src, playpal)
     src_h = len(patch)
     src_w = len(patch[0])
     dst_w = cols * 16
@@ -789,6 +844,8 @@ def main():
     s1 = bytearray()
     s1 += bytes(FIX_TILE)            # tile 0: blank
     s1 += bytes([0xFF]) * FIX_TILE   # tile 1: solid index 15
+    for tile in doom_status_digit_fix_tiles(args.iwad, args.zip_member, hud_palette):
+        s1 += tile
     for glyph in DIGIT_GLYPHS:
         s1 += encode_fix_glyph(glyph)
     s1 += encode_fix_glyph(CROSSHAIR_GLYPH)

@@ -182,7 +182,6 @@ static u16 player_score = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
-static u16 shown_score = 0xFFFF;
 static u8 shown_keys = 0xFF;
 
 enum {
@@ -1005,9 +1004,19 @@ static void map_cell(int mx, int my, u16 pal, u16 tile) {
 
 static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     if (value > 999) value = 999;
-    fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + value / 100));
-    fix_poke((u16)(col + 1), row, pal, (u16)(FIX_DIGIT_BASE + (value / 10) % 10));
-    fix_poke((u16)(col + 2), row, pal, (u16)(FIX_DIGIT_BASE + value % 10));
+    u8 digits[3] = {
+        (u8)(value / 100),
+        (u8)((value / 10) % 10),
+        (u8)(value % 10),
+    };
+    for (u16 i = 0; i < 3; i++) {
+        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
+        u16 x = (u16)(col + i * 2);
+        fix_poke(x, row, pal, tile);
+        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
+        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
+        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
+    }
 }
 
 static u16 weapon_ammo(void) {
@@ -1021,20 +1030,16 @@ static void update_status_numbers(void) {
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
     if (health != shown_health) {
-        draw_number3(11, 26, health, PAL_HUD);
+        draw_number3(11, 24, health, PAL_HUD);
         shown_health = health;
     }
     if (ammo != shown_ammo) {
-        draw_number3(5, 26, ammo, PAL_HUD);
+        draw_number3(5, 24, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
     if (armor != shown_armor) {
-        draw_number3(27, 26, armor, PAL_HUD);
+        draw_number3(27, 24, armor, PAL_HUD);
         shown_armor = armor;
-    }
-    if (player_score != shown_score) {
-        draw_number3(17, 26, player_score, PAL_HUD);
-        shown_score = player_score;
     }
     if (player_keys != shown_keys) {
         fix_poke(36, 26, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
@@ -1052,7 +1057,6 @@ static void force_fix_hud_redraw(void) {
     shown_health = 0xFFFF;
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
-    shown_score = 0xFFFF;
     shown_keys = 0xFF;
     update_status_numbers();
     draw_crosshair();

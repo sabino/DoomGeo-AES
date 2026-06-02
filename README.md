@@ -66,10 +66,10 @@ table instead of doing a 64-bit divide for each projected column.
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar using the `STBAR` palette instead of
-debug-green minimap colors. Clips, shells, and rockets are tracked
-separately, and the status bar shows compact weapon `1`/`2`/`3`/`4` digits before
-the active ammo pool. Bullet, shell, and rocket pools now use compact Doom-like caps, and
+armor counters over the Doom status bar using large Doom `STTNUM` digit art
+quantized into the `STBAR` palette instead of debug-green minimap colors.
+Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
+pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
 already full. Shotgun guys now drop a shotgun pickup, and collecting one equips
 Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
@@ -100,8 +100,9 @@ spending extra sprite slots; the same short timer also pauses their chase and
 attack logic, creating a compact Doom-like pain reaction. Former humans turn
 into clip pickups and shotgun guys turn into shotgun pickups when killed,
 reusing the existing projected pickup path instead of adding corpse sprites.
-Kills also add a small capped score counter on the fix-layer HUD, giving combat
-a persistent reward loop without spending sprite slots. Explosive barrel thing
+Kills still add a small capped internal score for combat bookkeeping, but the
+visible status bar keeps Doom's ammo, health, face, armor, and key fields
+instead of drawing a custom score over the face slot. Explosive barrel thing
 type `2035` is converted from the WAD, rendered with the `BAR1` sprite, and can
 be shot to apply compact radius damage to nearby monsters, barrels, and the
 player; detonated barrels briefly swap to a precomposed `BEXP` sprite before

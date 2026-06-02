@@ -69,15 +69,16 @@
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
 #define FIX_SOLID  1                /* all index 15 -> opaque, palette picks color */
-#define FIX_DIGIT_BASE 2            /* 2..11 = compact 8x8 HUD digits       */
-#define FIX_AIM    12               /* tiny center aim marker                */
-#define FIX_EXIT_BASE 13            /* 13..16 = EXIT message glyphs          */
-#define FIX_DEAD_D 17               /* 17,18 plus EXIT's E draw DEAD         */
-#define FIX_DEAD_A 18
-#define FIX_KEY_BASE 19             /* 19..21 = B/R/Y key HUD glyphs         */
-#define FIX_KEY_MSG_K 22            /* K for compact locked-door KEY message */
-#define FIX_AMMO_M 23               /* M,O for compact empty-ammo AMMO msg   */
-#define FIX_AMMO_O 24
+#define FIX_BIG_DIGIT_BASE 2        /* 2..41 = Doom STTNUM digits, 4 tiles each */
+#define FIX_DIGIT_BASE 42           /* 42..51 = compact 8x8 message digits   */
+#define FIX_AIM    52               /* tiny center aim marker                */
+#define FIX_EXIT_BASE 53            /* 53..56 = EXIT message glyphs          */
+#define FIX_DEAD_D 57               /* 57,58 plus EXIT's E draw DEAD         */
+#define FIX_DEAD_A 58
+#define FIX_KEY_BASE 59             /* 59..61 = B/R/Y key HUD glyphs         */
+#define FIX_KEY_MSG_K 62            /* K for compact locked-door KEY message */
+#define FIX_AMMO_M 63               /* M,O for compact empty-ammo AMMO msg   */
+#define FIX_AMMO_O 64
 
  
 #define MAP_FIX_COL 1             
