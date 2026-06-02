@@ -18,12 +18,13 @@ Every frame, for each of 64 screen columns:
    control block for that column's sprite.
 
 The video chip then scales each precomposed Doom wall-texture column to the
-computed height. Floor and ceiling now follow the original branch's steadier
-split-plane strategy: the converter still reads the player-start Doom flats,
-quantizes each into a 4x4 Neo Geo tile block, and scrolls the coarse backdrop
-tilemap from player position while keeping per-row distance shading. This keeps
-the 3D read anchored on the wall perspective, but the planes now carry real Doom
-flat texture and move with the player instead of sitting as fixed solid bands.
+computed height. Floor and ceiling use a cheap sprite-backed approximation of
+Doom floor casting: the converter still reads the player-start Doom flats,
+quantizes each into a 4x4 Neo Geo tile block, and each backdrop row samples that
+block from the raycaster's current position, direction, camera plane, and an
+approximate row distance. This keeps the planes tied to the wall perspective,
+so the real Doom flat texture now moves and turns with the camera instead of
+sitting as a fixed solid band.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own

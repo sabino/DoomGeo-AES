@@ -170,6 +170,13 @@ void rc_player_q8(int *x_q8, int *y_q8) {
     *y_q8 = posY >> (FBITS - 8);
 }
 
+void rc_view_q8(int *view_dir_x, int *view_dir_y, int *view_plane_x, int *view_plane_y) {
+    *view_dir_x = dirX >> (FBITS - 8);
+    *view_dir_y = dirY >> (FBITS - 8);
+    *view_plane_x = planeX >> (FBITS - 8);
+    *view_plane_y = planeY >> (FBITS - 8);
+}
+
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
     fix spriteX = ((fix)world_x_q8 << (FBITS - 8)) - posX;
     fix spriteY = ((fix)world_y_q8 << (FBITS - 8)) - posY;

@@ -171,7 +171,7 @@ static u8  map_prev = 0;
 static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
-static u8  bg_scroll_key = 0xFF;
+static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
@@ -1157,11 +1157,25 @@ static void disable_sprites(void) {
     }
 }
 
-/* ---- stable floor/ceiling backdrop: BG_COUNT full-width columns --------
+/* ---- floor/ceiling backdrop: BG_COUNT full-width columns ---------------
  * DOOM-FX has a dedicated floor plot-data renderer; on Neo Geo the cheap
- * sprite-backed equivalent is a stable, Doom-coloured split plane that lets
- * the textured wall columns carry perspective instead of fighting them.
+ * sprite-backed equivalent is row-distance tile sampling from the current
+ * raycaster basis, with the wall columns still carrying the precise depth.
  */
+static u16 plane_tile_for_sample(u16 base, int world_x_q8, int world_y_q8) {
+    u16 tile_x = (u16)((world_x_q8 >> 6) & 3);
+    u16 tile_y = (u16)((world_y_q8 >> 6) & 3);
+    return (u16)(base + tile_y * TILE_FLAT_COLS + tile_x);
+}
+
+static int plane_row_distance_q8(u16 t) {
+    int sample_y = (int)t * 16 + 8;
+    int p = sample_y - HORIZON;
+    if (p < 0) p = -p;
+    if (p < 8) p = 8;
+    return (GAME_H << 6) / p;
+}
+
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
@@ -1178,41 +1192,49 @@ static void init_background(void) {
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
         scb4(spr, i * 16);
     }
-    bg_scroll_key = 0xFF;
+    bg_scroll_key = 0xFFFFFFFFUL;
 }
 
 static void update_background_scroll(void) {
     int x_q8, y_q8;
-    u8 floor_x, floor_y, ceiling_x, ceiling_y, key;
+    int dir_x, dir_y, plane_x, plane_y;
+    u32 key;
     rc_player_q8(&x_q8, &y_q8);
-    floor_x = (u8)((x_q8 >> 6) & 3);
-    floor_y = (u8)((y_q8 >> 6) & 3);
-    ceiling_x = (u8)(((x_q8 + y_q8) >> 7) & 3);
-    ceiling_y = (u8)(((y_q8 - x_q8) >> 7) & 3);
-    key = (u8)(floor_x | (floor_y << 2) | (ceiling_x << 4) | (ceiling_y << 6));
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    key = (u32)((x_q8 >> 5) & 0x3F)
+        | ((u32)((y_q8 >> 5) & 0x3F) << 6)
+        | ((u32)(((dir_x + 256) >> 4) & 0x1F) << 12)
+        | ((u32)(((dir_y + 256) >> 4) & 0x1F) << 17)
+        | ((u32)(((plane_x + 256) >> 5) & 0x0F) << 22)
+        | ((u32)(((plane_y + 256) >> 5) & 0x0F) << 26);
     if (key == bg_scroll_key) return;
 
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
+        int camera_x = ((int)(((u32)(i * 16 + 8) * 512UL) / SCRW)) - 256;
+        int ray_x = dir_x + ((plane_x * camera_x) >> 8);
+        int ray_y = dir_y + ((plane_y * camera_x) >> 8);
         for (u16 t = 0; t < BG_WIN; t++) {
             u16 pal;
-            u16 tile_x;
-            u16 tile_y;
             u16 base;
+            u16 tile;
+            int dist = plane_row_distance_q8(t);
+            int world_x;
+            int world_y;
             if (t < BG_SPLIT) {
-                u16 row = (u16)(BG_SPLIT - 1 - t);
                 base = TILE_CEILING_FLAT_BASE;
-                tile_x = (u16)((i + ceiling_x) & 3);
-                tile_y = (u16)((row + ceiling_y) & 3);
+                world_x = x_q8 - ((ray_x * dist) >> 8);
+                world_y = y_q8 - ((ray_y * dist) >> 8);
                 pal = (u16)(PAL_CEILING_GRAD_BASE + t);
             } else {
                 u16 row = (u16)(t - BG_SPLIT);
                 base = TILE_FLOOR_FLAT_BASE;
-                tile_x = (u16)((i + floor_x) & 3);
-                tile_y = (u16)((row + floor_y) & 3);
+                world_x = x_q8 + ((ray_x * dist) >> 8);
+                world_y = y_q8 + ((ray_y * dist) >> 8);
                 pal = (u16)(PAL_FLOOR_GRAD_BASE + row);
             }
-            scb1_tile(spr, t, (u16)(base + tile_y * TILE_FLAT_COLS + tile_x), pal);
+            tile = plane_tile_for_sample(base, world_x, world_y);
+            scb1_tile(spr, t, tile, pal);
         }
     }
     bg_scroll_key = key;
@@ -1552,7 +1574,7 @@ static void restart_level(void) {
     restart_prev = 0;
     hurt_timer = 0;
     level_complete = 0;
-    bg_scroll_key = 0xFF;
+    bg_scroll_key = 0xFFFFFFFFUL;
     key_message_timer = 0;
     ammo_message_timer = 0;
     door_message_timer = 0;
