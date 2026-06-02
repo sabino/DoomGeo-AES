@@ -190,6 +190,7 @@ static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
+static u8  secret_message_timer = 0;
 static u8  pickup_message_timer = 0;
 static u8  pickup_message_type = 0;
 static u8  key_message_visible = 0;
@@ -221,6 +222,7 @@ static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
 static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
+static u8 secret_found_bits[MAP_SECRET_BYTES ? MAP_SECRET_BYTES : 1];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
@@ -1284,6 +1286,14 @@ static void draw_door_message(void) {
     fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 1));
 }
 
+static void draw_secret_message(void) {
+    const u16 col = (SCRW / 16) - 1;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_SECRET_S);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_SECRET_C);
+}
+
 static void draw_med_message(void) {
     const u16 col = (SCRW / 16) - 1;
     const u16 row = (GAME_H / 16) - 2;
@@ -1355,6 +1365,11 @@ static void update_center_message(void) {
         draw_door_message();
         door_message_timer--;
         key_message_visible = 1;
+    } else if (secret_message_timer) {
+        clear_center_message();
+        draw_secret_message();
+        secret_message_timer--;
+        key_message_visible = 1;
     } else if (pickup_message_timer) {
         clear_center_message();
         draw_pickup_message();
@@ -1364,6 +1379,27 @@ static void update_center_message(void) {
         clear_center_message();
         key_message_visible = 0;
     }
+}
+
+static u8 map_bit_get(const u8 *bits, u16 index) {
+    return (bits[index >> 3] & (1 << (index & 7))) ? 1 : 0;
+}
+
+static void map_bit_set(u8 *bits, u16 index) {
+    bits[index >> 3] |= (u8)(1 << (index & 7));
+}
+
+static void check_secret_reached(void) {
+    int px, py;
+    u16 cell;
+    rc_player_q8(&px, &py);
+    px >>= 8;
+    py >>= 8;
+    if (!map_cell_secret(px, py)) return;
+    cell = (u16)(py * MAP_W + px);
+    if (map_bit_get(secret_found_bits, cell)) return;
+    map_bit_set(secret_found_bits, cell);
+    secret_message_timer = 70;
 }
 
 static void update_floor_damage(void) {
@@ -2078,6 +2114,7 @@ static void restart_level(void) {
     key_message_timer = 0;
     ammo_message_timer = 0;
     door_message_timer = 0;
+    secret_message_timer = 0;
     pickup_message_timer = 0;
     pickup_message_type = 0;
     key_message_visible = 0;
@@ -2113,6 +2150,7 @@ static void restart_level(void) {
     face_pain_timer = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
+    for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         enemy_dead[i] = 0;
         enemy_hp[i] = 0;
@@ -2164,6 +2202,7 @@ int main(void) {
             u8 d_now = pressed & D;
             rc_input(pressed);
             update_floor_damage();
+            check_secret_reached();
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();

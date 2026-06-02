@@ -532,6 +532,10 @@ def sector_damage_amount(special: int) -> int:
     return 0
 
 
+def sector_is_secret(special: int) -> bool:
+    return special == 9
+
+
 def sector_segments(
     sector_index: int,
     linedefs: list[LineDef],
@@ -597,6 +601,47 @@ def sector_damage_grid(
                     damage_grid[gy][gx] = amount
                     break
     return damage_grid
+
+
+def sector_secret_grid(
+    grid: list[list[int]],
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    vertices: list[Vertex],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> list[list[int]]:
+    secret_grid = [[0 for _ in row] for row in grid]
+    secrets = [
+        (i, sector_segments(i, linedefs, sidedefs, vertices))
+        for i, sector in enumerate(sectors)
+        if sector_is_secret(sector.special)
+    ]
+    if not secrets:
+        return secret_grid
+
+    for sector_index, segments in secrets:
+        marked = False
+        for gy, row in enumerate(grid):
+            for gx, cell in enumerate(row):
+                if cell:
+                    continue
+                doom_x = min_x + ((gx + 0.5) - margin) * scale
+                doom_y = max_y - ((gy + 0.5) - margin) * scale
+                if segments and point_in_sector(doom_x, doom_y, segments):
+                    secret_grid[gy][gx] = 1
+                    marked = True
+        if not marked and segments:
+            xs = [point.x for segment in segments for point in segment]
+            ys = [point.y for segment in segments for point in segment]
+            gx, gy = grid_coord(sum(xs) // len(xs), sum(ys) // len(ys), min_x, max_y, scale, margin)
+            cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
+            if abs((cell_x + 0.5) - gx) <= 2.5 and abs((cell_y + 0.5) - gy) <= 2.5:
+                secret_grid[cell_y][cell_x] = 1
+    return secret_grid
 
 
 def runtime_things(
@@ -696,6 +741,7 @@ def emit_header(
     texture_grid: list[list[int]],
     texture_phase_grid: list[list[int]],
     damage_grid: list[list[int]],
+    secret_grid: list[list[int]],
     start_x: float,
     start_y: float,
     angle: int,
@@ -742,6 +788,7 @@ def emit_header(
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
+        f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; } NgRuntimeExit;\n\n")
         f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
@@ -767,6 +814,12 @@ def emit_header(
         f.write("};\n\n")
         f.write("static const unsigned char g_map_damage[MAP_H][MAP_W] = {\n")
         for row in damage_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned char g_map_secret[MAP_H][MAP_W] = {\n")
+        for row in secret_grid:
             f.write("    {")
             f.write(",".join(str(cell) for cell in row))
             f.write("},\n")
@@ -806,6 +859,10 @@ def emit_header(
         f.write("static inline unsigned char map_cell_damage(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
         f.write("    return g_map_damage[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_secret(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+        f.write("    return g_map_secret[y][x];\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
@@ -1032,6 +1089,7 @@ def convert(args: argparse.Namespace) -> None:
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
+    secret_grid = sector_secret_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
     emit_header(
         args.out,
@@ -1039,6 +1097,7 @@ def convert(args: argparse.Namespace) -> None:
         texture_grid,
         texture_phase_grid,
         damage_grid,
+        secret_grid,
         sx,
         sy,
         player.angle,

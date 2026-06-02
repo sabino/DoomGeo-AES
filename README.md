@@ -208,6 +208,9 @@ directory/lump metadata in the cartridge.
 Converted damaging sector specials now emit a tiny floor-damage grid, so E1M1
 nukage cells periodically hurt the player through the same armor, hurt flash,
 and status-face path as monster damage.
+Secret sectors also emit a compact bit grid. Entering a secret cell for the
+first time flashes a fix-layer `SEC` message, giving the map a basic Doom-style
+exploration reward without storing generic WAD metadata at runtime.
 
 ## Building
 
