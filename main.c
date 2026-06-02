@@ -576,10 +576,19 @@ static u8 monster_hp(int thing_index) {
 }
 
 static int enemy_sprite_def_for_type(u16 thing_type) {
+    int first = -1;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
-        if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        if (first < 0) {
+            first = i;
+            continue;
+        }
+        /* Duplicate baked monster defs are the next animation frame. Pickups,
+           corpses, projectiles, and effects keep their first exact frame. */
+        if (thing_is_monster(thing_type) && ((monster_ai_tick >> 3) & 1)) return i;
+        return first;
     }
-    return 0;
+    return first >= 0 ? first : 0;
 }
 
 static void load_enemy_palette(u16 slot, int def) {
@@ -1670,8 +1679,9 @@ static u8 face_frame_for_health(void) {
 }
 
 static void set_hud_face_frame(u8 frame) {
+    if (frame >= TILE_HUD_FACE_FRAMES) frame = 0;
     if (frame == hud_face_frame) return;
-    u16 frame_base = (u16)(TILE_HUD_FACE_BASE + (frame % TILE_HUD_FACE_FRAMES) * TILE_HUD_FACE_FRAME_TILES);
+    u16 frame_base = (u16)(TILE_HUD_FACE_BASE + frame * TILE_HUD_FACE_FRAME_TILES);
     for (u16 col = 0; col < TILE_HUD_FACE_COLS; col++) {
         u16 spr = HUD_BASE + TILE_HUD_FACE_COL + col;
         for (u16 row = 0; row < TILE_HUD_FACE_ROWS; row++) {
@@ -1703,7 +1713,8 @@ static void init_hud(void) {
 }
 
 static void set_weapon_frame(u8 frame) {
-    u16 frame_base = (u16)(TILE_WEAPON_BASE + (frame % TILE_WEAPON_FRAMES) * TILE_WEAPON_FRAME_TILES);
+    if (frame >= TILE_WEAPON_FRAMES) frame = 0;
+    u16 frame_base = (u16)(TILE_WEAPON_BASE + frame * TILE_WEAPON_FRAME_TILES);
     for (u16 i = 0; i < WEAPON_COUNT; i++) {
         u16 spr = WEAPON_BASE + i;
         vram_addr(VRAM_SCB1 + spr * 64);

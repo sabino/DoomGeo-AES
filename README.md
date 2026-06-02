@@ -50,10 +50,12 @@ then visible monsters/barrels are selected before useful pickups, and corpses
 only use slots left after collectible gameplay-critical objects; full or
 otherwise unusable pickups are fallback candidates after corpses;
 candidates are ranked by distance and screen relevance each frame, and tiny
-candidates hidden under the pistol overlay are skipped. The converter only emits monster thing
-types that currently have pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
-`SARG`, `BOSS`) and live palettes, so unsupported later-Doom IDs do not silently
-fall back to the wrong enemy art. The pistol clears
+candidates hidden under the pistol overlay are skipped. The converter only emits
+monster thing types that currently have pre-scaled sprite frames (`POSS`,
+`SPOS`, `TROO`, `SARG`, `BOSS`) and live palettes, and the live monster entries
+now bake Doom `A/B` frames so the 68000 can alternate poses without composing
+sprites or adding visible sprite slots. Unsupported later-Doom IDs do not
+silently fall back to the wrong enemy art. The pistol clears
 the currently rendered target set as the initial combat proof of concept. The
 optional minimap is drawn on the fix (text) layer, which always composites over
 sprites.
@@ -95,7 +97,9 @@ quantized into the `STBAR` palette instead of debug-green minimap colors.
 The center face is now generated as Doom health-band `STFST`, matching
 `STFOUCH`, and death face windows in C-ROM. It swaps by health band and briefly
 shows the matching pain face when damage lands, while weapon frames start after
-that dedicated face block so the gun cannot accidentally read HUD face tiles.
+that dedicated face block and both runtime frame setters clamp to their own
+generated banks, so the gun cannot accidentally read HUD face tiles or vice
+versa.
 The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
 Geo strip window aligned to the playfield bottom, preserving the lower hand
 pixels before the status bar masks the final edge.
