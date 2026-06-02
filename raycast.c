@@ -43,6 +43,7 @@ static inline fix recip(fix b) {
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
 static fix planeX, planeY;       /* camera plane (sets FOV; |plane|~0.66)   */
+static fix invDet;               /* inverse camera matrix determinant       */
 static fix cameraXbuf[NUM_COLS]; /* constant camera x in [-1,+1] per column */
 
 static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
@@ -62,6 +63,12 @@ static inline int projected_height(fix dist) {
     return (int)(((s32)WALLH * recip(dist)) >> FBITS);
 }
 
+static void update_projection_cache(void) {
+    fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
+    if (det > -FMIN && det < FMIN) invDet = 0;
+    else invDet = fdiv(FONE, det);
+}
+
 void rc_init(void) {
     init_recip_lut();
     for (int c = 0; c < NUM_COLS; c++) {
@@ -73,6 +80,7 @@ void rc_init(void) {
     dirY = FIX(DOOM_DIR_Y);
     planeX = FIX(DOOM_PLANE_X);
     planeY = FIX(DOOM_PLANE_Y);
+    update_projection_cache();
     for (int c = 0; c < NUM_COLS; c++) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
@@ -88,6 +96,7 @@ static void rotate(int sign) {
     fix opx = planeX;
     planeX = fmul(planeX, cs) - fmul(planeY, sn);
     planeY = fmul(opx,    sn) + fmul(planeY, cs);
+    update_projection_cache();
 }
 
 static void try_move(fix dx, fix dy) {
@@ -130,10 +139,8 @@ u8 rc_bg_phase(void) {
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
     fix spriteX = ((fix)world_x_q8 << (FBITS - 8)) - posX;
     fix spriteY = ((fix)world_y_q8 << (FBITS - 8)) - posY;
-    fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
-    if (det > -FMIN && det < FMIN) return 0;
+    if (!invDet) return 0;
 
-    fix invDet = fdiv(FONE, det);
     fix transformX = fmul(invDet, fmul(dirY, spriteX) - fmul(dirX, spriteY));
     fix transformY = fmul(invDet, -fmul(planeY, spriteX) + fmul(planeX, spriteY));
     if (transformY < (FONE >> 3)) return 0;
