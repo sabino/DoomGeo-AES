@@ -284,6 +284,11 @@ def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> No
         grid[y][x] = 1
 
 
+def raster_line_value(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int, value: int) -> None:
+    for x, y in line_cells(grid, x0, y0, x1, y1):
+        grid[y][x] = value
+
+
 def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
     width = len(grid[0])
     height = len(grid)
@@ -307,6 +312,20 @@ def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> lis
             err += dx
             y += sy
     return cells
+
+
+def solid_line_texture(line: LineDef, sidedefs: list[SideDef]) -> str:
+    side = sidedefs[line.side_front] if line.side_front != 0xFFFF else None
+    if side is None:
+        return ""
+    for name in (side.mid_texture, side.top_texture, side.bottom_texture):
+        if name and name != "-":
+            return name
+    return ""
+
+
+def wall_texture_class(name: str) -> int:
+    return 1 if name == "BROWNGRN" else 0
 
 
 def nearest_open(grid: list[list[int]], sx: int, sy: int) -> tuple[int, int]:
@@ -550,6 +569,7 @@ def runtime_doors(
 def emit_header(
     out_path: str,
     grid: list[list[int]],
+    texture_grid: list[list[int]],
     start_x: float,
     start_y: float,
     angle: int,
@@ -607,6 +627,12 @@ def emit_header(
             f.write(",".join(str(door_cell_id.get((x, y), cell)) for x, cell in enumerate(row)))
             f.write("},\n")
         f.write("};\n\n")
+        f.write("static const unsigned char g_map_tex[MAP_H][MAP_W] = {\n")
+        for row in texture_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
         f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
         for x_q8, y_q8, typ, flags in things:
             f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
@@ -630,6 +656,10 @@ def emit_header(
         f.write("static inline unsigned char map_cell_value(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
         f.write("    return g_map[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_texture(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+        f.write("    return g_map_tex[y][x];\n")
         f.write("}\n\n#endif /* DOOM_MAP_GENERATED_H */\n")
 
 
@@ -809,6 +839,7 @@ def convert(args: argparse.Namespace) -> None:
     scale = max((max_x - min_x) / max(1, usable_w), (max_y - min_y) / max(1, usable_h), 1.0)
 
     grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
+    texture_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     for x in range(args.width):
         grid[0][x] = 1
         grid[-1][x] = 1
@@ -831,6 +862,7 @@ def convert(args: argparse.Namespace) -> None:
         x0, y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
         x1, y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
         raster_line(grid, x0, y0, x1, y1)
+        raster_line_value(texture_grid, x0, y0, x1, y1, wall_texture_class(solid_line_texture(line, sidedefs)))
 
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
@@ -845,6 +877,7 @@ def convert(args: argparse.Namespace) -> None:
     emit_header(
         args.out,
         grid,
+        texture_grid,
         sx,
         sy,
         player.angle,

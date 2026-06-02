@@ -73,7 +73,14 @@ static void init_palettes(void) {
             int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
             for (int s = 0; s < 2; s++) {
                 int sf = s ? 140 : 256;
+                u16 alt_pal = PAL_WALL_ALT_DEPTH_BASE + s * DEPTH_BANDS + b;
                 u16 pal = PAL_DOOR_DEPTH_BASE + s * DEPTH_BANDS + b;
+                for (int i = 0; i < WALL_ALT_PALETTE_COLORS; i++) {
+                    int r = g_wall_alt_palette_rgb[i][0] * fn / 256 * sf / 256;
+                    int g = g_wall_alt_palette_rgb[i][1] * fn / 256 * sf / 256;
+                    int bl = g_wall_alt_palette_rgb[i][2] * fn / 256 * sf / 256;
+                    pal_set(alt_pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
+                }
                 for (int i = 0; i < DOOR_PALETTE_COLORS; i++) {
                     int r = g_door_palette_rgb[i][0] * fn / 256 * sf / 256;
                     int g = g_door_palette_rgb[i][1] * fn / 256 * sf / 256;
@@ -131,7 +138,14 @@ static void restore_play_palettes(void) {
         int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
         for (int s = 0; s < 2; s++) {
             int sf = s ? 140 : 256;
+            u16 alt_pal = PAL_WALL_ALT_DEPTH_BASE + s * DEPTH_BANDS + b;
             u16 pal = PAL_DOOR_DEPTH_BASE + s * DEPTH_BANDS + b;
+            for (int i = 0; i < WALL_ALT_PALETTE_COLORS; i++) {
+                int r = g_wall_alt_palette_rgb[i][0] * fn / 256 * sf / 256;
+                int g = g_wall_alt_palette_rgb[i][1] * fn / 256 * sf / 256;
+                int bl = g_wall_alt_palette_rgb[i][2] * fn / 256 * sf / 256;
+                pal_set(alt_pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
+            }
             for (int i = 0; i < DOOR_PALETTE_COLORS; i++) {
                 int r = g_door_palette_rgb[i][0] * fn / 256 * sf / 256;
                 int g = g_door_palette_rgb[i][1] * fn / 256 * sf / 256;
@@ -158,6 +172,7 @@ static void set_hurt_palettes(void) {
     for (int p = 0; p < DEPTH_BANDS * 2; p++) {
         for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
         for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DOOR_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
+        for (int i = 1; i < 16; i++) pal_set((u16)(PAL_WALL_ALT_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
     }
 }
 

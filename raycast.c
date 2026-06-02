@@ -55,10 +55,11 @@ static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
-static u8  kindbuf[NUM_COLS];    /* 0 = wall atlas, 1 = door atlas          */
+static u8  kindbuf[NUM_COLS];    /* 0 = wall, 1 = alt wall, 2 = door        */
 static u8  curkind[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
+static u16 wall_alt_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
@@ -83,6 +84,7 @@ void rc_init(void) {
         for (int row = 0; row < WALL_WIN; row++) {
             int ty = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
             wall_tiles[tx][row] = (u16)(TILE_WALL_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
+            wall_alt_tiles[tx][row] = (u16)(TILE_WALL_ALT_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
             door_tiles[tx][row] = (u16)(TILE_DOOR_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
         }
     }
@@ -223,7 +225,7 @@ void rc_render(void) {
                 break;
             }
         }
-        kindbuf[x] = (hit_cell >= 2) ? 1 : 0;
+        kindbuf[x] = (hit_cell >= 2) ? 2 : map_cell_texture(mapX, mapY);
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
         if (perp < FMIN) perp = FMIN;
@@ -255,7 +257,7 @@ void rc_render(void) {
         int band = ((MAX_H - h) * DEPTH_BANDS) / MAX_H;
         if (band < 0) band = 0;
         if (band >= DEPTH_BANDS) band = DEPTH_BANDS - 1;
-        palbuf[x] = (u8)((kindbuf[x] ? PAL_DOOR_DEPTH_BASE : PAL_DEPTH_BASE) + (side ? DEPTH_BANDS : 0) + band);
+        palbuf[x] = (u8)(((kindbuf[x] == 2) ? PAL_DOOR_DEPTH_BASE : (kindbuf[x] == 1 ? PAL_WALL_ALT_DEPTH_BASE : PAL_DEPTH_BASE)) + (side ? DEPTH_BANDS : 0) + band);
     }
     view_dirty = 0;
     wall_upload_dirty = 1;
@@ -305,7 +307,7 @@ void rc_blit(void) {
     for (int c = 0; c < NUM_COLS; c++) {
         if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c]) {
             u16 spr = WALL_BASE + c;
-            u16 *tiles = kindbuf[c] ? door_tiles[texbuf[c]] : wall_tiles[texbuf[c]];
+            u16 *tiles = (kindbuf[c] == 2) ? door_tiles[texbuf[c]] : (kindbuf[c] == 1 ? wall_alt_tiles[texbuf[c]] : wall_tiles[texbuf[c]]);
             if (palbuf[c] != curpal[c]) {
                 u16 attr = (u16)(palbuf[c] << 8);
                 vram_addr(VRAM_SCB1 + spr * 64);

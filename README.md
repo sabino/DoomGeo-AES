@@ -24,10 +24,11 @@ quantizes each into a 4x4 Neo Geo tile block, and scrolls the coarse backdrop
 tilemap from player position while keeping per-row distance shading. This keeps
 the 3D read anchored on the wall perspective, but the planes now carry real Doom
 flat texture and move with the player instead of sitting as fixed solid bands.
-The wall path now packs a second Doom texture
-atlas for converted closed-door cells, so normal walls keep the `STARTAN3`
-columns while closed doors use `BIGDOOR2` with their own distance-shaded
-palette range. Doom pistol frames and the `STFST00` status face are baked with
+The wall path now carries a compact per-cell texture-class grid alongside the
+solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
+`BROWNGRN` E1M1 linedefs can select their own precomposed atlas, and converted
+closed-door cells use `BIGDOOR2`; each atlas has its own distance-shaded palette
+range. Doom pistol frames and the `STFST00` status face are baked with
 Doom patch offsets so the weapon sits at the same screen anchor as the original
 psprite path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The pistol animates when B is pressed; walking and strafing nudge the strips
