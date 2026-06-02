@@ -124,6 +124,9 @@ Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
 closest to the crosshair instead of damaging every visible target at once.
+Pistol, shotgun, and rocket target selection now rejects projected candidates
+outside the actual playfield, so weapons cannot silently choose an off-screen
+monster just because the map line-of-sight trace still reaches it.
 Surviving monsters flash briefly when hit, making shots readable without
 spending extra sprite slots; the same short timer also pauses their chase and
 attack logic, creating a compact Doom-like pain reaction. Former humans turn

@@ -643,6 +643,15 @@ static void damage_visible_enemy(int thing_index, u8 damage) {
     else flash_visible_enemy(thing_index);
 }
 
+static u8 weapon_target_project(int thing, int *sx, int *h, int *dist_q8) {
+    int col;
+    if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], sx, h, dist_q8)) return 0;
+    if (*sx < 0 || *sx >= SCRW) return 0;
+    col = *sx / COLW;
+    if (col < 0 || col >= NUM_COLS) return 0;
+    return 1;
+}
+
 static int best_visible_enemy(void) {
     int best_thing = -1;
     int best_score = 9999;
@@ -652,7 +661,8 @@ static int best_visible_enemy(void) {
         if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
-        if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
+        if (!weapon_target_project(thing, &sx, &h, &dist_q8)) continue;
+        if (iabs16(sx - SCRW / 2) > 70 && h < 112) continue;
         score = iabs16(sx - SCRW / 2) + (dist_q8 >> 7);
         if (score < best_score) {
             best_score = score;
@@ -695,7 +705,7 @@ static void damage_shotgun_spread(void) {
         if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
-        if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
+        if (!weapon_target_project(thing, &sx, &h, &dist_q8)) continue;
 
         lateral = iabs16(sx - SCRW / 2);
         if (lateral > 54 && h < 100) continue;
