@@ -12,6 +12,7 @@ bitplanes 0,1 go to the odd ROM (C1) and 2,3 to the even ROM (C2); the
 leftmost pixel is the MSB; the color index MSB is bitplane 3.
 """
 import argparse
+import math
 import os
 import struct
 from collections import Counter
@@ -42,9 +43,23 @@ WALL_ATLAS_ROWS = 15
 WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
 WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
 DOOR_ATLAS_BASE = WALL_ALT_ATLAS_BASE + len(WALL_ALT_TEXTURES) * WALL_ATLAS_TILES
+BG_COLS = 20
+BG_HALF_ROWS = 6
+BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
 FLAT_COLS = 16
 FLAT_ROWS = 16
 FLAT_TILES = FLAT_COLS * FLAT_ROWS
+PLANE_PERSPECTIVE_DIRS = 16
+PLANE_PERSPECTIVE_PHASES = 2
+PLANE_PERSPECTIVE_ROWS = BG_HALF_ROWS
+PLANE_PERSPECTIVE_COLS = BG_COLS
+PLANE_PERSPECTIVE_TILES = (
+    PLANE_PERSPECTIVE_DIRS
+    * PLANE_PERSPECTIVE_PHASES
+    * PLANE_PERSPECTIVE_PHASES
+    * PLANE_PERSPECTIVE_ROWS
+    * PLANE_PERSPECTIVE_COLS
+)
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
 HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
@@ -61,15 +76,14 @@ HUD_FACE_FRAMES = (
     "STFOUCH0", "STFOUCH1", "STFOUCH2", "STFOUCH3", "STFOUCH4",
     "STFDEAD0",
 )
-BG_COLS = 20
-BG_HALF_ROWS = 6
-BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
 WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 8
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
 WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
-SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
+CEILING_PERSPECTIVE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
+FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
+SPRITE_CACHE_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 # Must match main.c/config.h's weapon sprite-chain top. If this differs, the
 # correct Doom psprite is baked into the wrong part of the visible tile window.
 WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
@@ -505,6 +519,56 @@ def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
     return source, palette, tiles
 
 
+def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False):
+    if not iwad:
+        return [tile_solid() for _ in range(PLANE_PERSPECTIVE_TILES)]
+
+    wad = Wad(read_wad(iwad, zip_member))
+    flat = decode_flat(wad, flat_name)
+    playpal = playpal_rgb(wad)
+    tiles = []
+    fov_plane = 0.66
+    horizon = 96
+    game_h = 192
+
+    for direction in range(PLANE_PERSPECTIVE_DIRS):
+        angle = (direction / PLANE_PERSPECTIVE_DIRS) * math.tau
+        dir_x = math.cos(angle)
+        dir_y = math.sin(angle)
+        plane_x = -dir_y * fov_plane
+        plane_y = dir_x * fov_plane
+        for phase_y in range(PLANE_PERSPECTIVE_PHASES):
+            origin_y = (phase_y * 256) // PLANE_PERSPECTIVE_PHASES
+            for phase_x in range(PLANE_PERSPECTIVE_PHASES):
+                origin_x = (phase_x * 256) // PLANE_PERSPECTIVE_PHASES
+                for row in range(PLANE_PERSPECTIVE_ROWS):
+                    screen_tile_y = row if ceiling else BG_HALF_ROWS + row
+                    for col in range(PLANE_PERSPECTIVE_COLS):
+                        tile = [[0] * 16 for _ in range(16)]
+                        for y in range(16):
+                            screen_y = screen_tile_y * 16 + y
+                            p = abs(screen_y - horizon)
+                            if p < 8:
+                                p = 8
+                            dist_q8 = (game_h << 7) / (p + 8)
+                            for x in range(16):
+                                screen_x = col * 16 + x
+                                camera_x = (2.0 * screen_x / 320.0) - 1.0
+                                ray_x = dir_x + plane_x * camera_x
+                                ray_y = dir_y + plane_y * camera_x
+                                if ceiling:
+                                    world_x = origin_x - ray_x * dist_q8
+                                    world_y = origin_y - ray_y * dist_q8
+                                else:
+                                    world_x = origin_x + ray_x * dist_q8
+                                    world_y = origin_y + ray_y * dist_q8
+                                sx = int(world_x / 4) & 63
+                                sy = int(world_y / 4) & 63
+                                tile[y][x] = quantize_color(flat[sy][sx], playpal, palette)
+                        tiles.append(tile)
+    return tiles
+
+
 def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     if not iwad:
         palette = [(20, 20, 20), (45, 45, 45), (70, 70, 70)] * 5
@@ -879,6 +943,8 @@ def main():
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
     ceiling_source, ceiling_palette, ceiling_tiles = flat_texture_tiles(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
     floor_source, floor_palette, floor_tiles = flat_texture_tiles(args.iwad, args.zip_member, floor_flat)
+    ceiling_perspective_tiles = perspective_plane_tiles(args.iwad, args.zip_member, ceiling_flat, ceiling_palette, ceiling=True)
+    floor_perspective_tiles = perspective_plane_tiles(args.iwad, args.zip_member, floor_flat, floor_palette)
     weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
     weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
@@ -908,7 +974,17 @@ def main():
     tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:]
     for wall_alt_tiles in wall_alt_tilesets:
         tiles += wall_alt_tiles[1:]
-    tiles += door_tiles[1:] + ceiling_tiles + floor_tiles + hud_tiles + face_tiles + weapon_cache + sprite_tiles
+    tiles += (
+        door_tiles[1:]
+        + ceiling_tiles
+        + floor_tiles
+        + hud_tiles
+        + face_tiles
+        + weapon_cache
+        + ceiling_perspective_tiles
+        + floor_perspective_tiles
+        + sprite_tiles
+    )
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
     c1, c2 = bytearray(), bytearray()
     for t in tiles:
@@ -967,6 +1043,8 @@ def main():
     print(f"  door texture: {door_source} atlas={DOOR_ATLAS_BASE}..{DOOR_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  ceiling flat: {ceiling_source} tile={CEILING_FLAT_BASE}..{CEILING_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
     print(f"  floor flat: {floor_source} tile={FLOOR_FLAT_BASE}..{FLOOR_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
+    print(f"  ceiling perspective: tile={CEILING_PERSPECTIVE_BASE}..{CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {PLANE_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
+    print(f"  floor perspective: tile={FLOOR_PERSPECTIVE_BASE}..{FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {PLANE_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")

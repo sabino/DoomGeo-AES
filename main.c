@@ -1637,22 +1637,36 @@ static void disable_sprites(void) {
 }
 
 /* ---- floor/ceiling backdrop: BG_COUNT full-width columns ---------------
- * DOOM-FX has a dedicated floor plot-data renderer; on Neo Geo the cheap
- * sprite-backed equivalent is row-distance tile sampling from the current
- * raycaster basis, with the wall columns still carrying the precise depth.
+ * The generator bakes Doom flats into coarse perspective tile caches. Runtime
+ * only selects the current direction/phase bucket so the expensive per-pixel
+ * floor sampling stays offline.
  */
-static u16 plane_tile_for_sample(u16 base, int world_x_q8, int world_y_q8) {
-    u16 tile_x = (u16)((world_x_q8 >> 4) & (TILE_FLAT_COLS - 1));
-    u16 tile_y = (u16)((world_y_q8 >> 4) & (TILE_FLAT_ROWS - 1));
-    return (u16)(base + tile_y * TILE_FLAT_COLS + tile_x);
+static u8 plane_direction_bucket(int dir_x, int dir_y) {
+    static const short dirs[TILE_PLANE_PERSPECTIVE_DIRS][2] = {
+        { 256,    0}, { 237,   98}, { 181,  181}, {  98,  237},
+        {   0,  256}, { -98,  237}, {-181,  181}, {-237,   98},
+        {-256,    0}, {-237,  -98}, {-181, -181}, { -98, -237},
+        {   0, -256}, {  98, -237}, { 181, -181}, { 237,  -98},
+    };
+    long best_dot = -2147483647L;
+    u8 best = 0;
+    for (u8 i = 0; i < TILE_PLANE_PERSPECTIVE_DIRS; i++) {
+        long dot = (long)dir_x * dirs[i][0] + (long)dir_y * dirs[i][1];
+        if (dot > best_dot) {
+            best_dot = dot;
+            best = i;
+        }
+    }
+    return best;
 }
 
-static int plane_row_distance_q8(u16 t) {
-    int sample_y = (int)t * 16 + 8;
-    int p = sample_y - HORIZON;
-    if (p < 0) p = -p;
-    if (p < 8) p = 8;
-    return (GAME_H << 7) / (p + 8);
+static u16 perspective_plane_tile(u16 base, u8 direction, u8 phase_x, u8 phase_y, u16 row, u16 col) {
+    u16 index = direction;
+    index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_y);
+    index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_x);
+    index = (u16)(index * TILE_PLANE_PERSPECTIVE_ROWS + row);
+    index = (u16)(index * TILE_PLANE_PERSPECTIVE_COLS + col);
+    return (u16)(base + index);
 }
 
 static void init_background(void) {
@@ -1677,42 +1691,37 @@ static void init_background(void) {
 static void update_background_scroll(void) {
     int x_q8, y_q8;
     int dir_x, dir_y, plane_x, plane_y;
+    u8 direction;
+    u8 phase_x;
+    u8 phase_y;
     u32 key;
     rc_player_q8(&x_q8, &y_q8);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    (void)plane_x;
+    (void)plane_y;
+    direction = plane_direction_bucket(dir_x, dir_y);
+    phase_x = (u8)((x_q8 >> 7) & 1);
+    phase_y = (u8)((y_q8 >> 7) & 1);
     key = (u32)((x_q8 >> 3) & 0x3F)
         | ((u32)((y_q8 >> 3) & 0x3F) << 6)
-        | ((u32)(((dir_x + 256) >> 2) & 0x3F) << 12)
-        | ((u32)(((dir_y + 256) >> 2) & 0x3F) << 18)
-        | ((u32)(((plane_x + 256) >> 5) & 0x0F) << 24)
-        | ((u32)(((plane_y + 256) >> 5) & 0x0F) << 28);
+        | ((u32)direction << 12)
+        | ((u32)phase_x << 16)
+        | ((u32)phase_y << 17);
     if (key == bg_scroll_key) return;
 
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
-        int camera_x = ((int)(((u32)(i * 16 + 8) * 512UL) / SCRW)) - 256;
-        int ray_x = dir_x + ((plane_x * camera_x) >> 8);
-        int ray_y = dir_y + ((plane_y * camera_x) >> 8);
         for (u16 t = 0; t < BG_WIN; t++) {
             u16 pal;
-            u16 base;
             u16 tile;
-            int dist = plane_row_distance_q8(t);
-            int world_x;
-            int world_y;
             if (t < BG_SPLIT) {
-                base = TILE_CEILING_FLAT_BASE;
-                world_x = x_q8 - ((ray_x * dist) >> 8);
-                world_y = y_q8 - ((ray_y * dist) >> 8);
                 pal = (u16)(PAL_CEILING_GRAD_BASE + t);
+                tile = perspective_plane_tile(TILE_CEILING_PERSPECTIVE_BASE, direction, phase_x, phase_y, t, i);
             } else {
                 u16 row = (u16)(t - BG_SPLIT);
-                base = TILE_FLOOR_FLAT_BASE;
-                world_x = x_q8 + ((ray_x * dist) >> 8);
-                world_y = y_q8 + ((ray_y * dist) >> 8);
                 pal = (u16)(PAL_FLOOR_GRAD_BASE + row);
+                tile = perspective_plane_tile(TILE_FLOOR_PERSPECTIVE_BASE, direction, phase_x, phase_y, row, i);
             }
-            tile = plane_tile_for_sample(base, world_x, world_y);
             scb1_tile(spr, t, tile, pal);
         }
     }

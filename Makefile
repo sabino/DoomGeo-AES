@@ -123,7 +123,7 @@ $(CROM2): rom/c2.bin
 rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
-$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR)
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR)
 	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
 	touch $@
 
