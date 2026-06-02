@@ -70,6 +70,8 @@ equips Doom's shotgun frames, adds shells, and makes B fire a wider spread shot
 that can hit a second visible target for reduced damage. Trying to fire empty
 flashes a compact fix-layer `AMMO` message instead of failing silently. Close
 visible monsters apply a first-pass contact-damage tick with armor absorption.
+Pickups briefly flash compact center feedback using existing fix glyphs:
+`KEY`, `AMMO`, `MED`, `ARM`, or `2` for the shotgun.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
 are visible and close enough, so the player has pressure to move, aim, and use
 doors instead of only avoiding contact. Combat uses a compact line-of-sight

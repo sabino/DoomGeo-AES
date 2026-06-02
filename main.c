@@ -146,6 +146,8 @@ static u8  hurt_timer = 0;
 static u8  level_complete = 0;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
+static u8  pickup_message_timer = 0;
+static u8  pickup_message_type = 0;
 static u8  key_message_visible = 0;
 static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
@@ -588,9 +590,11 @@ static void update_monster_ai(void) {
 
 static void apply_pickup(u16 thing_type) {
     u8 key = key_bit_for_thing(thing_type);
+    pickup_message_timer = 35;
     if (key) {
         player_keys |= key;
         shown_keys = 0xFF;
+        pickup_message_type = 1;
         return;
     }
 
@@ -601,38 +605,50 @@ static void apply_pickup(u16 thing_type) {
         player_shells += 8;
         weapon_frame = 0xFF;
         shown_weapon = 0xFF;
+        pickup_message_type = 2;
         break;
     case 2007: /* clip */
         player_ammo += 10;
+        pickup_message_type = 3;
         break;
     case 2008: /* shells */
         player_shells += 4;
+        pickup_message_type = 3;
         break;
     case 2010: /* rocket */
         player_ammo += 1;
+        pickup_message_type = 3;
         break;
     case 2011: /* stimpack */
         player_health = (u16)(player_health + 10 > 100 ? 100 : player_health + 10);
+        pickup_message_type = 4;
         break;
     case 2012: /* medikit */
         player_health = (u16)(player_health + 25 > 100 ? 100 : player_health + 25);
+        pickup_message_type = 4;
         break;
     case 2014: /* health bonus */
         if (player_health < 200) player_health++;
+        pickup_message_type = 4;
         break;
     case 2015: /* armor bonus */
         if (player_armor < 200) player_armor++;
+        pickup_message_type = 5;
         break;
     case 2018: /* green armor */
         if (player_armor < 100) player_armor = 100;
+        pickup_message_type = 5;
         break;
     case 2019: /* blue armor */
         if (player_armor < 200) player_armor = 200;
+        pickup_message_type = 5;
         break;
     case 2048: /* ammo box */
         player_ammo += 50;
+        pickup_message_type = 3;
         break;
     default:
+        pickup_message_timer = 0;
         break;
     }
     if (player_ammo > 999) player_ammo = 999;
@@ -687,6 +703,50 @@ static void draw_ammo_message(void) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_AMMO_O);
 }
 
+static void draw_med_message(void) {
+    const u16 col = (SCRW / 16) - 1;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_AMMO_M);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_DEAD_D);
+}
+
+static void draw_armor_message(void) {
+    const u16 col = (SCRW / 16) - 1;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_DEAD_A);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 1));
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_AMMO_M);
+}
+
+static void draw_weapon_pickup_message(void) {
+    const u16 col = SCRW / 16;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
+}
+
+static void draw_pickup_message(void) {
+    switch (pickup_message_type) {
+    case 1:
+        draw_key_message();
+        break;
+    case 2:
+        draw_weapon_pickup_message();
+        break;
+    case 3:
+        draw_ammo_message();
+        break;
+    case 4:
+        draw_med_message();
+        break;
+    case 5:
+        draw_armor_message();
+        break;
+    default:
+        break;
+    }
+}
+
 static void clear_center_message(void) {
     const u16 col = (SCRW / 16) - 2;
     const u16 row = (GAME_H / 16) - 2;
@@ -699,12 +759,19 @@ static void update_center_message(void) {
     } else if (level_complete) {
         draw_exit_message();
     } else if (key_message_timer) {
+        clear_center_message();
         draw_key_message();
         key_message_timer--;
         key_message_visible = 1;
     } else if (ammo_message_timer) {
+        clear_center_message();
         draw_ammo_message();
         ammo_message_timer--;
+        key_message_visible = 1;
+    } else if (pickup_message_timer) {
+        clear_center_message();
+        draw_pickup_message();
+        pickup_message_timer--;
         key_message_visible = 1;
     } else if (key_message_visible) {
         clear_center_message();
@@ -1170,6 +1237,8 @@ static void restart_level(void) {
     level_complete = 0;
     key_message_timer = 0;
     ammo_message_timer = 0;
+    pickup_message_timer = 0;
+    pickup_message_type = 0;
     key_message_visible = 0;
     monster_ai_tick = 0;
     player_keys = 0;
