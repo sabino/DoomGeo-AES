@@ -33,10 +33,10 @@
 #define BG_WIN    (GAME_H / 16)     
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 #define ENEMY_VISIBLE_COUNT 3
-#define ENEMY_STRIPS 3
+#define ENEMY_STRIPS 4
 #define ENEMY_BASE   (WALL_BASE + NUM_COLS)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
-#define ENEMY_WIN    4
+#define ENEMY_WIN    5
 #define WEAPON_BASE  (ENEMY_BASE + ENEMY_COUNT)
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   8
