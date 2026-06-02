@@ -1377,8 +1377,8 @@ static void disable_sprites(void) {
  * raycaster basis, with the wall columns still carrying the precise depth.
  */
 static u16 plane_tile_for_sample(u16 base, int world_x_q8, int world_y_q8) {
-    u16 tile_x = (u16)((world_x_q8 >> 6) & 3);
-    u16 tile_y = (u16)((world_y_q8 >> 6) & 3);
+    u16 tile_x = (u16)((world_x_q8 >> 5) & (TILE_FLAT_COLS - 1));
+    u16 tile_y = (u16)((world_y_q8 >> 5) & (TILE_FLAT_ROWS - 1));
     return (u16)(base + tile_y * TILE_FLAT_COLS + tile_x);
 }
 
@@ -1399,7 +1399,7 @@ static void init_background(void) {
                 : (u16)(PAL_FLOOR_GRAD_BASE + (t - BG_SPLIT));
             u16 base = (t < BG_SPLIT) ? TILE_CEILING_FLAT_BASE : TILE_FLOOR_FLAT_BASE;
             u16 row = (t < BG_SPLIT) ? (u16)(BG_SPLIT - 1 - t) : (u16)(t - BG_SPLIT);
-            u16 tile = (u16)(base + ((row & 3) * TILE_FLAT_COLS) + (i & 3));
+            u16 tile = (u16)(base + ((row & (TILE_FLAT_ROWS - 1)) * TILE_FLAT_COLS) + (i & (TILE_FLAT_COLS - 1)));
             scb1_tile(spr, t, tile, pal);
         }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */

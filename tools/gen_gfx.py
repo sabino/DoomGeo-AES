@@ -42,8 +42,8 @@ WALL_ATLAS_ROWS = 15
 WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
 WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
 DOOR_ATLAS_BASE = WALL_ALT_ATLAS_BASE + len(WALL_ALT_TEXTURES) * WALL_ATLAS_TILES
-FLAT_COLS = 4
-FLAT_ROWS = 4
+FLAT_COLS = 8
+FLAT_ROWS = 8
 FLAT_TILES = FLAT_COLS * FLAT_ROWS
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
@@ -486,12 +486,16 @@ def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
     if ceiling:
         palette = [(r * 3 // 4, g * 3 // 4, min(255, b * 5 // 4)) for r, g, b in palette]
     tiles = []
+    phase_x = 64 // FLAT_COLS
+    phase_y = 64 // FLAT_ROWS
     for row in range(FLAT_ROWS):
         for col in range(FLAT_COLS):
             tile = [[0] * 16 for _ in range(16)]
             for y in range(16):
+                sy = (row * phase_y + y) & 63
                 for x in range(16):
-                    tile[y][x] = quantize_color(flat[row * 16 + y][col * 16 + x], playpal, palette)
+                    sx = (col * phase_x + x) & 63
+                    tile[y][x] = quantize_color(flat[sy][sx], playpal, palette)
             tiles.append(tile)
     source = flat_name.upper()
     return source, palette, tiles
