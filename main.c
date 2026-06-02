@@ -142,6 +142,10 @@ static u8  weapon_bob_phase = 0;
 static signed char weapon_bob_x = 0;
 static signed char weapon_bob_y = 0;
 static u8  fire_timer = 0;
+static u8  fire_prev = 0;
+static u8  door_prev = 0;
+static u8  map_prev = 0;
+static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
 static u8  key_message_timer = 0;
@@ -1047,9 +1051,8 @@ static void update_weapon_bob(u8 pressed) {
 
 static void update_weapon(u8 pressed) {
     enum { B = 0x20 };
-    static u8 b_prev = 0;
     u8 b_now = pressed & B;
-    if (b_now && !b_prev && fire_timer == 0) {
+    if (b_now && !fire_prev && fire_timer == 0) {
         if (current_weapon && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
@@ -1064,7 +1067,7 @@ static void update_weapon(u8 pressed) {
             ammo_message_timer = 45;
         }
     }
-    b_prev = b_now;
+    fire_prev = b_now;
 
     u8 frame = current_weapon && player_has_shotgun ? 4 : 0;
     if (fire_timer) {
@@ -1254,6 +1257,10 @@ static void restart_level(void) {
     weapon_bob_x = 0;
     weapon_bob_y = 0;
     fire_timer = 0;
+    fire_prev = 0;
+    door_prev = 0;
+    map_prev = 0;
+    restart_prev = 0;
     hurt_timer = 0;
     level_complete = 0;
     key_message_timer = 0;
@@ -1316,20 +1323,18 @@ int main(void) {
         u8 pressed = (u8)~REG_P1CNT;    
         if (game_active()) {
             enum { A = 0x10, D = 0x80 };
-            static u8 d_prev = 0;
             u8 d_now = pressed & D;
             rc_input(pressed);
             update_monster_ai();
             collect_nearby_pickups();
             check_exit_reached();
-            if (d_now && !d_prev) {
+            if (d_now && !door_prev) {
                 if (pressed & A) toggle_weapon();
                 else open_nearby_door();
             }
-            d_prev = d_now;
+            door_prev = d_now;
         } else {
             enum { D = 0x80 };
-            static u8 restart_prev = 0;
             u8 restart_now = pressed & D;
             if (restart_now && !restart_prev) restart_level();
             restart_prev = restart_now;
@@ -1352,15 +1357,14 @@ int main(void) {
         /* button C toggles the minimap  */
         {
             enum { C = 0x40 };          /* P1 bit 6                            */
-            static u8 c_prev = 0;
             u8 c_now = pressed & C;
-            if (c_now && !c_prev) {
+            if (c_now && !map_prev) {
                 map_on = !map_on;
                 if (map_on) { draw_minimap(); prev_px = -1; }  /* -1 forces marker repaint */
                 else          clear_minimap();
                 force_fix_hud_redraw();
             }
-            c_prev = c_now;
+            map_prev = c_now;
         }
 
         update_marker();                /* 2 fix writes when the cell changes */

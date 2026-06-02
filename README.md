@@ -99,7 +99,9 @@ small separation radius between live monsters, which reduces stacked enemies
 and makes the two projected world-sprite slots more readable. When health
 reaches zero, movement and firing stop and the fix layer shows a compact `DEAD`
 message; pressing D resets the player, doors, pickups, monsters, and HUD for
-another run.
+another run. Restart also clears the button-edge latches used by fire, doors,
+weapon toggle, minimap, and restart so stale held inputs do not leak into the
+next run.
 
 The converter also preserves Doom door and exit linedefs as compact runtime
 trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
