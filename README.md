@@ -34,13 +34,16 @@ ceiling darker, so the sampled flats read as visible 3D surfaces instead of a
 black void.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
-`BROWNGRN`, `BROWN1`, `SUPPORT2`, `LITE3`, `COMPTILE`, and `DOORSTOP` E1M1
-linedefs can select their own precomposed atlases, and converted closed-door
-cells use `BIGDOOR2`; each atlas has its own distance-shaded palette range. The
-converter also emits a compact
+`BROWNGRN`, `BROWN1`, `SUPPORT2`, `LITE3`, `COMPTILE`, `DOORSTOP`, and
+`BROWN144` E1M1 linedefs can select their own precomposed atlases, and converted
+closed-door cells use `BIGDOOR2`; each atlas has its own distance-shaded palette
+range. The converter also emits a compact
 per-cell texture phase from Doom sidedef offsets and distance along each solid
 linedef, so wall columns no longer all restart at the same coarse grid-cell
-edge. Doom pistol frames and the status-face set are baked with Doom patch
+edge. When several Doom linedefs collapse into the same coarse Neo Geo cell, the
+converter keeps higher-priority distinctive textures such as door trim,
+computer panels, lights, and wide brown panels instead of letting later generic
+walls overwrite them. Doom pistol frames and the status-face set are baked with Doom patch
 offsets while keeping the bottom 32-pixel `STBAR` as a separate HUD surface.
 The weapon bake keeps the cropped psprite window raised above the face slot, and
 the first pistol firing frame precomposes Doom's `PISFA0` flash over `PISGB0`

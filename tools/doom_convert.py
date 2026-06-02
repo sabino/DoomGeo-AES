@@ -369,8 +369,22 @@ def wall_texture_class(name: str) -> int:
         "LITE3": 4,
         "COMPTILE": 5,
         "DOORSTOP": 6,
+        "BROWN144": 7,
     }
     return classes.get(name, 0)
+
+
+def wall_texture_priority(texture_class: int) -> int:
+    priorities = {
+        6: 90,  # DOORSTOP
+        5: 80,  # COMPTILE
+        4: 70,  # LITE3
+        3: 60,  # SUPPORT2
+        7: 45,  # BROWN144
+        1: 40,  # BROWNGRN
+        2: 40,  # BROWN1
+    }
+    return priorities.get(texture_class, 10)
 
 
 def nearest_open(grid: list[list[int]], sx: int, sy: int) -> tuple[int, int]:
@@ -1047,6 +1061,7 @@ def convert(args: argparse.Namespace) -> None:
     grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     texture_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     texture_phase_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
+    texture_priority_grid = [[0 for _ in range(args.width)] for _ in range(args.height)]
     for x in range(args.width):
         grid[0][x] = 1
         grid[-1][x] = 1
@@ -1072,15 +1087,17 @@ def convert(args: argparse.Namespace) -> None:
         x1, y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
         texture_name = solid_line_texture(line, sidedefs)
         texture_class = wall_texture_class(texture_name)
+        texture_priority = wall_texture_priority(texture_class)
         texture_width = texture_widths.get(texture_name, default_texture_width)
         texture_x = solid_line_texture_x(line, sidedefs)
         cells = line_cells(grid, x0, y0, x1, y1)
         cell_count = max(1, len(cells))
         for step, (cell_x, cell_y) in enumerate(cells):
             grid[cell_y][cell_x] = 1
-            if texture_class or texture_grid[cell_y][cell_x] == 0:
+            if texture_priority >= texture_priority_grid[cell_y][cell_x]:
                 texture_grid[cell_y][cell_x] = texture_class
                 texture_phase_grid[cell_y][cell_x] = texture_phase_for_cell(texture_x, texture_width, step, cell_count)
+                texture_priority_grid[cell_y][cell_x] = texture_priority
 
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
