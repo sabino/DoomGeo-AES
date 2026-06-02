@@ -280,6 +280,9 @@ static u16 player_max_bullets = 200;
 static u16 player_max_shells = 50;
 static u16 player_max_rockets = 50;
 static u16 player_score = 0;
+static u16 player_kills = 0;
+static u16 player_items = 0;
+static u16 player_secrets = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
@@ -710,6 +713,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                     if (!score_awarded && player_score <= 999) {
                         u16 value = monster_score_value(source_type);
                         player_score = (u16)(player_score + value > 999 ? 999 : player_score + value);
+                        if (player_kills < 999) player_kills++;
                         score_awarded = 1;
                     }
                     killed = 1;
@@ -1281,6 +1285,7 @@ static void collect_nearby_pickups(void) {
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
         if (iabs16(px - thing_x_q8[i]) <= 96 && iabs16(py - thing_y_q8[i]) <= 96) {
             if (apply_pickup(runtime_thing_type(i))) {
+                if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
                 hide_enemies();
             }
@@ -1362,6 +1367,22 @@ static void draw_weapon_pickup_message(void) {
     fix_poke(col, row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + weapon));
 }
 
+static void draw_stat3(u16 col, u16 row, u16 label, u16 value) {
+    u16 capped = value > 999 ? 999 : value;
+    fix_poke(col, row, PAL_MAP_PLAYER, label);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + (capped / 100) % 10));
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + (capped / 10) % 10));
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + capped % 10));
+}
+
+static void draw_exit_stats(void) {
+    const u16 col = (SCRW / 16) - 2;
+    draw_exit_message();
+    draw_stat3(col, 12, FIX_KEY_MSG_K, player_kills);
+    draw_stat3(col, 13, (u16)(FIX_EXIT_BASE + 2), player_items);
+    draw_stat3(col, 14, FIX_SECRET_S, player_secrets);
+}
+
 static void draw_pickup_message(void) {
     switch (pickup_message_type) {
     case 1:
@@ -1394,7 +1415,7 @@ static void update_center_message(void) {
     if (player_health == 0) {
         draw_dead_message();
     } else if (level_complete) {
-        draw_exit_message();
+        draw_exit_stats();
     } else if (key_message_timer) {
         clear_center_message();
         draw_key_message();
@@ -1444,6 +1465,7 @@ static void check_secret_reached(void) {
     cell = (u16)(py * MAP_W + px);
     if (map_bit_get(secret_found_bits, cell)) return;
     map_bit_set(secret_found_bits, cell);
+    if (player_secrets < 999) player_secrets++;
     secret_message_timer = 70;
 }
 
@@ -2199,6 +2221,9 @@ static void restart_level(void) {
     player_max_shells = PLAYER_MAX_SHELLS;
     player_max_rockets = PLAYER_MAX_ROCKETS;
     player_score = 0;
+    player_kills = 0;
+    player_items = 0;
+    player_secrets = 0;
     hurt_flash = 0;
     muzzle_flash = 0;
     palette_effect = 0;
