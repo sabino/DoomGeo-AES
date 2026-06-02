@@ -410,6 +410,21 @@ MONSTER_TYPES = {
     3006,
 }
 
+PICKUP_TYPES = {
+    2007,  # clip
+    2008,  # shells
+    2010,  # rocket
+    2011,  # stimpack
+    2012,  # medikit
+    2014,  # health bonus
+    2015,  # armor bonus
+    2018,  # green armor
+    2019,  # blue armor
+    2048,  # ammo box
+}
+
+RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES
+
 def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, by: float) -> bool:
     steps = max(1, int(math.hypot(bx - ax, by - ay) * 8))
     for i in range(1, steps):
@@ -439,7 +454,7 @@ def runtime_things(
     dir_y = -math.sin(angle_rad)
     rows: list[tuple[float, int, int, int, int]] = []
     for thing in things:
-        if thing.type not in MONSTER_TYPES:
+        if thing.type not in RUNTIME_THING_TYPES:
             continue
         gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
         cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))

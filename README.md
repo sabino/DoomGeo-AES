@@ -54,6 +54,11 @@ projected Doom targets can be lined up with keyboard or arcade-stick input.
 The wall and sprite projection heights use the raycaster's reciprocal lookup
 table instead of doing a 64-bit divide for each projected column.
 
+Runtime WAD things now include common Doom pickups as well as monsters. Pickups
+share the two projected world-sprite slots to preserve the Neo Geo scanline
+budget, disappear when touched, and update internal health, armor, and ammo
+state for later HUD/gameplay passes.
+
 ## Building
 
 The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under

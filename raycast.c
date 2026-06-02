@@ -115,6 +115,11 @@ void rc_player_cell(int *cx, int *cy) {
     *cy = posY >> FBITS;
 }
 
+void rc_player_q8(int *x_q8, int *y_q8) {
+    *x_q8 = posX >> (FBITS - 8);
+    *y_q8 = posY >> (FBITS - 8);
+}
+
 u8 rc_bg_phase(void) {
     fix forward = fmul(posX, dirX) + fmul(posY, dirY);
     fix lateral = fmul(posX, planeX) + fmul(posY, planeY);

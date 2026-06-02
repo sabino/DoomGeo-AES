@@ -84,6 +84,9 @@ static u8  fire_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
+static volatile u16 player_health = 100;
+static volatile u16 player_armor = 0;
+static volatile u16 player_ammo = 50;
 
 typedef struct EnemyDraw {
     int thing_index;
@@ -98,6 +101,52 @@ static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
+
+static int iabs16(int value) {
+    return value < 0 ? -value : value;
+}
+
+static u8 thing_is_monster(u16 thing_type) {
+    switch (thing_type) {
+    case 9:
+    case 58:
+    case 64:
+    case 65:
+    case 66:
+    case 67:
+    case 68:
+    case 69:
+    case 71:
+    case 84:
+    case 3001:
+    case 3002:
+    case 3003:
+    case 3004:
+    case 3005:
+    case 3006:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static u8 thing_is_pickup(u16 thing_type) {
+    switch (thing_type) {
+    case 2007:
+    case 2008:
+    case 2010:
+    case 2011:
+    case 2012:
+    case 2014:
+    case 2015:
+    case 2018:
+    case 2019:
+    case 2048:
+        return 1;
+    default:
+        return 0;
+    }
+}
 
 static int enemy_sprite_def_for_type(u16 thing_type) {
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
@@ -119,11 +168,12 @@ static void load_enemy_palette(u16 slot, int def) {
 
 static void kill_enemy_at(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
+    if (!thing_is_monster(g_runtime_things[thing_index].type)) return;
     {
         short x = g_runtime_things[thing_index].x_q8;
         short y = g_runtime_things[thing_index].y_q8;
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-            if (g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
+            if (thing_is_monster(g_runtime_things[i].type) && g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
                 enemy_dead[i] = 1;
             }
         }
@@ -138,6 +188,58 @@ static void kill_visible_enemies(void) {
         killed = 1;
     }
     if (killed) hide_enemies();
+}
+
+static void apply_pickup(u16 thing_type) {
+    switch (thing_type) {
+    case 2007: /* clip */
+        player_ammo += 10;
+        break;
+    case 2008: /* shells */
+        player_ammo += 4;
+        break;
+    case 2010: /* rocket */
+        player_ammo += 1;
+        break;
+    case 2011: /* stimpack */
+        player_health = (u16)(player_health + 10 > 100 ? 100 : player_health + 10);
+        break;
+    case 2012: /* medikit */
+        player_health = (u16)(player_health + 25 > 100 ? 100 : player_health + 25);
+        break;
+    case 2014: /* health bonus */
+        if (player_health < 200) player_health++;
+        break;
+    case 2015: /* armor bonus */
+        if (player_armor < 200) player_armor++;
+        break;
+    case 2018: /* green armor */
+        if (player_armor < 100) player_armor = 100;
+        break;
+    case 2019: /* blue armor */
+        if (player_armor < 200) player_armor = 200;
+        break;
+    case 2048: /* ammo box */
+        player_ammo += 50;
+        break;
+    default:
+        break;
+    }
+    if (player_ammo > 999) player_ammo = 999;
+}
+
+static void collect_nearby_pickups(void) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        const NgRuntimeThing *thing = &g_runtime_things[i];
+        if (enemy_dead[i] || !thing_is_pickup(thing->type)) continue;
+        if (iabs16(px - thing->x_q8) <= 96 && iabs16(py - thing->y_q8) <= 96) {
+            apply_pickup(thing->type);
+            enemy_dead[i] = 1;
+            hide_enemies();
+        }
+    }
 }
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
@@ -366,6 +468,7 @@ static void update_enemy(void) {
             else if (h > 48) idx = 2;
             else if (h > 30) idx = 3;
             else idx = 4;
+            if (thing_is_pickup(thing->type) && idx > 1) idx = 1;
             if (idx >= def->scale_count) idx = def->scale_count - 1;
             meta = &g_enemy_scales[def->first_scale + idx];
 
@@ -419,6 +522,7 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
         rc_input(pressed);
+        collect_nearby_pickups();
         rc_render();                    /* DDA during active display          */
         wait_vblank();
         watchdog_kick();
