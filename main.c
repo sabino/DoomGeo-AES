@@ -150,6 +150,7 @@ static u8  hurt_timer = 0;
 static u8  level_complete = 0;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
+static u8  door_message_timer = 0;
 static u8  pickup_message_timer = 0;
 static u8  pickup_message_type = 0;
 static u8  key_message_visible = 0;
@@ -728,6 +729,14 @@ static void draw_ammo_message(void) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_AMMO_O);
 }
 
+static void draw_door_message(void) {
+    const u16 col = (SCRW / 16) - 1;
+    const u16 row = (GAME_H / 16) - 2;
+    fix_poke(col, row, PAL_MAP_PLAYER, FIX_DEAD_D);
+    fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_AMMO_O);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 1));
+}
+
 static void draw_med_message(void) {
     const u16 col = (SCRW / 16) - 1;
     const u16 row = (GAME_H / 16) - 2;
@@ -793,6 +802,11 @@ static void update_center_message(void) {
         draw_ammo_message();
         ammo_message_timer--;
         key_message_visible = 1;
+    } else if (door_message_timer) {
+        clear_center_message();
+        draw_door_message();
+        door_message_timer--;
+        key_message_visible = 1;
     } else if (pickup_message_timer) {
         clear_center_message();
         draw_pickup_message();
@@ -834,6 +848,7 @@ static void open_nearby_door(void) {
                 return;
             }
             g_runtime_door_open[i] = 1;
+            door_message_timer = 35;
             rc_invalidate_view();
             if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
         }
@@ -1265,6 +1280,7 @@ static void restart_level(void) {
     level_complete = 0;
     key_message_timer = 0;
     ammo_message_timer = 0;
+    door_message_timer = 0;
     pickup_message_timer = 0;
     pickup_message_type = 0;
     key_message_visible = 0;
