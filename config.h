@@ -57,7 +57,9 @@
 #define TILE_WEAPON_BASE (TILE_FLOOR_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
 #define TILE_WEAPON_STRIPS 6
 #define TILE_WEAPON_ROWS 6
-#define TILE_SPRITE_CACHE_BASE (TILE_WEAPON_BASE + TILE_WEAPON_STRIPS * TILE_WEAPON_ROWS)
+#define TILE_WEAPON_FRAMES 4
+#define TILE_WEAPON_FRAME_TILES (TILE_WEAPON_STRIPS * TILE_WEAPON_ROWS)
+#define TILE_SPRITE_CACHE_BASE (TILE_WEAPON_BASE + TILE_WEAPON_FRAMES * TILE_WEAPON_FRAME_TILES)
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */

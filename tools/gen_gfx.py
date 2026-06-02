@@ -52,8 +52,8 @@ WEAPON_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
 WEAPON_STRIPS = 6
 WEAPON_ROWS = 6
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
-WEAPON_FRAME = "PISGA0"
-SPRITE_CACHE_BASE = WEAPON_BASE + WEAPON_TILES
+WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0")
+SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 
 
 def encode_tile(px):
@@ -438,47 +438,56 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     return tiles, patch_name, palette, src_w, src_h
 
 
-def weapon_tiles(iwad, zip_member, patch_name):
+def weapon_tiles(iwad, zip_member, patch_names):
     if not iwad:
         palette = [(16, 16, 16), (48, 48, 48), (96, 96, 96)] * 5
-        return [tile_solid() for _ in range(WEAPON_TILES)], "fallback-weapon", palette, WEAPON_STRIPS * 16, WEAPON_ROWS * 16
+        return [tile_solid() for _ in range(WEAPON_TILES * len(WEAPON_FRAMES))], "fallback-weapon", palette, WEAPON_STRIPS * 16, WEAPON_ROWS * 16
 
     wad = Wad(read_wad(iwad, zip_member))
-    patch_name = patch_name.upper()
-    lump_ids = wad.by_name.get(patch_name)
-    if not lump_ids:
-        raise ValueError(f"weapon patch {patch_name!r} not found in WAD")
-
-    patch = decode_patch(wad.lump_data(lump_ids[0]))
     playpal = playpal_rgb(wad)
-    palette = texture_palette(patch, playpal)
-    src_h = len(patch)
-    src_w = len(patch[0])
+    patches = []
+    for patch_name in patch_names:
+        patch_name = patch_name.upper()
+        lump_ids = wad.by_name.get(patch_name)
+        if not lump_ids:
+            raise ValueError(f"weapon patch {patch_name!r} not found in WAD")
+        patches.append((patch_name, decode_patch(wad.lump_data(lump_ids[0]))))
+
+    palette_src = []
+    for _name, patch in patches:
+        palette_src.extend(patch)
+    palette = texture_palette(palette_src, playpal)
     dst_w = WEAPON_STRIPS * 16
     dst_h = WEAPON_ROWS * 16
-    x0 = max(0, (dst_w - src_w) // 2)
-    y0 = max(0, dst_h - src_h)
-    canvas = [[-1] * dst_w for _ in range(dst_h)]
-
-    for y, row in enumerate(patch):
-        dy = y0 + y
-        if dy >= dst_h:
-            break
-        for x, color in enumerate(row):
-            dx = x0 + x
-            if color >= 0 and 0 <= dx < dst_w:
-                canvas[dy][dx] = color
 
     tiles = []
-    for row in range(WEAPON_ROWS):
-        for strip in range(WEAPON_STRIPS):
-            tile = [[0] * 16 for _ in range(16)]
-            for y in range(16):
-                for x in range(16):
-                    tile[y][x] = quantize_color(canvas[row * 16 + y][strip * 16 + x], playpal, palette)
-            tiles.append(tile)
+    max_w = max(len(patch[0]) for _name, patch in patches)
+    max_h = max(len(patch) for _name, patch in patches)
+    for _name, patch in patches:
+        src_h = len(patch)
+        src_w = len(patch[0])
+        x0 = max(0, (dst_w - src_w) // 2)
+        y0 = max(0, dst_h - src_h)
+        canvas = [[-1] * dst_w for _ in range(dst_h)]
 
-    return tiles, patch_name, palette, src_w, src_h
+        for y, row in enumerate(patch):
+            dy = y0 + y
+            if dy >= dst_h:
+                break
+            for x, color in enumerate(row):
+                dx = x0 + x
+                if color >= 0 and 0 <= dx < dst_w:
+                    canvas[dy][dx] = color
+
+        for row in range(WEAPON_ROWS):
+            for strip in range(WEAPON_STRIPS):
+                tile = [[0] * 16 for _ in range(16)]
+                for y in range(16):
+                    for x in range(16):
+                        tile[y][x] = quantize_color(canvas[row * 16 + y][strip * 16 + x], playpal, palette)
+                tiles.append(tile)
+
+    return tiles, "+".join(name for name, _patch in patches), palette, max_w, max_h
 
 
 def sprite_scale_tiles(iwad, zip_member, sprite_name, scales):
@@ -573,7 +582,7 @@ def main():
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
-    ap.add_argument("--weapon-frame", default=WEAPON_FRAME, help="Doom weapon patch frame to render as the player overlay")
+    ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
@@ -587,7 +596,8 @@ def main():
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
     ceiling_tiles, ceiling_source, ceiling_palette = flat_phase_tiles(args.iwad, args.zip_member, ceiling_flat, BG_COLS, BG_HALF_ROWS, ceiling=True)
     floor_tiles, floor_source, floor_palette = flat_phase_tiles(args.iwad, args.zip_member, floor_flat, BG_COLS, BG_HALF_ROWS)
-    weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, args.weapon_frame)
+    weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
+    weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     if args.palette_header:
         write_palette_header(
             args.palette_header,
@@ -642,7 +652,7 @@ def main():
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  ceiling flat: {ceiling_source} tile={CEILING_BASE}..{CEILING_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
     print(f"  floor flat: {floor_source} tile={FLOOR_BASE}..{FLOOR_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
-    print(f"  weapon frame: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}) source={weapon_w}x{weapon_h}")
+    print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")
     for name, scale, base, strips, rows, width, height in sprite_meta:
         print(f"  sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
     print(f"  tiles encoded: blank wall-cache solid "

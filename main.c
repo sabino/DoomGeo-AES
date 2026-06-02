@@ -80,6 +80,8 @@ static void clear_fix(void) {
 static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
 static u8  bg_phase = 0xFF;
+static u8  weapon_frame = 0xFF;
+static u8  fire_timer = 0;
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
@@ -186,19 +188,47 @@ static void init_hud(void) {
     }
 }
 
+static void set_weapon_frame(u8 frame) {
+    u16 frame_base = (u16)(TILE_WEAPON_BASE + (frame % TILE_WEAPON_FRAMES) * TILE_WEAPON_FRAME_TILES);
+    for (u16 i = 0; i < WEAPON_COUNT; i++) {
+        u16 spr = WEAPON_BASE + i;
+        vram_addr(VRAM_SCB1 + spr * 64);
+        vram_mod(1);
+        for (u16 row = 0; row < WEAPON_WIN; row++) {
+            vram_w((u16)(frame_base + row * WEAPON_COUNT + i));
+            vram_w((u16)(PAL_WEAPON << 8));
+        }
+    }
+    weapon_frame = frame;
+}
+
+static void update_weapon(u8 pressed) {
+    enum { B = 0x20 };
+    static u8 b_prev = 0;
+    u8 b_now = pressed & B;
+    if (b_now && !b_prev && fire_timer == 0) fire_timer = 12;
+    b_prev = b_now;
+
+    u8 frame = 0;
+    if (fire_timer) {
+        if (fire_timer > 8) frame = 1;
+        else if (fire_timer > 4) frame = 2;
+        else frame = 3;
+        fire_timer--;
+    }
+    if (frame != weapon_frame) set_weapon_frame(frame);
+}
+
 static void init_weapon(void) {
     u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
     int top = GAME_H - WEAPON_WIN * 16;
     for (u16 i = 0; i < WEAPON_COUNT; i++) {
         u16 spr = WEAPON_BASE + i;
-        for (u16 row = 0; row < WEAPON_WIN; row++) {
-            u16 tile = (u16)(TILE_WEAPON_BASE + row * WEAPON_COUNT + i);
-            scb1_tile(spr, row, tile, PAL_WEAPON);
-        }
         scb2(spr, 0x0F, 0xFF);
         scb3(spr, top, 0, WEAPON_WIN);
         scb4(spr, (u16)(start_x + i * 16));
     }
+    set_weapon_frame(0);
 }
 
 int main(void) {
@@ -220,6 +250,7 @@ int main(void) {
         watchdog_kick();
         rc_blit();                      /* push to VRAM during vblank         */
         update_background_phase(rc_bg_phase());
+        update_weapon(pressed);
 
         /* button C toggles the minimap  */
         {
