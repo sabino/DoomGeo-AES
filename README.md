@@ -71,9 +71,11 @@ flashes a compact fix-layer `AMMO` message instead of failing silently. Close
 visible monsters apply a first-pass contact-damage tick with armor absorption.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
 are visible and close enough, so the player has pressure to move, aim, and use
-doors instead of only avoiding contact. Damage briefly tints the playfield red
-by swapping palettes during vblank, giving clear feedback without spending
-additional sprite slots.
+doors instead of only avoiding contact. Combat uses a compact line-of-sight
+sample against the converted map, so closed doors and walls block player shots,
+shotgun spread targets, monster ranged damage, and monster chase wake-up. Damage
+briefly tints the playfield red by swapping palettes during vblank, giving clear
+feedback without spending additional sprite slots.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster

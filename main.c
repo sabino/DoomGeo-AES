@@ -188,6 +188,29 @@ static int iabs16(int value) {
     return value < 0 ? -value : value;
 }
 
+static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
+    int dx = bx - ax;
+    int dy = by - ay;
+    int steps = iabs16(dx) > iabs16(dy) ? iabs16(dx) : iabs16(dy);
+    if (steps <= 0) return 1;
+    steps >>= 6;
+    if (steps < 1) steps = 1;
+    if (steps > 40) steps = 40;
+
+    for (int i = 1; i < steps; i++) {
+        int x = ax + (dx * i) / steps;
+        int y = ay + (dy * i) / steps;
+        if (map_at(x >> 8, y >> 8)) return 0;
+    }
+    return 1;
+}
+
+static u8 player_line_of_sight_to(short x_q8, short y_q8) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    return line_of_sight_q8((short)px, (short)py, x_q8, y_q8);
+}
+
 static u8 game_active(void) {
     return player_health != 0 && !level_complete;
 }
@@ -403,6 +426,7 @@ static int best_visible_enemy(void) {
         int score;
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
+        if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
         if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
         score = iabs16(sx - SCRW / 2) + (dist_q8 >> 7);
         if (score < best_score) {
@@ -428,6 +452,7 @@ static void damage_shotgun_spread(void) {
         int insert_at;
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
+        if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
         if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
 
         lateral = iabs16(sx - SCRW / 2);
@@ -503,7 +528,8 @@ static void update_monster_damage(void) {
             return;
         }
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
-        if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18) {
+        if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
+            && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
             player_take_damage(ranged_damage);
             hurt_timer = 48;
             return;
@@ -536,6 +562,7 @@ static void update_monster_ai(void) {
         ady = iabs16(dy);
         if (adx + ady > 2304) continue;
         if (adx < 288 && ady < 288) continue;
+        if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
 
         nx = thing_x_q8[i];
         ny = thing_y_q8[i];
