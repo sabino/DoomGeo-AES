@@ -1118,12 +1118,31 @@ static void update_projectile(void) {
     if (!projectile_timer) projectile_active = 0;
 }
 
+static u8 update_close_monster_melee(void) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+        u16 type = runtime_thing_type(thing);
+        if (enemy_dead[thing] || !thing_is_monster(type)) continue;
+        if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
+        if (iabs16(px - thing_x_q8[thing]) < 288 && iabs16(py - thing_y_q8[thing]) < 288) {
+            player_take_damage(4);
+            enemy_awake[thing] = 1;
+            enemy_attack_cooldown[thing] = 32;
+            hurt_timer = 18;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void update_monster_damage(void) {
     if (hurt_timer) {
         hurt_timer--;
         return;
     }
     if (!game_active()) return;
+    if (update_close_monster_melee()) return;
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
@@ -1132,12 +1151,6 @@ static void update_monster_damage(void) {
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
-        if (enemies[slot].dist_q8 < 300) {
-            player_take_damage(4);
-            enemy_attack_cooldown[thing] = 32;
-            hurt_timer = 18;
-            return;
-        }
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {

@@ -144,9 +144,10 @@ and raise health toward 200 through the existing status-face and health path.
 The weapon psprite bake now uses the same eight-row top position as the runtime
 Neo Geo sprite chain, with the Doom hand/gun patches lowered inside that window
 so the pistol reads as a held weapon above the status bar.
-Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
-green armor absorbs roughly one third of incoming damage and blue armor absorbs
-roughly half.
+Close live monsters apply a first-pass contact-damage tick from runtime position,
+even if they are not currently selected for one of the scarce visible sprite
+slots. Damage still goes through Doom-like armor absorption: green armor absorbs
+roughly one third of incoming damage and blue armor absorbs roughly half.
 Pickups briefly flash compact center feedback using existing fix glyphs:
 `KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
 Former humans and shotgun guys still apply compact hitscan-style ranged damage,
