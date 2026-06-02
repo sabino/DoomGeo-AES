@@ -6,7 +6,7 @@ in C.
 This was made purely for research purposes to understand the complexities of rendering realtime "3D"
 on the Neo Geo. The code is unoptimized and could be built to run much faster. 
 
-<img width="960" height="672" alt="Current Neo Geo Doom prototype with textured floor and ceiling, pistol HUD, and a WAD-derived monster target" src="docs/screenshots/doom-neogeo-current.png" />
+<img width="960" height="672" alt="Current Neo Geo Doom prototype with textured floor and ceiling, pistol HUD, pickups, and live counters" src="docs/screenshots/doom-neogeo-current.png" />
 
 ## How it works
 
@@ -56,8 +56,8 @@ table instead of doing a 64-bit divide for each projected column.
 
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
-budget, disappear when touched, and update internal health, armor, and ammo
-state for later HUD/gameplay passes.
+budget, disappear when touched, and update live fix-layer health, ammo, and
+armor counters over the Doom status bar.
 
 ## Building
 

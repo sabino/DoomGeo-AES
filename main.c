@@ -52,7 +52,9 @@ static void init_palettes(void) {
 
     /* minimap */
     pal_set(PAL_MAP_WALL,   15, RGB(20, 20, 22)); /* walls */
-    pal_set(PAL_MAP_PLAYER, 15, RGB( 4, 31,  8)); /* player */
+    for (int i = 1; i < 16; i++) {
+        pal_set(PAL_MAP_PLAYER, (u16)i, RGB(4, 31, 8)); /* player + HUD digits */
+    }
 
     for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
         u8 r = g_hud_palette_rgb[i][0];
@@ -87,6 +89,9 @@ static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static volatile u16 player_ammo = 50;
+static u16 shown_health = 0xFFFF;
+static u16 shown_armor = 0xFFFF;
+static u16 shown_ammo = 0xFFFF;
 
 typedef struct EnemyDraw {
     int thing_index;
@@ -244,6 +249,31 @@ static void collect_nearby_pickups(void) {
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
+}
+
+static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
+    if (value > 999) value = 999;
+    fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + value / 100));
+    fix_poke((u16)(col + 1), row, pal, (u16)(FIX_DIGIT_BASE + (value / 10) % 10));
+    fix_poke((u16)(col + 2), row, pal, (u16)(FIX_DIGIT_BASE + value % 10));
+}
+
+static void update_status_numbers(void) {
+    u16 health = player_health;
+    u16 ammo = player_ammo;
+    u16 armor = player_armor;
+    if (health != shown_health) {
+        draw_number3(3, 26, health, PAL_MAP_PLAYER);
+        shown_health = health;
+    }
+    if (ammo != shown_ammo) {
+        draw_number3(18, 26, ammo, PAL_MAP_PLAYER);
+        shown_ammo = ammo;
+    }
+    if (armor != shown_armor) {
+        draw_number3(33, 26, armor, PAL_MAP_PLAYER);
+        shown_armor = armor;
+    }
 }
 
 static void draw_minimap(void) {
@@ -517,6 +547,7 @@ int main(void) {
     init_hud();
     init_weapon();
     hide_enemies();
+    update_status_numbers();
     rc_init();
 
     for (;;) {
@@ -530,6 +561,7 @@ int main(void) {
         update_background_phase(rc_bg_phase());
         update_enemy();
         update_weapon(pressed);
+        update_status_numbers();
 
         /* button C toggles the minimap  */
         {

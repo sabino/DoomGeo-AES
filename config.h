@@ -69,6 +69,7 @@
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
 #define FIX_SOLID  1                /* all index 15 -> opaque, palette picks color */
+#define FIX_DIGIT_BASE 2            /* 2..11 = compact 8x8 HUD digits       */
 
  
 #define MAP_FIX_COL 1             
