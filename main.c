@@ -172,6 +172,11 @@ static u16 shown_ammo = 0xFFFF;
 static u8 shown_keys = 0xFF;
 static u8 shown_weapon = 0xFF;
 
+enum {
+    PLAYER_MAX_BULLETS = 200,
+    PLAYER_MAX_SHELLS = 50
+};
+
 typedef struct EnemyDraw {
     int thing_index;
     int sprite_def;
@@ -588,71 +593,84 @@ static void update_monster_ai(void) {
     }
 }
 
-static void apply_pickup(u16 thing_type) {
+static u8 add_capped_u16(volatile u16 *value, u16 amount, u16 cap) {
+    if (*value >= cap) return 0;
+    *value = (u16)(*value + amount > cap ? cap : *value + amount);
+    return 1;
+}
+
+static u8 apply_pickup(u16 thing_type) {
     u8 key = key_bit_for_thing(thing_type);
-    pickup_message_timer = 35;
     if (key) {
+        if (player_keys & key) return 0;
         player_keys |= key;
         shown_keys = 0xFF;
         pickup_message_type = 1;
-        return;
+        pickup_message_timer = 35;
+        return 1;
     }
 
     switch (thing_type) {
     case 2001: /* shotgun */
+        if (player_has_shotgun && player_shells >= PLAYER_MAX_SHELLS) return 0;
         player_has_shotgun = 1;
         current_weapon = 1;
-        player_shells += 8;
+        add_capped_u16(&player_shells, 8, PLAYER_MAX_SHELLS);
         weapon_frame = 0xFF;
         shown_weapon = 0xFF;
         pickup_message_type = 2;
         break;
     case 2007: /* clip */
-        player_ammo += 10;
+        if (!add_capped_u16(&player_ammo, 10, PLAYER_MAX_BULLETS)) return 0;
         pickup_message_type = 3;
         break;
     case 2008: /* shells */
-        player_shells += 4;
+        if (!add_capped_u16(&player_shells, 4, PLAYER_MAX_SHELLS)) return 0;
         pickup_message_type = 3;
         break;
     case 2010: /* rocket */
-        player_ammo += 1;
+        if (!add_capped_u16(&player_ammo, 1, PLAYER_MAX_BULLETS)) return 0;
         pickup_message_type = 3;
         break;
     case 2011: /* stimpack */
+        if (player_health >= 100) return 0;
         player_health = (u16)(player_health + 10 > 100 ? 100 : player_health + 10);
         pickup_message_type = 4;
         break;
     case 2012: /* medikit */
+        if (player_health >= 100) return 0;
         player_health = (u16)(player_health + 25 > 100 ? 100 : player_health + 25);
         pickup_message_type = 4;
         break;
     case 2014: /* health bonus */
+        if (player_health >= 200) return 0;
         if (player_health < 200) player_health++;
         pickup_message_type = 4;
         break;
     case 2015: /* armor bonus */
+        if (player_armor >= 200) return 0;
         if (player_armor < 200) player_armor++;
         pickup_message_type = 5;
         break;
     case 2018: /* green armor */
+        if (player_armor >= 100) return 0;
         if (player_armor < 100) player_armor = 100;
         pickup_message_type = 5;
         break;
     case 2019: /* blue armor */
+        if (player_armor >= 200) return 0;
         if (player_armor < 200) player_armor = 200;
         pickup_message_type = 5;
         break;
     case 2048: /* ammo box */
-        player_ammo += 50;
+        if (!add_capped_u16(&player_ammo, 50, PLAYER_MAX_BULLETS)) return 0;
         pickup_message_type = 3;
         break;
     default:
-        pickup_message_timer = 0;
-        break;
+        return 0;
     }
-    if (player_ammo > 999) player_ammo = 999;
-    if (player_shells > 999) player_shells = 999;
+    pickup_message_timer = 35;
+    return 1;
 }
 
 static void collect_nearby_pickups(void) {
@@ -661,9 +679,10 @@ static void collect_nearby_pickups(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
         if (iabs16(px - thing_x_q8[i]) <= 96 && iabs16(py - thing_y_q8[i]) <= 96) {
-            apply_pickup(runtime_thing_type(i));
-            enemy_dead[i] = 1;
-            hide_enemies();
+            if (apply_pickup(runtime_thing_type(i))) {
+                enemy_dead[i] = 1;
+                hide_enemies();
+            }
         }
     }
 }

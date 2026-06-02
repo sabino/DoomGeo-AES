@@ -65,11 +65,13 @@ share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar. Clips and shells are tracked
 separately, and the status bar shows compact weapon `1`/`2` digits before the
-active ammo pool. Shotgun guys now drop a shotgun pickup, and collecting one
-equips Doom's shotgun frames, adds shells, and makes B fire a wider spread shot
-that can hit a second visible target for reduced damage. Trying to fire empty
-flashes a compact fix-layer `AMMO` message instead of failing silently. Close
-visible monsters apply a first-pass contact-damage tick with armor absorption.
+active ammo pool. Bullet and shell pools now use compact Doom-like caps, and
+pickups remain in the map instead of disappearing when the matching resource is
+already full. Shotgun guys now drop a shotgun pickup, and collecting one equips
+Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
+can hit a second visible target for reduced damage. Trying to fire empty flashes
+a compact fix-layer `AMMO` message instead of failing silently. Close visible
+monsters apply a first-pass contact-damage tick with armor absorption.
 Pickups briefly flash compact center feedback using existing fix glyphs:
 `KEY`, `AMMO`, `MED`, `ARM`, or `2` for the shotgun.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they
