@@ -60,7 +60,9 @@ budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar. Pistol shots spend ammo, and close
 visible monsters apply a first-pass contact-damage tick with armor absorption.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
-over multiple hits instead of deleting every visible enemy immediately.
+over multiple hits instead of deleting every visible enemy immediately; the
+pistol picks the visible monster closest to the crosshair instead of damaging
+every visible target at once.
 
 ## Building
 

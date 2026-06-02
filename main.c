@@ -221,13 +221,24 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     return killed;
 }
 
-static void damage_visible_enemies(void) {
-    u8 killed = 0;
+static void damage_best_visible_enemy(void) {
+    int best_slot = -1;
+    int best_score = 9999;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        if (enemies[slot].thing_index < 0) continue;
-        if (damage_enemy_at(enemies[slot].thing_index, 1)) killed = 1;
+        int thing = enemies[slot].thing_index;
+        int center;
+        int score;
+        if (thing < 0) continue;
+        if (!thing_is_monster(g_runtime_things[thing].type)) continue;
+        center = enemies[slot].screen_x + enemies[slot].screen_w / 2;
+        score = iabs16(center - SCRW / 2);
+        if (score < best_score) {
+            best_score = score;
+            best_slot = slot;
+        }
     }
-    if (killed) hide_enemies();
+    if (best_slot < 0 || best_score > 96) return;
+    if (damage_enemy_at(enemies[best_slot].thing_index, 1)) hide_enemies();
 }
 
 static void player_take_damage(u16 amount) {
@@ -462,7 +473,7 @@ static void update_weapon(u8 pressed) {
         if (player_ammo > 0) {
             player_ammo--;
             fire_timer = 12;
-            damage_visible_enemies();
+            damage_best_visible_enemy();
         }
     }
     b_prev = b_now;
