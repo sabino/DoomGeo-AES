@@ -42,7 +42,8 @@ math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Active monster projectiles
 reserve the first visible world-sprite slot so incoming fire stays readable,
 then visible monsters/barrels are selected before useful pickups, and corpses
-only use slots left after those gameplay-critical objects;
+only use slots left after collectible gameplay-critical objects; full or
+otherwise unusable pickups are fallback candidates after corpses;
 candidates are ranked by distance and screen relevance each frame, and tiny
 candidates hidden under the pistol overlay are skipped. The converter only emits monster thing
 types that currently have pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
@@ -92,7 +93,8 @@ status bar masks the bottom edge.
 Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
 pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
-already full. Shotgun guys now drop a shotgun pickup, and collecting one equips
+already full, but the renderer gives currently collectible pickups first claim
+on scarce world-sprite slots. Shotgun guys now drop a shotgun pickup, and collecting one equips
 Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
 can hit a second visible target for reduced damage. Chaingun pickups are also
 converted from Doom thing type `2002`, rendered with the `MGUN` pickup sprite,

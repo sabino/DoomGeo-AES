@@ -244,6 +244,7 @@ static int iabs16(int value) {
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
+static u8 key_bit_for_thing(u16 thing_type);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
@@ -321,6 +322,40 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2046:
     case 2048:
         return 1;
+    default:
+        return 0;
+    }
+}
+
+static u8 pickup_is_collectible(u16 thing_type) {
+    u8 key = key_bit_for_thing(thing_type);
+    if (key) return (player_keys & key) == 0;
+
+    switch (thing_type) {
+    case 2001: /* shotgun */
+        return !player_has_shotgun || player_shells < PLAYER_MAX_SHELLS;
+    case 2002: /* chaingun */
+        return !player_has_chaingun || player_ammo < PLAYER_MAX_BULLETS;
+    case 2003: /* rocket launcher */
+        return !player_has_rocket_launcher || player_rockets < PLAYER_MAX_ROCKETS;
+    case 2007: /* clip */
+    case 2048: /* ammo box */
+        return player_ammo < PLAYER_MAX_BULLETS;
+    case 2008: /* shells */
+        return player_shells < PLAYER_MAX_SHELLS;
+    case 2010: /* rocket */
+    case 2046: /* box of rockets */
+        return player_rockets < PLAYER_MAX_ROCKETS;
+    case 2011: /* stimpack */
+    case 2012: /* medikit */
+        return player_health < 100;
+    case 2014: /* health bonus */
+        return player_health < 200;
+    case 2015: /* armor bonus */
+    case 2019: /* blue armor */
+        return player_armor < 200;
+    case 2018: /* green armor */
+        return player_armor < 100;
     default:
         return 0;
     }
@@ -1714,8 +1749,9 @@ static int select_visible_things(int found, u8 pass) {
         u8 is_monster = thing_is_monster(thing_type) || thing_is_barrel(thing_type) || thing_is_explosion(thing_type);
         if (enemy_dead[i]) continue;
         if (pass == 1 && !is_monster) continue;
-        if (pass == 2 && !thing_is_pickup(thing_type)) continue;
+        if (pass == 2 && (!thing_is_pickup(thing_type) || !pickup_is_collectible(thing_type))) continue;
         if (pass == 3 && !thing_is_corpse(thing_type)) continue;
+        if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
         if (enemy_obscured_by_weapon(sx, h)) continue;
@@ -1756,6 +1792,7 @@ static void update_enemy(void) {
     found = select_visible_things(found, 1);
     found = select_visible_things(found, 2);
     found = select_visible_things(found, 3);
+    found = select_visible_things(found, 4);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
 
