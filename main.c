@@ -1906,11 +1906,9 @@ static void update_background_scroll(void) {
     direction = plane_direction_bucket(dir_x, dir_y);
     phase_x = (u8)((x_q8 >> 7) & 1);
     phase_y = (u8)((y_q8 >> 7) & 1);
-    key = (u32)((x_q8 >> 3) & 0x3F)
-        | ((u32)((y_q8 >> 3) & 0x3F) << 6)
-        | ((u32)direction << 12)
-        | ((u32)phase_x << 16)
-        | ((u32)phase_y << 17);
+    key = (u32)direction
+        | ((u32)phase_x << 5)
+        | ((u32)phase_y << 6);
     if (key == bg_scroll_key) return;
 
     for (u16 i = 0; i < BG_COUNT; i++) {

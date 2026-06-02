@@ -24,9 +24,11 @@ bakes each plane into 16 view-direction buckets, 2x2 movement phases, and 6x20
 screen-tile perspective caches. Runtime only chooses the current bucket from
 the raycaster's direction and half-cell player phase, so each 16x16 backdrop
 tile already contains perspective-sampled flat pixels instead of a raw flat
-block. The baked sampler uses a denser Doom-flat texel scale, keeping the
-planes tied to the wall perspective while making the near floor read as a
-receding textured surface without adding more per-scanline sprites.
+block. The backdrop tilemap cache is keyed only by those visible buckets, so
+small player steps no longer re-upload the whole plane when the selected baked
+view is unchanged. The baked sampler uses a denser Doom-flat texel scale,
+keeping the planes tied to the wall perspective while making the near floor
+read as a receding textured surface without adding more per-scanline sprites.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own
@@ -37,9 +39,9 @@ linedef, so wall columns no longer all restart at the same coarse grid-cell
 edge. Doom pistol frames and the status-face set are baked with Doom patch
 offsets so the weapon sits at the same screen anchor as the original psprite
 path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
-The weapon bake lifts the cropped psprite window inside the Neo Geo strip chain,
-keeping the pistol hand and barrel visible above the status bar instead of
-letting the lower rows disappear into the HUD edge.
+The weapon bake lowers the cropped psprite window inside the Neo Geo strip chain,
+keeping the pistol hand and barrel anchored from the bottom of the playfield
+instead of floating as a center-screen object.
 The pistol animates when B is pressed; walking and strafing nudge the strips
 with a small hardware-position bob so movement feels less static without adding
 any sprite slots. Real shots also pulse the weapon palette for a few frames,
@@ -136,8 +138,8 @@ compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
 Supercharge pickups now convert from Doom thing type `2013`, use `SOUL` art,
 and raise health toward 200 through the existing status-face and health path.
 The weapon psprite bake now uses the same eight-row top position as the runtime
-Neo Geo sprite chain, so the original Doom hand/gun patches land in the intended
-screen-space window instead of being clipped into an unreadable center blob.
+Neo Geo sprite chain, with the Doom hand/gun patches lowered inside that window
+so the pistol reads as a held weapon above the status bar.
 Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
 green armor absorbs roughly one third of incoming damage and blue armor absorbs
 roughly half.
