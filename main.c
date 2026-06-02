@@ -145,10 +145,12 @@ static u8  monster_ai_tick = 0;
 static u8  player_keys = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
+static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
+static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static volatile u16 player_ammo = 50;
@@ -309,6 +311,13 @@ static void load_enemy_palette(u16 slot, int def) {
     enemy_palette_def[slot] = def;
 }
 
+static void load_enemy_hit_palette(u16 slot) {
+    for (int i = 1; i < 16; i++) {
+        pal_set((u16)(PAL_ENEMY_BASE + slot), (u16)i, RGB(31, 31, 24));
+    }
+    enemy_palette_def[slot] = -1;
+}
+
 static u8 damage_enemy_at(int thing_index, u8 damage) {
     u8 killed = 0;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
@@ -326,6 +335,8 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                 if (hp == 0) {
                     enemy_dead[i] = 1;
                     killed = 1;
+                } else {
+                    enemy_hit_flash[i] = 30;
                 }
             }
         }
@@ -334,23 +345,45 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
 }
 
 static void damage_best_visible_enemy(void) {
+    int best_thing = -1;
     int best_slot = -1;
     int best_score = 9999;
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        int thing = enemies[slot].thing_index;
-        int center;
+    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+        int sx, h, dist_q8;
         int score;
-        if (thing < 0) continue;
         if (!thing_is_monster(g_runtime_things[thing].type)) continue;
-        center = enemies[slot].screen_x + enemies[slot].screen_w / 2;
-        score = iabs16(center - SCRW / 2);
+        if (enemy_dead[thing]) continue;
+        if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
+        score = iabs16(sx - SCRW / 2) + (dist_q8 >> 7);
         if (score < best_score) {
             best_score = score;
-            best_slot = slot;
+            best_thing = thing;
         }
     }
-    if (best_slot < 0 || best_score > 96) return;
-    if (damage_enemy_at(enemies[best_slot].thing_index, 1)) hide_enemies();
+    (void)best_score;
+    if (best_thing < 0) return;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        if (enemies[slot].thing_index == best_thing) {
+            best_slot = slot;
+            break;
+        }
+    }
+    if (damage_enemy_at(best_thing, 1)) hide_enemies();
+    else {
+        if (best_slot >= 0) {
+            enemy_slot_flash[best_slot] = 30;
+            load_enemy_hit_palette((u16)best_slot);
+        }
+    }
+}
+
+static void update_enemy_hit_flash(void) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
+    }
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        if (enemy_slot_flash[slot]) enemy_slot_flash[slot]--;
+    }
 }
 
 static void player_take_damage(u16 amount) {
@@ -803,7 +836,8 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     enemies[slot].sprite_def = def_idx;
     enemies[slot].dist_q8 = dist_q8;
     enemies[slot].screen_h = h;
-    load_enemy_palette(slot, def_idx);
+    if (enemy_hit_flash[thing_index] || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
+    else load_enemy_palette(slot, def_idx);
 
     if (h > 110) idx = 0;
     else if (h > 76) idx = 1;
@@ -944,6 +978,7 @@ int main(void) {
         else update_enemy();
         update_monster_damage();
         update_weapon(pressed);
+        update_enemy_hit_flash();
         update_status_numbers();
         update_center_message();
 
