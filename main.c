@@ -335,6 +335,10 @@ static u8 thing_is_explosion(u16 thing_type) {
     return thing_type == 9000;
 }
 
+static u8 thing_is_corpse(u16 thing_type) {
+    return thing_type >= 9001 && thing_type <= 9004;
+}
+
 static u8 thing_is_shootable(u16 thing_type) {
     return thing_is_monster(thing_type) || thing_is_barrel(thing_type);
 }
@@ -413,6 +417,22 @@ static u16 monster_drop_type(u16 thing_type) {
     }
 }
 
+static u16 monster_corpse_type(u16 thing_type) {
+    switch (thing_type) {
+    case 3004:
+        return 9001; /* former human corpse */
+    case 9:
+        return 9002; /* shotgun guy corpse */
+    case 3001:
+        return 9003; /* imp corpse */
+    case 3002:
+    case 58:
+        return 9004; /* demon/spectre corpse */
+    default:
+        return 0;
+    }
+}
+
 static u16 monster_score_value(u16 thing_type) {
     switch (thing_type) {
     case 3004: /* former human */
@@ -482,6 +502,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         short y = thing_y_q8[thing_index];
         u16 source_type = runtime_thing_type(thing_index);
         u16 drop_type = monster_drop_type(source_type);
+        u16 corpse_type = monster_corpse_type(source_type);
         u8 score_awarded = 0;
         u8 hp = monster_hp(thing_index);
         if (damage >= hp) hp = 0;
@@ -494,6 +515,9 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                 if (hp == 0) {
                     if (drop_type) {
                         thing_type_override[i] = drop_type;
+                        enemy_dead[i] = 0;
+                    } else if (corpse_type) {
+                        thing_type_override[i] = corpse_type;
                         enemy_dead[i] = 0;
                     } else {
                         enemy_dead[i] = 1;
@@ -1417,6 +1441,7 @@ static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist
     else if (h > 30) idx = 3;
     else idx = 4;
     if (thing_is_pickup(thing_type) && idx > 1) idx = 1;
+    if (thing_is_corpse(thing_type) && idx > 2) idx = 2;
     if (thing_is_explosion(thing_type) && idx > 2) idx = 2;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];

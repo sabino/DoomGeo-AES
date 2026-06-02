@@ -114,7 +114,9 @@ Surviving monsters flash briefly when hit, making shots readable without
 spending extra sprite slots; the same short timer also pauses their chase and
 attack logic, creating a compact Doom-like pain reaction. Former humans turn
 into clip pickups and shotgun guys turn into shotgun pickups when killed,
-reusing the existing projected pickup path instead of adding corpse sprites.
+reusing the existing projected pickup path. Other killed monsters now turn into
+projected Doom corpse frames (`TROOR0`, `SARGN0`, etc.) so fights leave a
+readable battlefield state instead of simply deleting every dead thing.
 Kills still add a small capped internal score for combat bookkeeping, but the
 visible status bar keeps Doom's ammo, health, face, armor, and key fields
 instead of drawing a custom score over the face slot. Explosive barrel thing
