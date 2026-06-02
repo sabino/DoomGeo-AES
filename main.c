@@ -1733,6 +1733,13 @@ static void draw_weapon_status(void) {
     shown_weapon_status = weapon_status_bits();
 }
 
+static void draw_face_debug_indices(void) {
+    fix_poke(18, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 0));
+    fix_poke(20, 24, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 1));
+    fix_poke(18, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 2));
+    fix_poke(20, 26, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + 3));
+}
+
 static void update_status_numbers(u8 pressed) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
@@ -1761,6 +1768,7 @@ static void update_status_numbers(u8 pressed) {
         shown_keys = player_keys;
     }
     if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
+    draw_face_debug_indices();
 }
 
 static void draw_crosshair(void) {
