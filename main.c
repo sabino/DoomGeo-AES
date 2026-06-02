@@ -66,6 +66,12 @@ static void init_palettes(void) {
         u8 b = g_weapon_palette_rgb[i][2];
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
     }
+    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
+        u8 r = g_enemy_palette_rgb[i][0];
+        u8 g = g_enemy_palette_rgb[i][1];
+        u8 b = g_enemy_palette_rgb[i][2];
+        pal_set(PAL_ENEMY, (u16)(i + 1), RGB(r, g, b));
+    }
 
     REG_BACKDROP = RGB(0, 0, 0);
 }
@@ -82,6 +88,11 @@ static u8  map_on = 0;              /* minimap visible?                       */
 static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
+static u8  enemy_alive = 1;
+static int enemy_screen_x = SCRW / 2;
+static int enemy_screen_w = 0;
+
+static void hide_enemy(void);
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
@@ -206,7 +217,13 @@ static void update_weapon(u8 pressed) {
     enum { B = 0x20 };
     static u8 b_prev = 0;
     u8 b_now = pressed & B;
-    if (b_now && !b_prev && fire_timer == 0) fire_timer = 12;
+    if (b_now && !b_prev && fire_timer == 0) {
+        fire_timer = 12;
+        if (enemy_alive) {
+            enemy_alive = 0;
+            hide_enemy();
+        }
+    }
     b_prev = b_now;
 
     u8 frame = 0;
@@ -231,6 +248,73 @@ static void init_weapon(void) {
     set_weapon_frame(0);
 }
 
+static void hide_enemy(void) {
+    for (u16 i = 0; i < ENEMY_COUNT; i++) {
+        u16 spr = ENEMY_BASE + i;
+        scb2(spr, 0x0F, 0x00);
+        scb3(spr, SCRH + 32, 0, 1);
+        scb4(spr, 0);
+    }
+    enemy_screen_w = 0;
+}
+
+static void set_enemy_tiles(const DoomSpriteScale *meta) {
+    for (u16 i = 0; i < ENEMY_COUNT; i++) {
+        u16 spr = ENEMY_BASE + i;
+        vram_addr(VRAM_SCB1 + spr * 64);
+        vram_mod(1);
+        for (u16 row = 0; row < ENEMY_WIN; row++) {
+            if (i < meta->strips && row < meta->rows) {
+                vram_w((u16)(meta->tile_base + row * meta->strips + i));
+                vram_w((u16)(PAL_ENEMY << 8));
+            } else {
+                vram_w(TILE_BLANK);
+                vram_w(0);
+            }
+        }
+    }
+}
+
+static void update_enemy(void) {
+    enum { ENEMY_X_Q8 = 3 * 256 + 64, ENEMY_Y_Q8 = 15 * 256 + 51 };
+    int sx, h, dist_q8;
+    int idx;
+    const DoomSpriteScale *meta;
+    if (!enemy_alive || !rc_project_point(ENEMY_X_Q8, ENEMY_Y_Q8, &sx, &h, &dist_q8)) {
+        hide_enemy();
+        return;
+    }
+
+    if (h > 110) idx = 0;
+    else if (h > 76) idx = 1;
+    else if (h > 48) idx = 2;
+    else if (h > 30) idx = 3;
+    else idx = 4;
+    if (idx >= ENEMY_SCALE_COUNT) idx = ENEMY_SCALE_COUNT - 1;
+    meta = &g_enemy_scales[idx];
+
+    set_enemy_tiles(meta);
+    enemy_screen_x = sx - meta->width / 2;
+    enemy_screen_w = meta->width;
+    {
+        int bottom = (GAME_H + h) / 2;
+        int top = bottom - meta->height;
+        if (top < 0) top = 0;
+        for (u16 i = 0; i < ENEMY_COUNT; i++) {
+            u16 spr = ENEMY_BASE + i;
+            if (i < meta->strips) {
+                scb2(spr, 0x0F, 0xFF);
+                scb3(spr, top, 0, meta->rows);
+                scb4(spr, (u16)(enemy_screen_x + i * 16));
+            } else {
+                scb2(spr, 0x0F, 0x00);
+                scb3(spr, SCRH + 32, 0, 1);
+                scb4(spr, 0);
+            }
+        }
+    }
+}
+
 int main(void) {
     watchdog_kick();
     clear_fix();
@@ -240,6 +324,7 @@ int main(void) {
     init_walls();
     init_hud();
     init_weapon();
+    hide_enemy();
     rc_init();
 
     for (;;) {
@@ -250,6 +335,7 @@ int main(void) {
         watchdog_kick();
         rc_blit();                      /* push to VRAM during vblank         */
         update_background_phase(rc_bg_phase());
+        update_enemy();
         update_weapon(pressed);
 
         /* button C toggles the minimap  */

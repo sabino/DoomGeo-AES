@@ -35,7 +35,10 @@
 #define HUD_BASE  (WALL_BASE + NUM_COLS)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
-#define WEAPON_BASE  (HUD_BASE + HUD_COUNT)
+#define ENEMY_BASE   (HUD_BASE + HUD_COUNT)
+#define ENEMY_COUNT  3
+#define ENEMY_WIN    4
+#define WEAPON_BASE  (ENEMY_BASE + ENEMY_COUNT)
 #define WEAPON_COUNT 6
 #define WEAPON_WIN   6
 #define SPR_TOTAL 381               
@@ -78,6 +81,7 @@
 #define PAL_MAP_PLAYER 6            /* minimap player marker                 */
 #define PAL_HUD       7
 #define PAL_WEAPON    36
+#define PAL_ENEMY     37
 
  
 #define DEPTH_BANDS    14

@@ -51,6 +51,7 @@ static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
+static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 
 static inline u16 wall_tile(u8 tex_x, int row) {
     int tex_y = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
@@ -117,6 +118,33 @@ u8 rc_bg_phase(void) {
     return (u8)((mix >> (FBITS - 4)) & (BG_PHASES - 1));
 }
 
+int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
+    fix spriteX = ((fix)world_x_q8 << (FBITS - 8)) - posX;
+    fix spriteY = ((fix)world_y_q8 << (FBITS - 8)) - posY;
+    fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
+    if (det > -FMIN && det < FMIN) return 0;
+
+    fix invDet = fdiv(FONE, det);
+    fix transformX = fmul(invDet, fmul(dirY, spriteX) - fmul(dirX, spriteY));
+    fix transformY = fmul(invDet, -fmul(planeY, spriteX) + fmul(planeX, spriteY));
+    if (transformY < (FONE >> 3)) return 0;
+
+    int sx = (SCRW / 2) + (int)(((int64_t)(SCRW / 2) * transformX) / transformY);
+    int h = (int)(((int64_t)WALLH << FBITS) / transformY);
+    if (h < 1) return 0;
+    if (h > GAME_H) h = GAME_H;
+
+    if (sx >= 0 && sx < SCRW) {
+        int col = sx / COLW;
+        if (col >= 0 && col < NUM_COLS && transformY > distbuf[col] + (FONE >> 3)) return 0;
+    }
+
+    *screen_x = sx;
+    *height = h;
+    *dist_q8 = (int)(transformY >> (FBITS - 8));
+    return 1;
+}
+
 void rc_render(void) {
     for (int x = 0; x < NUM_COLS; x++) {
         fix cameraX = cameraXbuf[x];
@@ -145,6 +173,7 @@ void rc_render(void) {
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
         if (perp < FMIN) perp = FMIN;
+        distbuf[x] = perp;
 
         {
             fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
