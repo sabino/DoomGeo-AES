@@ -43,6 +43,7 @@ static inline fix recip(fix b) {
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
 static fix planeX, planeY;       /* camera plane (sets FOV; |plane|~0.66)   */
+static fix cameraXbuf[NUM_COLS]; /* constant camera x in [-1,+1] per column */
 
 static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
 static u16 scb3buf[NUM_COLS];    /* Y/size word                             */
@@ -51,6 +52,9 @@ static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 
 void rc_init(void) {
     init_recip_lut();
+    for (int c = 0; c < NUM_COLS; c++) {
+        cameraXbuf[c] = (fix)(((int64_t)2 * FONE * c) / (NUM_COLS - 1)) - FONE;
+    }
     posX = FIX(DOOM_START_X);
     posY = FIX(DOOM_START_Y);
     dirX = FIX(DOOM_DIR_X);
@@ -98,8 +102,7 @@ void rc_player_cell(int *cx, int *cy) {
 
 void rc_render(void) {
     for (int x = 0; x < NUM_COLS; x++) {
-        /* camera x in [-1, +1] across the screen */
-        fix cameraX = (fix)(((int64_t)2 * FONE * x) / (NUM_COLS - 1)) - FONE;
+        fix cameraX = cameraXbuf[x];
         fix rayX = dirX + fmul(planeX, cameraX);
         fix rayY = dirY + fmul(planeY, cameraX);
 
