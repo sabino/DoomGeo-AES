@@ -284,6 +284,7 @@ static u8  map_prev = 0;
 static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
 static u8  floor_damage_timer = 0;
+static u8  armor_flash_timer = 0;
 static u8  level_complete = 0;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u8  key_message_timer = 0;
@@ -1017,6 +1018,7 @@ static void player_take_damage(u16 amount) {
         if (saved > player_armor) saved = player_armor;
         player_armor = (u16)(player_armor - saved);
         amount = (u16)(amount - saved);
+        if (saved) armor_flash_timer = 18;
         if (!player_armor) player_armor_class = 0;
     }
     hurt_flash = 5;
@@ -1744,7 +1746,11 @@ static void update_status_numbers(u8 pressed) {
         draw_number3(5, 24, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
-    if (armor != shown_armor) {
+    if (armor_flash_timer) {
+        draw_number3(27, 24, armor, PAL_MAP_PLAYER);
+        shown_armor = 0xFFFF;
+        armor_flash_timer--;
+    } else if (armor != shown_armor) {
         draw_number3(27, 24, armor, PAL_HUD);
         shown_armor = armor;
     }
@@ -2417,6 +2423,7 @@ static void restart_level(void) {
     hurt_flash = 0;
     muzzle_flash = 0;
     bonus_flash = 0;
+    armor_flash_timer = 0;
     palette_effect = 0;
     face_pain_timer = 0;
     face_evil_timer = 0;

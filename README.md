@@ -147,7 +147,9 @@ so the pistol reads as a held weapon above the status bar.
 Close live monsters apply a first-pass contact-damage tick from runtime position,
 even if they are not currently selected for one of the scarce visible sprite
 slots. Damage still goes through Doom-like armor absorption: green armor absorbs
-roughly one third of incoming damage and blue armor absorbs roughly half.
+roughly one third of incoming damage and blue armor absorbs roughly half. When
+armor absorbs part of a hit, the status bar armor digits briefly brighten so the
+player can tell that armor, not only health, took the impact.
 Pickups briefly flash compact center feedback using existing fix glyphs:
 `KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
 Former humans and shotgun guys still apply compact hitscan-style ranged damage,
