@@ -27,7 +27,9 @@ WALL_TEXTURE = "BROWN1"
 WALL_MIP_TILE = 1
 SOLID_TILE = 2
 WALL_ATLAS_BASE = 3
-WALL_ATLAS_TILES = 64
+WALL_ATLAS_COLS = 16
+WALL_ATLAS_ROWS = 15
+WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
 SPRITE_CACHE_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
 
 
@@ -145,6 +147,12 @@ def compose_texture(wad, texture_name):
                 tx = origin_x + px
                 if color >= 0 and 0 <= tx < width:
                     canvas[ty][tx] = color
+    used = Counter(color for row in canvas for color in row if color >= 0)
+    fill = used.most_common(1)[0][0] if used else 0
+    for y, row in enumerate(canvas):
+        for x, color in enumerate(row):
+            if color < 0:
+                canvas[y][x] = fill
     return canvas
 
 
@@ -227,6 +235,19 @@ def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
     return tile
 
 
+def sample_wall_column_tile(texture, playpal, palette, tex_col, tex_row, cols, rows):
+    height = len(texture)
+    width = len(texture[0])
+    tx = min(width - 1, int((tex_col + 0.5) * width / cols))
+    tile = [[0] * 16 for _ in range(16)]
+    for y in range(16):
+        ty = min(height - 1, int(((tex_row * 16) + y + 0.5) * height / (rows * 16)))
+        color = quantize_color(texture[ty][tx], playpal, palette)
+        for x in range(16):
+            tile[y][x] = color
+    return tile
+
+
 def wall_texture_tiles(iwad, zip_member, texture_name):
     if not iwad:
         brick = tile_brick()
@@ -238,10 +259,10 @@ def wall_texture_tiles(iwad, zip_member, texture_name):
     palette = texture_palette(texture, playpal)
     height = len(texture)
     width = len(texture[0])
-    tiles = [sample_texture_tile(texture, playpal, palette, 0, 0, max(1, width // 8), max(1, height // 8))]
-    for ty in range(8):
-        for tx in range(8):
-            tiles.append(sample_texture_tile(texture, playpal, palette, tx * width // 8, ty * height // 8, max(1, width // 8), max(1, height // 8)))
+    tiles = [sample_texture_tile(texture, playpal, palette, 0, 0, width, height)]
+    for ty in range(WALL_ATLAS_ROWS):
+        for tx in range(WALL_ATLAS_COLS):
+            tiles.append(sample_wall_column_tile(texture, playpal, palette, tx, ty, WALL_ATLAS_COLS, WALL_ATLAS_ROWS))
     return tiles, texture_name.upper(), palette
 
 
@@ -355,7 +376,7 @@ def main():
             f.write(data)
         print(f"  {name:8} {len(data):#8x} bytes")
 
-    print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1}")
+    print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     for name, scale, base, strips, rows, width, height in sprite_meta:
         print(f"  sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
     print(f"  tiles encoded: blank wall-cache solid "

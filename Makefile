@@ -38,6 +38,7 @@ FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_
 DOOM_MAP?=E1M1
 DOOM_MAP_WIDTH?=38
 DOOM_MAP_HEIGHT?=27
+DOOM_WALL_TEXTURE?=BASE2
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
@@ -116,7 +117,7 @@ rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture BROWN1 --palette-header $(GFX_HEADER)
+	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
 	touch $@
 
 $(GFX_HEADER): $(GFX_STAMP)

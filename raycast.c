@@ -53,8 +53,8 @@ static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 
 static inline u16 wall_tile(u8 tex_x, int row) {
-    int tex_y = (row * 8) / WALL_WIN;
-    return (u16)(TILE_WALL_ATLAS_BASE + tex_y * 8 + (tex_x & 7));
+    int tex_y = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
+    return (u16)(TILE_WALL_ATLAS_BASE + tex_y * TILE_WALL_ATLAS_COLS + (tex_x % TILE_WALL_ATLAS_COLS));
 }
 
 void rc_init(void) {
@@ -141,9 +141,9 @@ void rc_render(void) {
 
         {
             fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
-            int tex_x = (int)(((wall & (FONE - 1)) * 8) >> FBITS);
+            int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
             if (tex_x < 0) tex_x = 0;
-            if (tex_x > 7) tex_x = 7;
+            if (tex_x >= TILE_WALL_ATLAS_COLS) tex_x = TILE_WALL_ATLAS_COLS - 1;
             texbuf[x] = (u8)tex_x;
         }
 
