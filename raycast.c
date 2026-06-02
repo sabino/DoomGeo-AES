@@ -159,7 +159,7 @@ static void update_bg_phase_cache(void) {
     fix forward = fmul(posX, dirX) + fmul(posY, dirY);
     fix lateral = fmul(posX, planeX) + fmul(posY, planeY);
     fix mix = forward + (lateral >> 1);
-    bg_phase_cache = (u8)((mix >> (FBITS - 4)) & (BG_PHASES - 1));
+    bg_phase_cache = (u8)((mix >> (FBITS - 5)) & (BG_PHASES - 1));
 }
 
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {

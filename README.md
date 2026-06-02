@@ -19,9 +19,9 @@ Every frame, for each of 64 screen columns:
 
 The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling use Doom flat textures selected from the
-player-start sector and packed into preprojected sprite-strip phase banks; the
-68000 swaps backdrop tile IDs as the player moves so the planes scroll without
-a framebuffer span renderer. Doom pistol frames are rendered as a centered
+player-start sector and packed into 32 preprojected sprite-strip phase banks;
+the 68000 swaps backdrop tile IDs as the player moves so the planes scroll
+without a framebuffer span renderer. Doom pistol frames are rendered as a centered
 sprite-strip overlay above the bottom 32-pixel `STBAR` status bar and animate
 when B is pressed; walking and strafing nudge the pistol strips with a small
 hardware-position bob so movement feels less static without adding any sprite

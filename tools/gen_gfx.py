@@ -26,7 +26,7 @@ from doom_convert import (
     read_wad,
 )
 
-C_PAD = 0x80000   # pad each C ROM to 512 KiB (well above any tile we use)
+C_PAD = 0x100000  # pad each C ROM to 1 MiB for larger precomputed tile banks
 S_PAD = 0x20000   # 128 KiB fix ROM, all blank
 M_PAD = 0x10000   # 64 KiB Z80 program, all 0x00 (NOP) -> silent
 V_PAD = 0x10000   # 64 KiB ADPCM samples, empty
@@ -45,7 +45,7 @@ HUD_TILES = HUD_COLS * HUD_ROWS
 BG_COLS = 20
 BG_HALF_ROWS = 6
 BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
-BG_PHASES = 16
+BG_PHASES = 32
 CEILING_BASE = HUD_BASE + HUD_TILES
 FLOOR_BASE = CEILING_BASE + BG_PHASES * BG_HALF_TILES
 WEAPON_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
