@@ -33,9 +33,12 @@ static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 
 void rc_init(void) {
-    posX = FIX(8.5); posY = FIX(12.5);   /* open floor, clear of all walls     */
-    dirX = FIX(0.0); dirY = FIX(-1.0);   /* face north across the hall         */
-    planeX = FIX(0.66); planeY = FIX(0.0);
+    posX = FIX(DOOM_START_X);
+    posY = FIX(DOOM_START_Y);
+    dirX = FIX(DOOM_DIR_X);
+    dirY = FIX(DOOM_DIR_Y);
+    planeX = FIX(DOOM_PLANE_X);
+    planeY = FIX(DOOM_PLANE_Y);
     for (int c = 0; c < NUM_COLS; c++) curpal[c] = 0xFF; /* force first write */
 }
 

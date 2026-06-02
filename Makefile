@@ -23,12 +23,21 @@ all: cart bios
 # location of generated and compiled content
 BUILDDIR=build
 # all directories that contain source to be compiled
-SRCDIRS=assets
+SRCDIRS=
 # default build flags, can be overriden per target
 CFLAGS=-I$(BUILDDIR) -std=c99 -fomit-frame-pointer -Os -g
 LDFLAGS=
 Z80FLAGS=
 Z80LDFLAGS=
+
+# Build-time Doom WAD conversion. The generated header is intentionally kept
+# in BUILDDIR so cart builds can swap maps without touching committed sources.
+FREEDOOM_VERSION=0.13.0
+FREEDOOM_ZIP=.tools/assets/freedoom-$(FREEDOOM_VERSION).zip
+FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_VERSION)/freedoom-$(FREEDOOM_VERSION).zip
+DOOM_MAP?=E1M1
+DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
+CUSTOM_GENERATE_TARGETS+=doom-assets
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
@@ -54,6 +63,17 @@ include emu.mk
 ELF=$(BUILDDIR)/rom.elf
 $(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o
 $(PROM1): $(ELF)
+
+$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER)
+
+$(FREEDOOM_ZIP):
+	mkdir -p $(dir $@)
+	curl -L --fail --output $@ $(FREEDOOM_URL)
+
+$(DOOM_MAP_HEADER): tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --out $@
+
+doom-assets: $(DOOM_MAP_HEADER)
 
 
 
@@ -121,7 +141,6 @@ $(MROM1): $(SOUND_DRIVER)
 #     the right ROM bank based on your input assets
 # Those actions can be achieved by creating custom make targets
 # that get invoked automatically when added to the variable below.
-CUSTOM_GENERATE_TARGETS=
 
 
 
