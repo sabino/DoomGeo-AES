@@ -49,6 +49,13 @@ static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
 static u16 scb3buf[NUM_COLS];    /* Y/size word                             */
 static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
+static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
+static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
+
+static inline u16 wall_tile(u8 tex_x, int row) {
+    int tex_y = (row * 8) / WALL_WIN;
+    return (u16)(TILE_WALL_ATLAS_BASE + tex_y * 8 + (tex_x & 7));
+}
 
 void rc_init(void) {
     init_recip_lut();
@@ -61,7 +68,10 @@ void rc_init(void) {
     dirY = FIX(DOOM_DIR_Y);
     planeX = FIX(DOOM_PLANE_X);
     planeY = FIX(DOOM_PLANE_Y);
-    for (int c = 0; c < NUM_COLS; c++) curpal[c] = 0xFF; /* force first write */
+    for (int c = 0; c < NUM_COLS; c++) {
+        curpal[c] = 0xFF; /* force first write */
+        curtex[c] = 0xFF;
+    }
 }
 
 static void rotate(int sign) {
@@ -129,6 +139,14 @@ void rc_render(void) {
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
         if (perp < FMIN) perp = FMIN;
 
+        {
+            fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
+            int tex_x = (int)(((wall & (FONE - 1)) * 8) >> FBITS);
+            if (tex_x < 0) tex_x = 0;
+            if (tex_x > 7) tex_x = 7;
+            texbuf[x] = (u8)tex_x;
+        }
+
         int h =  (int)(((int64_t)WALLH << FBITS) / perp);  /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
@@ -163,6 +181,19 @@ void rc_blit(void) {
 
     /* directional shading */
     for (int c = 0; c < NUM_COLS; c++) {
+        if (texbuf[c] != curtex[c]) {
+            u16 spr = WALL_BASE + c;
+            u16 attr = (u16)(palbuf[c] << 8);
+            vram_addr(VRAM_SCB1 + spr * 64);
+            vram_mod(1);
+            for (int t = 0; t < WALL_WIN; t++) {
+                vram_w(wall_tile(texbuf[c], t));
+                vram_w(attr);
+            }
+            curtex[c] = texbuf[c];
+            curpal[c] = palbuf[c];
+            continue;
+        }
         if (palbuf[c] == curpal[c]) continue;
         u16 spr = WALL_BASE + c;
         vram_addr(VRAM_SCB1 + spr * 64 + 1);
