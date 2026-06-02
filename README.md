@@ -103,7 +103,7 @@ and equip a third weapon slot that uses the `CHGG` weapon frames for a faster
 held-fire bullet stream. Rocket launchers now convert from thing type `2003`
 with `LAUN` pickup art, use `MISG` weapon frames, track rockets separately from
 bullets and shells, and apply compact splash damage around the auto-aimed
-target. Trying to fire empty flashes
+target or a traced wall impact when no visible target is selected. Trying to fire empty flashes
 a compact fix-layer `AMMO` message instead of failing silently, and firing an
 empty selected weapon first auto-selects another owned weapon with usable ammo.
 Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:

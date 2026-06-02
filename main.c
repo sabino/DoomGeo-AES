@@ -676,13 +676,10 @@ static void damage_best_visible_enemy(u8 damage) {
     damage_visible_enemy(best_visible_enemy(), damage);
 }
 
-static void damage_rocket_target(void) {
-    int target = best_visible_enemy();
-    short x;
-    short y;
-    if (target < 0) return;
-    x = thing_x_q8[target];
-    y = thing_y_q8[target];
+static void damage_rocket_radius(short x, short y) {
+    int px, py;
+    rc_player_q8(&px, &py);
+    if (iabs16(px - x) + iabs16(py - y) < 420) player_take_damage(8);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u16 type = runtime_thing_type(i);
         if (enemy_dead[i] || !thing_is_shootable(type)) continue;
@@ -691,6 +688,42 @@ static void damage_rocket_target(void) {
         }
     }
     hide_enemies();
+}
+
+static void rocket_forward_impact(short *x, short *y) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    int last_x, last_y;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    last_x = px;
+    last_y = py;
+    for (int step = 128; step <= 2304; step += 128) {
+        int tx = px + ((dir_x * step) >> 8);
+        int ty = py + ((dir_y * step) >> 8);
+        if (map_at(tx >> 8, ty >> 8)) {
+            *x = (short)tx;
+            *y = (short)ty;
+            return;
+        }
+        last_x = tx;
+        last_y = ty;
+    }
+    *x = (short)last_x;
+    *y = (short)last_y;
+}
+
+static void damage_rocket_target(void) {
+    int target = best_visible_enemy();
+    short x;
+    short y;
+    if (target >= 0) {
+        x = thing_x_q8[target];
+        y = thing_y_q8[target];
+    } else {
+        rocket_forward_impact(&x, &y);
+    }
+    damage_rocket_radius(x, y);
 }
 
 static void damage_shotgun_spread(void) {
