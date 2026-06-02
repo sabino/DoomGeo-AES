@@ -19,10 +19,11 @@ Every frame, for each of 64 screen columns:
 
 The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling use Doom flat textures selected from the
-player-start sector and packed into full-width sprite backdrops (lower sprite
-indices draw first = further back). The bottom 32 pixels are reserved for a
-Doom `STBAR` status bar converted into Neo Geo sprite strips. The optional
-minimap is drawn on the fix (text) layer, which always composites over sprites.
+player-start sector and packed into preprojected sprite-strip phase banks; the
+68000 swaps backdrop tile IDs as the player moves so the planes scroll without
+a framebuffer span renderer. The bottom 32 pixels are reserved for a Doom
+`STBAR` status bar converted into Neo Geo sprite strips. The optional minimap
+is drawn on the fix (text) layer, which always composites over sprites.
 
 All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
 renderer writes only a few control words per column per frame; the expensive

@@ -73,6 +73,7 @@ static void clear_fix(void) {
 
 static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
+static u8  bg_phase = 0xFF;
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
@@ -118,22 +119,40 @@ static void disable_sprites(void) {
     }
 }
 
-/* ---- static floor/ceiling backdrop: BG_COUNT full-width columns ------  */
+static void set_background_phase(u8 phase) {
+    u16 phase_base = (u16)(phase * TILE_BG_PHASE_TILES);
+    for (u16 i = 0; i < BG_COUNT; i++) {
+        u16 spr = BG_BASE + i;
+        vram_addr(VRAM_SCB1 + spr * 64);
+        vram_mod(1);
+        for (u16 t = 0; t < BG_WIN; t++) {
+            if (t < BG_SPLIT) {
+                vram_w((u16)(TILE_CEILING_BASE + phase_base + t * BG_COUNT + i));
+                vram_w((u16)(PAL_CEILING << 8));
+            } else {
+                u16 row = (u16)(t - BG_SPLIT);
+                vram_w((u16)(TILE_FLOOR_BASE + phase_base + row * BG_COUNT + i));
+                vram_w((u16)(PAL_FLOOR << 8));
+            }
+        }
+    }
+    bg_phase = phase;
+}
+
+static void update_background_phase(u8 phase) {
+    if (phase == bg_phase) return;
+    set_background_phase(phase);
+}
+
+/* ---- floor/ceiling backdrop: BG_COUNT full-width columns -------------- */
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
-        for (u16 t = 0; t < BG_WIN; t++) {
-            if (t < BG_SPLIT) {
-                scb1_tile(spr, t, (u16)(TILE_CEILING_BASE + t * BG_COUNT + i), PAL_CEILING);
-            } else {
-                u16 row = (u16)(t - BG_SPLIT);
-                scb1_tile(spr, t, (u16)(TILE_FLOOR_BASE + row * BG_COUNT + i), PAL_FLOOR);
-            }
-        }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
         scb4(spr, i * 16);
     }
+    set_background_phase(0);
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
@@ -178,6 +197,7 @@ int main(void) {
         wait_vblank();
         watchdog_kick();
         rc_blit();                      /* push to VRAM during vblank         */
+        update_background_phase(rc_bg_phase());
 
         /* button C toggles the minimap  */
         {

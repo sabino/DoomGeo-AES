@@ -45,9 +45,10 @@ HUD_TILES = HUD_COLS * HUD_ROWS
 BG_COLS = 20
 BG_HALF_ROWS = 6
 BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
+BG_PHASES = 16
 CEILING_BASE = HUD_BASE + HUD_TILES
-FLOOR_BASE = CEILING_BASE + BG_HALF_TILES
-SPRITE_CACHE_BASE = FLOOR_BASE + BG_HALF_TILES
+FLOOR_BASE = CEILING_BASE + BG_PHASES * BG_HALF_TILES
+SPRITE_CACHE_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
 
 
 def encode_tile(px):
@@ -337,35 +338,63 @@ def decode_flat(wad, flat_name):
     return [list(data[y * 64 : (y + 1) * 64]) for y in range(64)]
 
 
-def flat_grid_tiles(iwad, zip_member, flat_name, cols, rows, shade_top=False):
+def flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=False, phase=0):
+    tiles = []
+
+    width = cols * 16
+    height = rows * 16
+    center_x = width // 2
+
+    phase_offset = (phase * 64) // BG_PHASES
+
+    for row in range(rows):
+        for col in range(cols):
+            tile = [[0] * 16 for _ in range(16)]
+            for y in range(16):
+                screen_y = row * 16 + y
+                if ceiling:
+                    horizon_delta = max(1, height - screen_y)
+                    shade_step = height - screen_y
+                else:
+                    horizon_delta = max(1, screen_y + 1)
+                    shade_step = screen_y
+
+                # Precompute an affine strip for this scanline. Near the
+                # horizon, distance is high and the flat compresses; near the
+                # viewer, distance drops and texels widen. This costs ROM, not
+                # 68000 time, and avoids a runtime floor-span renderer.
+                distance = (height * 48) / horizon_delta
+                forward = int(distance * 2.0)
+                for x in range(16):
+                    screen_x = col * 16 + x
+                    lateral = int((screen_x - center_x) * distance / 40.0)
+                    sx = (lateral + (phase_offset >> 1)) & 63
+                    sy = (forward + phase_offset) & 63
+                    q = quantize_color(flat[sy][sx], playpal, palette)
+                    if shade_step < 24 and q > 1:
+                        q -= 1
+                    if shade_step < 12 and q > 1:
+                        q -= 1
+                    tile[y][x] = q
+            tiles.append(tile)
+
+    return tiles
+
+
+def flat_phase_tiles(iwad, zip_member, flat_name, cols, rows, ceiling=False):
     if not iwad:
         palette = [(12, 12, 12), (36, 36, 36), (72, 72, 72)] * 5
-        return [tile_solid() for _ in range(cols * rows)], flat_name, palette
+        return [tile_solid() for _ in range(cols * rows * BG_PHASES)], flat_name, palette
 
     wad = Wad(read_wad(iwad, zip_member))
     flat = decode_flat(wad, flat_name)
     playpal = playpal_rgb(wad)
     palette = texture_palette(flat, playpal)
-    tiles = []
-
-    for row in range(rows):
-        # Keep the texture coherent but progressively stretch rows near the
-        # horizon, approximating a floor/ceiling plane without software spans.
-        repeat = 1 + row * 2
-        shade_step = row if shade_top else rows - 1 - row
-        for col in range(cols):
-            tile = [[0] * 16 for _ in range(16)]
-            for y in range(16):
-                for x in range(16):
-                    sx = ((col * 16 + x) * repeat) & 63
-                    sy = ((row * 16 + y) * repeat) & 63
-                    q = quantize_color(flat[sy][sx], playpal, palette)
-                    if shade_step < 2 and q > 1:
-                        q -= 1
-                    tile[y][x] = q
-            tiles.append(tile)
-
-    return tiles, flat_name.upper(), palette
+    all_tiles = []
+    source = flat_name.upper()
+    for phase in range(BG_PHASES):
+        all_tiles.extend(flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=ceiling, phase=phase))
+    return all_tiles, source, palette
 
 
 def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
@@ -500,8 +529,8 @@ def main():
     wall_tiles, wall_source, wall_palette = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
     hud_tiles, hud_source, hud_palette, hud_w, hud_h = patch_grid_tiles(args.iwad, args.zip_member, "STBAR", HUD_COLS, HUD_ROWS)
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
-    ceiling_tiles, ceiling_source, ceiling_palette = flat_grid_tiles(args.iwad, args.zip_member, ceiling_flat, BG_COLS, BG_HALF_ROWS, shade_top=True)
-    floor_tiles, floor_source, floor_palette = flat_grid_tiles(args.iwad, args.zip_member, floor_flat, BG_COLS, BG_HALF_ROWS)
+    ceiling_tiles, ceiling_source, ceiling_palette = flat_phase_tiles(args.iwad, args.zip_member, ceiling_flat, BG_COLS, BG_HALF_ROWS, ceiling=True)
+    floor_tiles, floor_source, floor_palette = flat_phase_tiles(args.iwad, args.zip_member, floor_flat, BG_COLS, BG_HALF_ROWS)
     if args.palette_header:
         write_palette_header(
             args.palette_header,
@@ -552,8 +581,8 @@ def main():
 
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
-    print(f"  ceiling flat: {ceiling_source} tile={CEILING_BASE}..{CEILING_BASE + BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS})")
-    print(f"  floor flat: {floor_source} tile={FLOOR_BASE}..{FLOOR_BASE + BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS})")
+    print(f"  ceiling flat: {ceiling_source} tile={CEILING_BASE}..{CEILING_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
+    print(f"  floor flat: {floor_source} tile={FLOOR_BASE}..{FLOOR_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
     for name, scale, base, strips, rows, width, height in sprite_meta:
         print(f"  sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
     print(f"  tiles encoded: blank wall-cache solid "

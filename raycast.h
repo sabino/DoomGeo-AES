@@ -9,5 +9,6 @@ void rc_input(u8 pressed);   /* pressed = active-HIGH P1 bits (already inv.) */
 void rc_render(void);        /* run DDA for every column -> shadow buffers   */
 void rc_blit(void);          /* push shadow buffers to VRAM (call in vblank) */
 void rc_player_cell(int *cx, int *cy);
+u8 rc_bg_phase(void);        /* coarse floor/ceiling texture motion phase     */
 
 #endif /* RAYCAST_H */

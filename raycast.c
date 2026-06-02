@@ -110,6 +110,13 @@ void rc_player_cell(int *cx, int *cy) {
     *cy = posY >> FBITS;
 }
 
+u8 rc_bg_phase(void) {
+    fix forward = fmul(posX, dirX) + fmul(posY, dirY);
+    fix lateral = fmul(posX, planeX) + fmul(posY, planeY);
+    fix mix = forward + (lateral >> 1);
+    return (u8)((mix >> (FBITS - 4)) & (BG_PHASES - 1));
+}
+
 void rc_render(void) {
     for (int x = 0; x < NUM_COLS; x++) {
         fix cameraX = cameraXbuf[x];
