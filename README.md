@@ -64,9 +64,10 @@ Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar. Clips and shells are tracked
-separately; shotgun guys now drop a shotgun pickup, and collecting one equips
-Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
-can hit a second visible target for reduced damage. Trying to fire empty
+separately, and the status bar shows compact weapon `1`/`2` digits before the
+active ammo pool. Shotgun guys now drop a shotgun pickup, and collecting one
+equips Doom's shotgun frames, adds shells, and makes B fire a wider spread shot
+that can hit a second visible target for reduced damage. Trying to fire empty
 flashes a compact fix-layer `AMMO` message instead of failing silently. Close
 visible monsters apply a first-pass contact-damage tick with armor absorption.
 Former humans, shotgun guys, and imps also apply slower ranged damage when they

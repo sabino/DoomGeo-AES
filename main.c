@@ -168,6 +168,7 @@ static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
 static u8 shown_keys = 0xFF;
+static u8 shown_weapon = 0xFF;
 
 typedef struct EnemyDraw {
     int thing_index;
@@ -589,6 +590,7 @@ static void apply_pickup(u16 thing_type) {
         current_weapon = 1;
         player_shells += 8;
         weapon_frame = 0xFF;
+        shown_weapon = 0xFF;
         break;
     case 2007: /* clip */
         player_ammo += 10;
@@ -755,9 +757,14 @@ static void update_status_numbers(void) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
+    u8 weapon = current_weapon && player_has_shotgun ? 2 : 1;
     if (health != shown_health) {
         draw_number3(3, 26, health, PAL_MAP_PLAYER);
         shown_health = health;
+    }
+    if (weapon != shown_weapon) {
+        fix_poke(16, 26, player_has_shotgun ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_DIGIT_BASE + weapon));
+        shown_weapon = weapon;
     }
     if (ammo != shown_ammo) {
         draw_number3(18, 26, ammo, PAL_MAP_PLAYER);
@@ -784,6 +791,7 @@ static void force_fix_hud_redraw(void) {
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
     shown_keys = 0xFF;
+    shown_weapon = 0xFF;
     update_status_numbers();
     draw_crosshair();
     update_center_message();
@@ -909,6 +917,7 @@ static void toggle_weapon(void) {
     current_weapon ^= 1;
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
+    shown_weapon = 0xFF;
 }
 
 static void set_weapon_position(signed char bob_x, signed char bob_y) {
@@ -949,6 +958,7 @@ static void update_weapon(u8 pressed) {
             damage_shotgun_spread();
         } else if (player_ammo > 0) {
             current_weapon = 0;
+            shown_weapon = 0xFF;
             player_ammo--;
             fire_timer = 12;
             damage_best_visible_enemy(1);
