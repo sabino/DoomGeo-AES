@@ -138,6 +138,9 @@ static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
 static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
+static u8  weapon_bob_phase = 0;
+static signed char weapon_bob_x = 0;
+static signed char weapon_bob_y = 0;
 static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
@@ -780,6 +783,33 @@ static void set_weapon_frame(u8 frame) {
     weapon_frame = frame;
 }
 
+static void set_weapon_position(signed char bob_x, signed char bob_y) {
+    u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
+    int top = GAME_H - WEAPON_WIN * 16 + bob_y;
+    if (bob_x == weapon_bob_x && bob_y == weapon_bob_y) return;
+    for (u16 i = 0; i < WEAPON_COUNT; i++) {
+        u16 spr = WEAPON_BASE + i;
+        scb3(spr, top, 0, WEAPON_WIN);
+        scb4(spr, (u16)(start_x + i * 16 + bob_x));
+    }
+    weapon_bob_x = bob_x;
+    weapon_bob_y = bob_y;
+}
+
+static void update_weapon_bob(u8 pressed) {
+    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, A = 0x10 };
+    static const signed char bx[8] = { 0, 1, 1, 0, 0, -1, -1, 0 };
+    static const signed char by[8] = { 0, 1, 2, 1, 0, 1, 2, 1 };
+    u8 moving = (pressed & (UP | DOWN)) || ((pressed & A) && (pressed & (LEFT | RIGHT)));
+    if (moving) {
+        weapon_bob_phase = (u8)((weapon_bob_phase + 1) & 7);
+        set_weapon_position(bx[weapon_bob_phase], by[weapon_bob_phase]);
+    } else {
+        weapon_bob_phase = 0;
+        set_weapon_position(0, 0);
+    }
+}
+
 static void update_weapon(u8 pressed) {
     enum { B = 0x20 };
     static u8 b_prev = 0;
@@ -801,6 +831,7 @@ static void update_weapon(u8 pressed) {
         fire_timer--;
     }
     if (frame != weapon_frame) set_weapon_frame(frame);
+    update_weapon_bob(pressed);
 }
 
 static void init_weapon(void) {
@@ -812,6 +843,8 @@ static void init_weapon(void) {
         scb3(spr, top, 0, WEAPON_WIN);
         scb4(spr, (u16)(start_x + i * 16));
     }
+    weapon_bob_x = 0;
+    weapon_bob_y = 0;
     set_weapon_frame(0);
 }
 

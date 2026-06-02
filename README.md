@@ -23,9 +23,11 @@ player-start sector and packed into preprojected sprite-strip phase banks; the
 68000 swaps backdrop tile IDs as the player moves so the planes scroll without
 a framebuffer span renderer. Doom pistol frames are rendered as a centered
 sprite-strip overlay above the bottom 32-pixel `STBAR` status bar and animate
-when B is pressed. The converter emits a compact grid-space runtime list from
-WAD `THINGS`; the renderer projects up to two visible monster candidates with
-the same camera math as the wall renderer while staying at the Neo Geo's
+when B is pressed; walking and strafing nudge the pistol strips with a small
+hardware-position bob so movement feels less static without adding any sprite
+slots. The converter emits a compact grid-space runtime list from WAD `THINGS`;
+the renderer projects up to two visible monster candidates with the same camera
+math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
 before pickups so the limited sprite slots keep combat readable; candidates are
 ranked by distance and screen relevance each frame, and tiny candidates hidden
