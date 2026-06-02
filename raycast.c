@@ -14,10 +14,27 @@ static inline fix fmul(fix a, fix b) { return (fix)(((int64_t)a * b) >> FBITS); 
 static inline fix fdiv(fix a, fix b) { return (fix)(((int64_t)a << FBITS) / b); }
 static inline fix fabsx(fix a)       { return a < 0 ? -a : a; }
  
+#define RECIP_SHIFT    9
+#define RECIP_LUT_SIZE 256
+#define RECIP_MIN      (FONE >> 8)
+
+static fix recip_lut[RECIP_LUT_SIZE];
+
+static void init_recip_lut(void) {
+    for (int i = 0; i < RECIP_LUT_SIZE; i++) {
+        u32 ab = (u32)(i << RECIP_SHIFT);
+        if (ab < (u32)RECIP_MIN) ab = RECIP_MIN;
+        recip_lut[i] = (fix)(0x100000000ULL / ab);
+    }
+}
+
 static inline fix recip(fix b) {
     u32 ab = (b < 0) ? (u32)(-b) : (u32)b;
-    if (ab < (u32)(FONE >> 8)) ab = (FONE >> 8);   /* clamp |b| >= 1/256 */
-    return (fix)(0x100000000ULL / ab);
+    u32 idx;
+    if (ab < (u32)RECIP_MIN) return recip_lut[0];
+    idx = ab >> RECIP_SHIFT;
+    if (idx >= RECIP_LUT_SIZE) idx = RECIP_LUT_SIZE - 1;
+    return recip_lut[idx];
 }
 
 #define FBIG (1 << 28)            
@@ -33,6 +50,7 @@ static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
 static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 
 void rc_init(void) {
+    init_recip_lut();
     posX = FIX(DOOM_START_X);
     posY = FIX(DOOM_START_Y);
     dirX = FIX(DOOM_DIR_X);
