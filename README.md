@@ -99,8 +99,9 @@ held-fire bullet stream. Rocket launchers now convert from thing type `2003`
 with `LAUN` pickup art, use `MISG` weapon frames, track rockets separately from
 bullets and shells, and apply compact splash damage around the auto-aimed
 target. Trying to fire empty flashes
-a compact fix-layer `AMMO` message instead of failing silently. Close visible
-monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
+a compact fix-layer `AMMO` message instead of failing silently, and firing an
+empty selected weapon first auto-selects another owned weapon with usable ammo.
+Close visible monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
 green armor absorbs roughly one third of incoming damage and blue armor absorbs
 roughly half.
 Pickups briefly flash compact center feedback using existing fix glyphs:

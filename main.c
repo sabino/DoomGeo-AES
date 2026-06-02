@@ -361,6 +361,36 @@ static u8 player_has_weapon(u8 weapon) {
     }
 }
 
+static u8 weapon_has_ammo(u8 weapon) {
+    switch (weapon) {
+    case 0:
+        return player_ammo > 0;
+    case 1:
+        return player_has_shotgun && player_shells > 0;
+    case 2:
+        return player_has_chaingun && player_ammo > 0;
+    case 3:
+        return player_has_rocket_launcher && player_rockets > 0;
+    default:
+        return 0;
+    }
+}
+
+static u8 switch_to_ready_weapon(void) {
+    static const u8 fallback_order[] = {1, 2, 0, 3};
+    if (weapon_has_ammo(current_weapon)) return 1;
+    for (u16 i = 0; i < sizeof(fallback_order); i++) {
+        u8 weapon = fallback_order[i];
+        if (weapon_has_ammo(weapon)) {
+            current_weapon = weapon;
+            weapon_frame = 0xFF;
+            shown_ammo = 0xFFFF;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static u8 key_bit_for_thing(u16 thing_type) {
     switch (thing_type) {
     case 5:
@@ -1457,7 +1487,9 @@ static void update_weapon(u8 pressed) {
     enum { B = 0x20 };
     u8 b_now = pressed & B;
     if (b_now && fire_timer == 0) {
-        if (current_weapon == 2 && player_has_chaingun) {
+        if (!switch_to_ready_weapon()) {
+            if (!fire_prev) ammo_message_timer = 45;
+        } else if (current_weapon == 2 && player_has_chaingun) {
             if (player_ammo > 0) {
                 player_ammo--;
                 fire_timer = 4;
