@@ -42,6 +42,7 @@ DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
+GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_STAMP=rom/.generated-gfx
 CUSTOM_GENERATE_TARGETS+=doom-assets
 
@@ -70,7 +71,8 @@ ELF=$(BUILDDIR)/rom.elf
 $(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(BUILDDIR)/main.o: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/raycast.o: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
@@ -113,9 +115,12 @@ $(CROM2): rom/c2.bin
 rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
-$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(FREEDOOM_ZIP)
-	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture BROWN1
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --wall-texture BROWN1 --palette-header $(GFX_HEADER)
 	touch $@
+
+$(GFX_HEADER): $(GFX_STAMP)
+	@test -f $@
 
 
 

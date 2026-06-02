@@ -3,6 +3,7 @@
  */
 #include "hw.h"
 #include "config.h"
+#include "doom_gfx_generated.h"
 #include "raycast.h"
 #include "map.h"
 
@@ -11,31 +12,25 @@ static void init_palettes(void) {
     /* index 0 of every palette is transparent for sprites; we keep walls
      * opaque by only using indices 1..3. */
 
-    /* wall, lit (N/S faces): mortar / brick / highlight */
-    pal_set(PAL_WALL_LIT, 1, RGB( 9,  9, 10));
-    pal_set(PAL_WALL_LIT, 2, RGB(24,  8,  6));
-    pal_set(PAL_WALL_LIT, 3, RGB(29, 14, 12));
+    for (int i = 0; i < WALL_PALETTE_COLORS; i++) {
+        u8 r = g_wall_palette_rgb[i][0];
+        u8 g = g_wall_palette_rgb[i][1];
+        u8 b = g_wall_palette_rgb[i][2];
+        pal_set(PAL_WALL_LIT, (u16)(i + 1), RGB(r, g, b));
+        pal_set(PAL_WALL_DARK, (u16)(i + 1), RGB((u8)(r * 140 / 256), (u8)(g * 140 / 256), (u8)(b * 140 / 256)));
+    }
 
-    /* wall, dark (E/W faces): same hues, dimmer */
-    pal_set(PAL_WALL_DARK, 1, RGB( 5,  5,  6));
-    pal_set(PAL_WALL_DARK, 2, RGB(14,  4,  3));
-    pal_set(PAL_WALL_DARK, 3, RGB(18,  8,  7));
-
-    /* distance-shaded wall palettes Shading toward black. */
+    /* distance-shaded wall palettes. */
     {
-        /* index:        1=body 2=body 3=highlight  (1 and 2 share the wall colour) */
-        static const u8 base_r[3] = {24, 24, 29};
-        static const u8 base_g[3] = { 8,  8, 14};
-        static const u8 base_b[3] = { 6,  6, 12};
         for (int b = 0; b < DEPTH_BANDS; b++) {
             int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);   /* 256 near .. 56 far */
             for (int s = 0; s < 2; s++) {
                 int sf = s ? 140 : 256;                     /* dark side ~55%     */
                 u16 pal = PAL_DEPTH_BASE + s * DEPTH_BANDS + b;
-                for (int i = 0; i < 3; i++) {
-                    int r = base_r[i] * fn / 256 * sf / 256;
-                    int g = base_g[i] * fn / 256 * sf / 256;
-                    int bl = base_b[i] * fn / 256 * sf / 256;
+                for (int i = 0; i < WALL_PALETTE_COLORS; i++) {
+                    int r = g_wall_palette_rgb[i][0] * fn / 256 * sf / 256;
+                    int g = g_wall_palette_rgb[i][1] * fn / 256 * sf / 256;
+                    int bl = g_wall_palette_rgb[i][2] * fn / 256 * sf / 256;
                     pal_set(pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
                 }
             }

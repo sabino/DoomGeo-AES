@@ -14,6 +14,7 @@ leftmost pixel is the MSB; the color index MSB is bitplane 3.
 import argparse
 import os
 import struct
+from collections import Counter
 
 from doom_convert import Wad, read_wad
 
@@ -147,27 +148,74 @@ def compose_texture(wad, texture_name):
     return canvas
 
 
-def playpal_luma(wad):
+def playpal_rgb(wad):
     data = wad.lump_data(wad.by_name["PLAYPAL"][0])
-    luma = []
+    rgb = []
     for i in range(256):
         r, g, b = data[i * 3 : i * 3 + 3]
-        luma.append((r * 30 + g * 59 + b * 11) // 100)
-    return luma
+        rgb.append((r, g, b))
+    return rgb
 
 
-def quantize_color(color_index, luma):
+def to_neo_rgb(rgb):
+    return tuple(max(0, min(31, (component * 31 + 127) // 255)) for component in rgb)
+
+
+def texture_palette(texture, playpal, colors=15):
+    hist = Counter()
+    for row in texture:
+        for color in row:
+            if color >= 0:
+                hist[color] += 1
+    if not hist:
+        return [(0, 0, 0)] * colors
+
+    seeds = [playpal[index] for index, _count in hist.most_common(colors)]
+    while len(seeds) < colors:
+        seeds.append(seeds[-1])
+
+    centroids = [(float(r), float(g), float(b)) for r, g, b in seeds]
+    weighted = [(playpal[index], count) for index, count in hist.items()]
+    for _ in range(10):
+        sums = [[0.0, 0.0, 0.0, 0.0] for _ in range(colors)]
+        for rgb, count in weighted:
+            best = min(
+                range(colors),
+                key=lambda i: (
+                    (rgb[0] - centroids[i][0]) ** 2
+                    + (rgb[1] - centroids[i][1]) ** 2
+                    + (rgb[2] - centroids[i][2]) ** 2
+                ),
+            )
+            sums[best][0] += rgb[0] * count
+            sums[best][1] += rgb[1] * count
+            sums[best][2] += rgb[2] * count
+            sums[best][3] += count
+        for i, (r, g, b, count) in enumerate(sums):
+            if count:
+                centroids[i] = (r / count, g / count, b / count)
+
+    palette = [tuple(int(round(c)) for c in centroid) for centroid in centroids]
+    palette.sort(key=lambda rgb: (rgb[0] * 30 + rgb[1] * 59 + rgb[2] * 11, rgb[0], rgb[1], rgb[2]))
+    return palette
+
+
+def quantize_color(color_index, playpal, palette):
     if color_index < 0:
         return 0
-    y = luma[color_index]
-    if y < 64:
-        return 1
-    if y < 132:
-        return 2
-    return 3
+    rgb = playpal[color_index]
+    best = min(
+        range(len(palette)),
+        key=lambda i: (
+            (rgb[0] - palette[i][0]) ** 2
+            + (rgb[1] - palette[i][1]) ** 2
+            + (rgb[2] - palette[i][2]) ** 2
+        ),
+    )
+    return best + 1
 
 
-def sample_texture_tile(texture, luma, src_x, src_y, src_w, src_h):
+def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
     height = len(texture)
     width = len(texture[0])
     tile = [[0] * 16 for _ in range(16)]
@@ -175,25 +223,26 @@ def sample_texture_tile(texture, luma, src_x, src_y, src_w, src_h):
         ty = min(height - 1, src_y + int((y + 0.5) * src_h / 16))
         for x in range(16):
             tx = min(width - 1, src_x + int((x + 0.5) * src_w / 16))
-            tile[y][x] = quantize_color(texture[ty][tx], luma)
+            tile[y][x] = quantize_color(texture[ty][tx], playpal, palette)
     return tile
 
 
 def wall_texture_tiles(iwad, zip_member, texture_name):
     if not iwad:
         brick = tile_brick()
-        return [brick] + [brick for _ in range(WALL_ATLAS_TILES)], "fallback-brick"
+        return [brick] + [brick for _ in range(WALL_ATLAS_TILES)], "fallback-brick", [(8, 8, 8), (24, 8, 6), (29, 14, 12)] * 5
 
     wad = Wad(read_wad(iwad, zip_member))
     texture = compose_texture(wad, texture_name)
-    luma = playpal_luma(wad)
+    playpal = playpal_rgb(wad)
+    palette = texture_palette(texture, playpal)
     height = len(texture)
     width = len(texture[0])
-    tiles = [sample_texture_tile(texture, luma, 0, 0, max(1, width // 8), max(1, height // 8))]
+    tiles = [sample_texture_tile(texture, playpal, palette, 0, 0, max(1, width // 8), max(1, height // 8))]
     for ty in range(8):
         for tx in range(8):
-            tiles.append(sample_texture_tile(texture, luma, tx * width // 8, ty * height // 8, max(1, width // 8), max(1, height // 8)))
-    return tiles, texture_name.upper()
+            tiles.append(sample_texture_tile(texture, playpal, palette, tx * width // 8, ty * height // 8, max(1, width // 8), max(1, height // 8)))
+    return tiles, texture_name.upper(), palette
 
 
 def sprite_scale_tiles(iwad, zip_member, sprite_name, scales):
@@ -206,7 +255,8 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales):
     if not lump_ids:
         raise ValueError(f"sprite frame {sprite_name!r} not found in WAD")
     patch = decode_patch(wad.lump_data(lump_ids[0]))
-    luma = playpal_luma(wad)
+    playpal = playpal_rgb(wad)
+    palette = texture_palette(patch, playpal)
     src_h = len(patch)
     src_w = len(patch[0])
 
@@ -232,10 +282,24 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales):
                         if dx >= dst_w:
                             continue
                         sx = min(src_w - 1, int(dx / scale))
-                        tile[y][x] = quantize_color(patch[sy][sx], luma)
+                        tile[y][x] = quantize_color(patch[sy][sx], playpal, palette)
                 tiles.append(tile)
         next_tile += strips * rows
     return tiles, meta
+
+
+def write_palette_header(path, palette, source_name):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="ascii") as f:
+        f.write("/* Generated by tools/gen_gfx.py; do not edit by hand. */\n")
+        f.write("#ifndef DOOM_GFX_GENERATED_H\n#define DOOM_GFX_GENERATED_H\n\n")
+        f.write("#define WALL_PALETTE_COLORS 15\n")
+        f.write(f"#define WALL_TEXTURE_SOURCE \"{source_name}\"\n")
+        f.write("static const u8 g_wall_palette_rgb[WALL_PALETTE_COLORS][3] = {\n")
+        for rgb in palette:
+            r, g, b = to_neo_rgb(rgb)
+            f.write(f"    {{{r},{g},{b}}},\n")
+        f.write("};\n\n#endif /* DOOM_GFX_GENERATED_H */\n")
 
 
 def main():
@@ -243,6 +307,7 @@ def main():
     ap.add_argument("--iwad", help="Path to a WAD or Freedoom release zip for offline texture conversion")
     ap.add_argument("--zip-member", help="WAD member inside a zip archive")
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
+    ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
@@ -251,7 +316,9 @@ def main():
     out = os.path.join(here, "..", "rom")
     os.makedirs(out, exist_ok=True)
 
-    wall_tiles, wall_source = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
+    wall_tiles, wall_source, wall_palette = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
+    if args.palette_header:
+        write_palette_header(args.palette_header, wall_palette, wall_source)
     scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
     sprite_tiles, sprite_meta = sprite_scale_tiles(args.iwad, args.zip_member, args.sprite_frame, scales)
     tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + sprite_tiles
