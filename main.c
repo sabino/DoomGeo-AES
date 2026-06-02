@@ -2102,7 +2102,7 @@ static void update_weapon(u8 pressed) {
         } else if (!fire_prev && current_weapon == 0 && player_ammo > 0) {
             current_weapon = 0;
             player_ammo--;
-            fire_timer = 12;
+            fire_timer = 15;
             trigger_weapon_flash();
             alert_monsters_by_sound();
             fire_single_target_damage(1);
@@ -2120,8 +2120,8 @@ static void update_weapon(u8 pressed) {
             frame = fire_timer > 10 ? 11 : 10;
         } else {
             u8 base = current_weapon == 1 && player_has_shotgun ? 4 : 0;
-            if (fire_timer > 12) frame = (u8)(base + 1);
-            else if (fire_timer > 6) frame = (u8)(base + 2);
+            if (fire_timer > 10) frame = (u8)(base + 1);
+            else if (fire_timer > 5) frame = (u8)(base + 2);
             else frame = (u8)(base + 3);
         }
         fire_timer--;

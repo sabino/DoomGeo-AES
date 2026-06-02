@@ -42,9 +42,10 @@ path while the bottom 32-pixel `STBAR` remains a separate HUD surface.
 The weapon bake lowers the cropped psprite window inside the Neo Geo strip chain,
 keeping the pistol hand and barrel anchored from the bottom of the playfield
 instead of floating as a center-screen object.
-The pistol animates when B is pressed; walking and strafing nudge the strips
-with a small hardware-position bob so movement feels less static without adding
-any sprite slots. Real shots also pulse the weapon palette for a few frames,
+The pistol animates through the intended Doom firing patches when B is pressed;
+walking and strafing nudge the strips with a small hardware-position bob so
+movement feels less static without adding any sprite slots. Real shots also
+pulse the weapon palette for a few frames,
 briefly brighten the wall/floor/ceiling depth palettes, and successful pickups
 add a short warm bonus flash, giving muzzle and item feedback through cheap
 palette updates while the project still uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
