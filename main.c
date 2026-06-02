@@ -282,6 +282,7 @@ static int iabs16(int value) {
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
+static void spawn_impact_effect(short x_q8, short y_q8, u8 timer);
 static u8 key_bit_for_thing(u16 thing_type);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
@@ -719,8 +720,31 @@ static int best_visible_enemy(void) {
     return best_thing;
 }
 
-static void damage_best_visible_enemy(u8 damage) {
-    damage_visible_enemy(best_visible_enemy(), damage);
+static void forward_impact_effect_point(short *x, short *y) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    *x = (short)(px + ((dir_x * 640) >> 8));
+    *y = (short)(py + ((dir_y * 640) >> 8));
+}
+
+static void spawn_weapon_impact_for_target(int target) {
+    short x;
+    short y;
+    if (target >= 0) {
+        x = thing_x_q8[target];
+        y = thing_y_q8[target];
+    } else {
+        forward_impact_effect_point(&x, &y);
+    }
+    spawn_impact_effect(x, y, 10);
+}
+
+static void fire_single_target_damage(u8 damage) {
+    int target = best_visible_enemy();
+    spawn_weapon_impact_for_target(target);
+    damage_visible_enemy(target, damage);
 }
 
 static void damage_rocket_radius(short x, short y) {
@@ -770,6 +794,7 @@ static void damage_rocket_target(void) {
     } else {
         rocket_forward_impact(&x, &y);
     }
+    spawn_impact_effect(x, y, 8);
     damage_rocket_radius(x, y);
 }
 
@@ -806,6 +831,7 @@ static void damage_shotgun_spread(void) {
         scores[insert_at] = score;
     }
 
+    spawn_weapon_impact_for_target(targets[0]);
     damage_visible_enemy(targets[0], 5);
     damage_visible_enemy(targets[1], 2);
     damage_visible_enemy(targets[2], 1);
@@ -913,11 +939,28 @@ static void spawn_monster_projectile(int thing, u16 type, u8 damage) {
     projectile_active = 1;
 }
 
+static void spawn_impact_effect(short x_q8, short y_q8, u8 timer) {
+    if (projectile_active) return;
+    projectile_x_q8 = x_q8;
+    projectile_y_q8 = y_q8;
+    projectile_dx_q8 = 0;
+    projectile_dy_q8 = 0;
+    projectile_timer = timer;
+    projectile_type = 9000;
+    projectile_damage = 0;
+    projectile_active = 1;
+}
+
 static void update_projectile(void) {
     int px, py;
     if (!projectile_active) return;
     if (!game_active()) {
         projectile_active = 0;
+        return;
+    }
+    if (projectile_type == 9000 && projectile_damage == 0) {
+        if (projectile_timer) projectile_timer--;
+        if (!projectile_timer) projectile_active = 0;
         return;
     }
     projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
@@ -1723,7 +1766,7 @@ static void update_weapon(u8 pressed) {
                 chaingun_flash ^= 1;
                 trigger_weapon_flash();
                 alert_monsters_by_sound();
-                damage_best_visible_enemy(1);
+                fire_single_target_damage(1);
             } else if (!fire_prev) {
                 ammo_message_timer = 45;
             }
@@ -1745,7 +1788,7 @@ static void update_weapon(u8 pressed) {
             fire_timer = 12;
             trigger_weapon_flash();
             alert_monsters_by_sound();
-            damage_best_visible_enemy(1);
+            fire_single_target_damage(1);
         } else if (!fire_prev) {
             ammo_message_timer = 45;
         }
@@ -1860,7 +1903,9 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
     {
         int bottom = (GAME_H + h) / 2;
         int top;
-        if (thing_is_projectile(thing_type)) {
+        if (thing_is_explosion(thing_type) && thing_index < 0) {
+            top = HORIZON - meta->height - 32;
+        } else if (thing_is_projectile(thing_type)) {
             top = (GAME_H - meta->height) / 2;
         } else {
             if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
@@ -1947,6 +1992,10 @@ static int select_visible_things(int found, u8 pass) {
 static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
+    if (projectile_type == 9000 && projectile_damage == 0) {
+        render_type_slot((u16)found, -1, projectile_type, SCRW / 2, 48, 512, 0);
+        return found + 1;
+    }
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
     render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0);
     return found + 1;

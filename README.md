@@ -138,7 +138,10 @@ briefly tints the playfield red by swapping palettes during vblank, giving clear
 feedback without spending additional sprite slots. Firing a real shot now also
 wakes nearby monsters with a compact sound-alert pass, so rooms escalate more
 like Doom instead of only reacting to the single enemy currently under the
-crosshair.
+crosshair. Pistol, shotgun, chaingun, and rocket hits also reserve the existing
+projectile/effect slot for a short Doom `BEXP` puff, giving misses,
+wall shots, and impacts visible feedback without increasing the scanline sprite
+budget.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
