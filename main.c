@@ -1088,12 +1088,46 @@ static void check_exit_reached(void) {
     }
 }
 
+static int closed_door_at_cell(int cell_x, int cell_y) {
+    if (cell_x < 0 || cell_y < 0 || cell_x >= MAP_W || cell_y >= MAP_H) return -1;
+    u8 cell = g_map[cell_y][cell_x];
+    if (cell < 2) return -1;
+    int door_index = cell - 2;
+    if (door_index < 0 || door_index >= NG_RUNTIME_DOOR_COUNT) return -1;
+    if (g_runtime_door_open[door_index]) return -1;
+    return door_index;
+}
+
+static void open_door_index(u16 door_index) {
+    const NgRuntimeDoor *door = &g_runtime_doors[door_index];
+    u8 required_key = key_bit_for_door(door->special);
+    if (required_key && (player_keys & required_key) == 0) {
+        key_message_timer = 60;
+        return;
+    }
+    g_runtime_door_open[door_index] = 1;
+    door_message_timer = 35;
+    rc_invalidate_view();
+    if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
+}
+
 static void open_nearby_door(void) {
     int px, py, dir_x, dir_y, plane_x, plane_y;
     int best = -1;
     int best_score = 0x7FFFFFFF;
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+
+    for (int step = 96; step <= 896; step += 64) {
+        int trace_x = px + ((dir_x * step) >> 8);
+        int trace_y = py + ((dir_y * step) >> 8);
+        int door_index = closed_door_at_cell(trace_x >> 8, trace_y >> 8);
+        if (door_index >= 0) {
+            open_door_index((u16)door_index);
+            return;
+        }
+    }
+
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         const NgRuntimeDoor *door = &g_runtime_doors[i];
         int to_x = (int)door->x * 256 + 128 - px;
@@ -1112,17 +1146,7 @@ static void open_nearby_door(void) {
         }
     }
     if (best < 0) return;
-
-    const NgRuntimeDoor *door = &g_runtime_doors[best];
-    u8 required_key = key_bit_for_door(door->special);
-    if (required_key && (player_keys & required_key) == 0) {
-        key_message_timer = 60;
-        return;
-    }
-    g_runtime_door_open[best] = 1;
-    door_message_timer = 35;
-    rc_invalidate_view();
-    if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
+    open_door_index((u16)best);
 }
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
