@@ -20,12 +20,13 @@ Every frame, for each of 64 screen columns:
 The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling use a cheap sprite-backed approximation of
 Doom floor casting: the converter still reads the player-start Doom flats,
-quantizes each into an 8x8 Neo Geo phase atlas, and each backdrop row samples that
-block from the raycaster's current position, direction, camera plane, and an
-approximate row distance. This keeps the planes tied to the wall perspective,
-and the refresh key tracks smaller position and turn changes so the real Doom
-flat texture moves and turns with the camera instead of sitting as a fixed
-solid band, without adding more per-scanline sprites.
+quantizes each into a 16x16 Neo Geo phase atlas, and each backdrop row samples
+that block from the raycaster's current position, direction, camera plane, and a
+near-weighted row distance. This keeps the planes tied to the wall perspective,
+gives the near floor stronger texture movement, and the refresh key tracks
+smaller position and turn changes so the real Doom flat texture moves and turns
+with the camera instead of sitting as a fixed solid band, without adding more
+per-scanline sprites.
 The wall path now carries a compact per-cell texture-class grid alongside the
 solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
 `BROWNGRN`, `BROWN1`, and `SUPPORT2` E1M1 linedefs can select their own

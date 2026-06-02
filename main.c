@@ -36,8 +36,8 @@ static void restore_flat_palettes(void) {
     }
 
     for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(72 + row * 18);
-        u16 floor_scale = (u16)(96 + row * 18);
+        u16 ceiling_scale = (u16)(58 + row * 17);
+        u16 floor_scale = (u16)(78 + row * 26);
         set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
         set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }
@@ -1523,8 +1523,8 @@ static void disable_sprites(void) {
  * raycaster basis, with the wall columns still carrying the precise depth.
  */
 static u16 plane_tile_for_sample(u16 base, int world_x_q8, int world_y_q8) {
-    u16 tile_x = (u16)((world_x_q8 >> 5) & (TILE_FLAT_COLS - 1));
-    u16 tile_y = (u16)((world_y_q8 >> 5) & (TILE_FLAT_ROWS - 1));
+    u16 tile_x = (u16)((world_x_q8 >> 4) & (TILE_FLAT_COLS - 1));
+    u16 tile_y = (u16)((world_y_q8 >> 4) & (TILE_FLAT_ROWS - 1));
     return (u16)(base + tile_y * TILE_FLAT_COLS + tile_x);
 }
 
@@ -1533,7 +1533,7 @@ static int plane_row_distance_q8(u16 t) {
     int p = sample_y - HORIZON;
     if (p < 0) p = -p;
     if (p < 8) p = 8;
-    return (GAME_H << 6) / p;
+    return (GAME_H << 7) / (p + 8);
 }
 
 static void init_background(void) {
@@ -1561,10 +1561,10 @@ static void update_background_scroll(void) {
     u32 key;
     rc_player_q8(&x_q8, &y_q8);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    key = (u32)((x_q8 >> 4) & 0x3F)
-        | ((u32)((y_q8 >> 4) & 0x3F) << 6)
-        | ((u32)(((dir_x + 256) >> 3) & 0x3F) << 12)
-        | ((u32)(((dir_y + 256) >> 3) & 0x3F) << 18)
+    key = (u32)((x_q8 >> 3) & 0x3F)
+        | ((u32)((y_q8 >> 3) & 0x3F) << 6)
+        | ((u32)(((dir_x + 256) >> 2) & 0x3F) << 12)
+        | ((u32)(((dir_y + 256) >> 2) & 0x3F) << 18)
         | ((u32)(((plane_x + 256) >> 5) & 0x0F) << 24)
         | ((u32)(((plane_y + 256) >> 5) & 0x0F) << 28);
     if (key == bg_scroll_key) return;
