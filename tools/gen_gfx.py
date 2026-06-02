@@ -40,7 +40,12 @@ WALL_ATLAS_COLS = 16
 WALL_ATLAS_ROWS = 15
 WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
 DOOR_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
-HUD_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
+FLAT_COLS = 4
+FLAT_ROWS = 4
+FLAT_TILES = FLAT_COLS * FLAT_ROWS
+CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
+FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
+HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
 HUD_COLS = 20
 HUD_ROWS = 2
 HUD_TILES = HUD_COLS * HUD_ROWS
@@ -463,29 +468,27 @@ def decode_flat(wad, flat_name):
     return [list(data[y * 64 : (y + 1) * 64]) for y in range(64)]
 
 
-def flat_solid_palette(iwad, zip_member, flat_name, ceiling=False):
+def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
     if not iwad:
         base = (40, 42, 48) if ceiling else (56, 48, 36)
-        return flat_name, [base] * 15
+        return flat_name, [base] * 15, [tile_solid() for _ in range(FLAT_TILES)]
 
     wad = Wad(read_wad(iwad, zip_member))
     flat = decode_flat(wad, flat_name)
     playpal = playpal_rgb(wad)
-    used = Counter(color for row in flat for color in row if color >= 0)
-    if used:
-        colors = [playpal[index] for index, _count in used.most_common(8)]
-        r = sum(color[0] for color in colors) // len(colors)
-        g = sum(color[1] for color in colors) // len(colors)
-        b = sum(color[2] for color in colors) // len(colors)
-    else:
-        r = g = b = 32
+    palette = texture_palette(flat, playpal)
     if ceiling:
-        r = r * 3 // 4
-        g = g * 3 // 4
-        b = min(255, b * 5 // 4)
-    palette = [(r, g, b)] * 15
+        palette = [(r * 3 // 4, g * 3 // 4, min(255, b * 5 // 4)) for r, g, b in palette]
+    tiles = []
+    for row in range(FLAT_ROWS):
+        for col in range(FLAT_COLS):
+            tile = [[0] * 16 for _ in range(16)]
+            for y in range(16):
+                for x in range(16):
+                    tile[y][x] = quantize_color(flat[row * 16 + y][col * 16 + x], playpal, palette)
+            tiles.append(tile)
     source = flat_name.upper()
-    return source, palette
+    return source, palette, tiles
 
 
 def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
@@ -834,8 +837,8 @@ def main():
         raise ValueError(f"expected {len(HUD_FACE_FRAMES)} status face frames, got {len(face_frames)}")
     face_tiles, face_source = hud_face_tiles(args.iwad, args.zip_member, face_frames, hud_palette)
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
-    ceiling_source, ceiling_palette = flat_solid_palette(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
-    floor_source, floor_palette = flat_solid_palette(args.iwad, args.zip_member, floor_flat)
+    ceiling_source, ceiling_palette, ceiling_tiles = flat_texture_tiles(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
+    floor_source, floor_palette, floor_tiles = flat_texture_tiles(args.iwad, args.zip_member, floor_flat)
     weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
     weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
@@ -860,7 +863,7 @@ def main():
             sprite_meta,
             sprite_palettes,
         )
-    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + door_tiles[1:] + hud_tiles + face_tiles + weapon_cache + sprite_tiles
+    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + door_tiles[1:] + ceiling_tiles + floor_tiles + hud_tiles + face_tiles + weapon_cache + sprite_tiles
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
     c1, c2 = bytearray(), bytearray()
     for t in tiles:
@@ -912,10 +915,10 @@ def main():
 
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  door texture: {door_source} atlas={DOOR_ATLAS_BASE}..{DOOR_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
+    print(f"  ceiling flat: {ceiling_source} tile={CEILING_FLAT_BASE}..{CEILING_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
+    print(f"  floor flat: {floor_source} tile={FLOOR_FLAT_BASE}..{FLOOR_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")
-    print(f"  ceiling flat: {ceiling_source} solid backdrop palette")
-    print(f"  floor flat: {floor_source} solid backdrop palette")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")
     for thing_type, first_scale, scale_count, frame in sprite_defs:
         print(f"  monster sprite: thing={thing_type} frame={frame} scales={first_scale}..{first_scale + scale_count - 1}")

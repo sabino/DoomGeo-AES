@@ -17,11 +17,13 @@ static u8 shade_channel(u8 value, u16 scale) {
     return shaded > 31 ? 31 : (u8)shaded;
 }
 
-static void set_flat_palette(u16 pal, const u8 rgb[3], u16 scale) {
-    u8 r = shade_channel(rgb[0], scale);
-    u8 g = shade_channel(rgb[1], scale);
-    u8 b = shade_channel(rgb[2], scale);
-    for (int i = 1; i < 16; i++) pal_set(pal, (u16)i, RGB(r, g, b));
+static void set_shaded_palette(u16 pal, const u8 rgb[][3], u16 colors, u16 scale) {
+    for (u16 i = 0; i < colors; i++) {
+        u8 r = shade_channel(rgb[i][0], scale);
+        u8 g = shade_channel(rgb[i][1], scale);
+        u8 b = shade_channel(rgb[i][2], scale);
+        pal_set(pal, (u16)(i + 1), RGB(r, g, b));
+    }
 }
 
 static void restore_flat_palettes(void) {
@@ -35,8 +37,8 @@ static void restore_flat_palettes(void) {
     for (u16 row = 0; row < BG_SPLIT; row++) {
         u16 ceiling_scale = (u16)(72 + row * 18);
         u16 floor_scale = (u16)(96 + row * 18);
-        set_flat_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb[0], ceiling_scale);
-        set_flat_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb[0], floor_scale);
+        set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
+        set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }
 }
 
@@ -193,6 +195,7 @@ static u8  map_prev = 0;
 static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
+static u8  bg_scroll_key = 0xFF;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
@@ -1166,12 +1169,53 @@ static void init_background(void) {
             u16 pal = (t < BG_SPLIT)
                 ? (u16)(PAL_CEILING_GRAD_BASE + t)
                 : (u16)(PAL_FLOOR_GRAD_BASE + (t - BG_SPLIT));
-            scb1_tile(spr, t, TILE_SOLID, pal);
+            u16 base = (t < BG_SPLIT) ? TILE_CEILING_FLAT_BASE : TILE_FLOOR_FLAT_BASE;
+            u16 row = (t < BG_SPLIT) ? (u16)(BG_SPLIT - 1 - t) : (u16)(t - BG_SPLIT);
+            u16 tile = (u16)(base + ((row & 3) * TILE_FLAT_COLS) + (i & 3));
+            scb1_tile(spr, t, tile, pal);
         }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
         scb4(spr, i * 16);
     }
+    bg_scroll_key = 0xFF;
+}
+
+static void update_background_scroll(void) {
+    int x_q8, y_q8;
+    u8 floor_x, floor_y, ceiling_x, ceiling_y, key;
+    rc_player_q8(&x_q8, &y_q8);
+    floor_x = (u8)((x_q8 >> 6) & 3);
+    floor_y = (u8)((y_q8 >> 6) & 3);
+    ceiling_x = (u8)(((x_q8 + y_q8) >> 7) & 3);
+    ceiling_y = (u8)(((y_q8 - x_q8) >> 7) & 3);
+    key = (u8)(floor_x | (floor_y << 2) | (ceiling_x << 4) | (ceiling_y << 6));
+    if (key == bg_scroll_key) return;
+
+    for (u16 i = 0; i < BG_COUNT; i++) {
+        u16 spr = BG_BASE + i;
+        for (u16 t = 0; t < BG_WIN; t++) {
+            u16 pal;
+            u16 tile_x;
+            u16 tile_y;
+            u16 base;
+            if (t < BG_SPLIT) {
+                u16 row = (u16)(BG_SPLIT - 1 - t);
+                base = TILE_CEILING_FLAT_BASE;
+                tile_x = (u16)((i + ceiling_x) & 3);
+                tile_y = (u16)((row + ceiling_y) & 3);
+                pal = (u16)(PAL_CEILING_GRAD_BASE + t);
+            } else {
+                u16 row = (u16)(t - BG_SPLIT);
+                base = TILE_FLOOR_FLAT_BASE;
+                tile_x = (u16)((i + floor_x) & 3);
+                tile_y = (u16)((row + floor_y) & 3);
+                pal = (u16)(PAL_FLOOR_GRAD_BASE + row);
+            }
+            scb1_tile(spr, t, (u16)(base + tile_y * TILE_FLAT_COLS + tile_x), pal);
+        }
+    }
+    bg_scroll_key = key;
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
@@ -1507,6 +1551,7 @@ static void restart_level(void) {
     restart_prev = 0;
     hurt_timer = 0;
     level_complete = 0;
+    bg_scroll_key = 0xFF;
     key_message_timer = 0;
     ammo_message_timer = 0;
     door_message_timer = 0;
@@ -1597,6 +1642,7 @@ int main(void) {
         wait_vblank();
         watchdog_kick();
         update_hurt_flash();
+        update_background_scroll();
         rc_blit();                      /* push to VRAM during vblank         */
         if (level_complete) hide_enemies();
         else update_enemy();

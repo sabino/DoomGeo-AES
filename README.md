@@ -20,10 +20,11 @@ Every frame, for each of 64 screen columns:
 The video chip then scales each precomposed Doom wall-texture column to the
 computed height. Floor and ceiling now follow the original branch's steadier
 split-plane strategy: the converter still reads the player-start Doom flats,
-but uses them to derive row-shaded backdrop colours instead of trying to animate
-a screen-space flat texture sheet. This keeps the 3D read anchored on the wall
-perspective and avoids the noisy floor/ceiling motion that fought the raycaster
-on Neo Geo's sprite hardware. The wall path now packs a second Doom texture
+quantizes each into a 4x4 Neo Geo tile block, and scrolls the coarse backdrop
+tilemap from player position while keeping per-row distance shading. This keeps
+the 3D read anchored on the wall perspective, but the planes now carry real Doom
+flat texture and move with the player instead of sitting as fixed solid bands.
+The wall path now packs a second Doom texture
 atlas for converted closed-door cells, so normal walls keep the `STARTAN3`
 columns while closed doors use `BIGDOOR2` with their own distance-shaded
 palette range. Doom pistol frames and the `STFST00` status face are baked with
