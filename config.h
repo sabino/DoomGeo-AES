@@ -35,6 +35,9 @@
 #define HUD_BASE  (WALL_BASE + NUM_COLS)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
+#define WEAPON_BASE  (HUD_BASE + HUD_COUNT)
+#define WEAPON_COUNT 6
+#define WEAPON_WIN   6
 #define SPR_TOTAL 381               
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */
@@ -51,7 +54,10 @@
 #define TILE_CEILING_BASE (TILE_HUD_BASE + TILE_HUD_COLS * TILE_HUD_ROWS)
 #define TILE_BG_PHASE_TILES (BG_COUNT * BG_SPLIT)
 #define TILE_FLOOR_BASE (TILE_CEILING_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
-#define TILE_SPRITE_CACHE_BASE (TILE_FLOOR_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
+#define TILE_WEAPON_BASE (TILE_FLOOR_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
+#define TILE_WEAPON_STRIPS 6
+#define TILE_WEAPON_ROWS 6
+#define TILE_SPRITE_CACHE_BASE (TILE_WEAPON_BASE + TILE_WEAPON_STRIPS * TILE_WEAPON_ROWS)
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
@@ -69,6 +75,7 @@
 #define PAL_MAP_WALL  5             /* minimap wall block (fix tile, idx 15) */
 #define PAL_MAP_PLAYER 6            /* minimap player marker                 */
 #define PAL_HUD       7
+#define PAL_WEAPON    36
 
  
 #define DEPTH_BANDS    14

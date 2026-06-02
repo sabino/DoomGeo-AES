@@ -60,6 +60,12 @@ static void init_palettes(void) {
         u8 b = g_hud_palette_rgb[i][2];
         pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
     }
+    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
+        u8 r = g_weapon_palette_rgb[i][0];
+        u8 g = g_weapon_palette_rgb[i][1];
+        u8 b = g_weapon_palette_rgb[i][2];
+        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
+    }
 
     REG_BACKDROP = RGB(0, 0, 0);
 }
@@ -180,6 +186,21 @@ static void init_hud(void) {
     }
 }
 
+static void init_weapon(void) {
+    u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
+    int top = GAME_H - WEAPON_WIN * 16;
+    for (u16 i = 0; i < WEAPON_COUNT; i++) {
+        u16 spr = WEAPON_BASE + i;
+        for (u16 row = 0; row < WEAPON_WIN; row++) {
+            u16 tile = (u16)(TILE_WEAPON_BASE + row * WEAPON_COUNT + i);
+            scb1_tile(spr, row, tile, PAL_WEAPON);
+        }
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, top, 0, WEAPON_WIN);
+        scb4(spr, (u16)(start_x + i * 16));
+    }
+}
+
 int main(void) {
     watchdog_kick();
     clear_fix();
@@ -188,6 +209,7 @@ int main(void) {
     init_background();
     init_walls();
     init_hud();
+    init_weapon();
     rc_init();
 
     for (;;) {
