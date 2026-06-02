@@ -302,6 +302,10 @@ static short projectile_x_q8 = 0;
 static short projectile_y_q8 = 0;
 static short projectile_dx_q8 = 0;
 static short projectile_dy_q8 = 0;
+static u8  impact_active = 0;
+static u8  impact_timer = 0;
+static short impact_x_q8 = 0;
+static short impact_y_q8 = 0;
 static u8  player_keys = 0;
 static u8  player_has_shotgun = 0;
 static u8  player_has_chaingun = 0;
@@ -1070,15 +1074,20 @@ static u8 spawn_monster_projectile(int thing, u16 type, u8 damage) {
 }
 
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer) {
-    if (projectile_active) return;
-    projectile_x_q8 = x_q8;
-    projectile_y_q8 = y_q8;
-    projectile_dx_q8 = 0;
-    projectile_dy_q8 = 0;
-    projectile_timer = timer;
-    projectile_type = 9000;
-    projectile_damage = 0;
-    projectile_active = 1;
+    impact_x_q8 = x_q8;
+    impact_y_q8 = y_q8;
+    impact_timer = timer;
+    impact_active = 1;
+}
+
+static void update_impact_effect(void) {
+    if (!impact_active) return;
+    if (!game_active()) {
+        impact_active = 0;
+        return;
+    }
+    if (impact_timer) impact_timer--;
+    if (!impact_timer) impact_active = 0;
 }
 
 static void update_projectile(void) {
@@ -2309,12 +2318,16 @@ static int select_visible_things(int found, u8 pass) {
 static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
-    if (projectile_type == 9000 && projectile_damage == 0) {
-        render_type_slot((u16)found, -1, projectile_type, SCRW / 2, 48, 512, 0);
-        return found + 1;
-    }
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
     render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0);
+    return found + 1;
+}
+
+static int render_visible_impact(int found) {
+    int sx, h, dist_q8;
+    if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
+    if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
+    render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0);
     return found + 1;
 }
 
@@ -2322,6 +2335,7 @@ static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
+    found = render_visible_impact(found);
     found = render_visible_projectile(found);
     found = select_visible_things(found, 1);
     found = select_visible_things(found, 2);
@@ -2365,6 +2379,10 @@ static void restart_level(void) {
     projectile_y_q8 = 0;
     projectile_dx_q8 = 0;
     projectile_dy_q8 = 0;
+    impact_active = 0;
+    impact_timer = 0;
+    impact_x_q8 = 0;
+    impact_y_q8 = 0;
     player_keys = 0;
     player_has_shotgun = 0;
     player_has_chaingun = 0;
@@ -2473,6 +2491,7 @@ int main(void) {
         update_weapon_flash();
         update_background_scroll();
         rc_blit();                      /* push to VRAM during vblank         */
+        update_impact_effect();
         update_projectile();
         if (level_complete) hide_enemies();
         else update_enemy();
