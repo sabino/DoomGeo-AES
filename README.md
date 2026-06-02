@@ -62,7 +62,7 @@ pixel work is offloaded to the scaler hardware.
 | Hold A + Left/Right | Strafe            |
 | B                   | Fire weapon       |
 | C                   | Toggle minimap    |
-| D                   | Open nearby door  |
+| D                   | Use facing door   |
 | Hold A + D          | Toggle weapon     |
 | D after DEAD/EXIT   | Restart level     |
 
@@ -147,11 +147,12 @@ next run.
 The converter also preserves Doom door and exit linedefs as compact runtime
 trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
 bits. The status bar shows compact `B`, `R`, and `Y` key indicators that brighten
-when the matching key is collected. Pressing D opens nearby converted door cells,
-with keyed door specials requiring the matching key, and affects both movement
-and raycasting through the shared `map_at()` path. Opened doors flash a compact
-`DOR` center message; trying a nearby keyed door without the matching key
-flashes `KEY`, so door interactions have readable feedback. Reaching the
+when the matching key is collected. Pressing D opens the nearest converted door
+cell in front of the player, with keyed door specials requiring the matching
+key, and affects both movement and raycasting through the shared `map_at()`
+path. Opened doors flash a compact `DOR` center message; trying a facing keyed
+door without the matching key flashes `KEY`, so door interactions have readable
+feedback. Reaching the
 converted E1M1 exit cell now
 raises a fix-layer `EXIT` message and freezes player control, monster movement,
 and monster damage until D restarts the level. This keeps level progression

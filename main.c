@@ -1089,25 +1089,40 @@ static void check_exit_reached(void) {
 }
 
 static void open_nearby_door(void) {
-    int px, py;
+    int px, py, dir_x, dir_y, plane_x, plane_y;
+    int best = -1;
+    int best_score = 0x7FFFFFFF;
     rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         const NgRuntimeDoor *door = &g_runtime_doors[i];
-        u8 required_key = key_bit_for_door(door->special);
-        int dx = px - ((int)door->x * 256 + 128);
-        int dy = py - ((int)door->y * 256 + 128);
+        int to_x = (int)door->x * 256 + 128 - px;
+        int to_y = (int)door->y * 256 + 128 - py;
+        int adx = iabs16(to_x);
+        int ady = iabs16(to_y);
+        int dist = adx + ady;
+        int dot = to_x * dir_x + to_y * dir_y;
+        int lateral = iabs16(to_x * dir_y - to_y * dir_x);
         if (g_runtime_door_open[i]) continue;
-        if (iabs16(dx) <= 384 && iabs16(dy) <= 384) {
-            if (required_key && (player_keys & required_key) == 0) {
-                key_message_timer = 60;
-                return;
-            }
-            g_runtime_door_open[i] = 1;
-            door_message_timer = 35;
-            rc_invalidate_view();
-            if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
+        if (adx > 512 || ady > 512 || dist > 768) continue;
+        if (dot <= 0 || lateral > dot * 2) continue;
+        if (dist < best_score) {
+            best = i;
+            best_score = dist;
         }
     }
+    if (best < 0) return;
+
+    const NgRuntimeDoor *door = &g_runtime_doors[best];
+    u8 required_key = key_bit_for_door(door->special);
+    if (required_key && (player_keys & required_key) == 0) {
+        key_message_timer = 60;
+        return;
+    }
+    g_runtime_door_open[best] = 1;
+    door_message_timer = 35;
+    rc_invalidate_view();
+    if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
 }
 
 static void map_cell(int mx, int my, u16 pal, u16 tile) {
