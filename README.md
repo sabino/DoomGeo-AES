@@ -41,8 +41,10 @@ math as the wall renderer while staying at the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Visible monsters are selected
 before pickups so the limited sprite slots keep combat readable; candidates are
 ranked by distance and screen relevance each frame, and tiny candidates hidden
-under the pistol overlay are skipped. Common Doom monster thing types map to
-their own pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`, `SARG`, `BOSS`) and live palette, and the pistol clears
+under the pistol overlay are skipped. The converter only emits monster thing
+types that currently have pre-scaled sprite frames (`POSS`, `SPOS`, `TROO`,
+`SARG`, `BOSS`) and live palettes, so unsupported later-Doom IDs do not silently
+fall back to the wrong enemy art. The pistol clears
 the currently rendered target set as the initial combat proof of concept. The
 optional minimap is drawn on the fix (text) layer, which always composites over
 sprites.

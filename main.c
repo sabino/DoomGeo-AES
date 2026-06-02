@@ -279,20 +279,10 @@ static u8 thing_is_monster(u16 thing_type) {
     switch (thing_type) {
     case 9:
     case 58:
-    case 64:
-    case 65:
-    case 66:
-    case 67:
-    case 68:
-    case 69:
-    case 71:
-    case 84:
     case 3001:
     case 3002:
     case 3003:
     case 3004:
-    case 3005:
-    case 3006:
         return 1;
     default:
         return 0;

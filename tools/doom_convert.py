@@ -424,22 +424,12 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
 
 
 MONSTER_TYPES = {
-    9,
-    58,
-    64,
-    65,
-    66,
-    67,
-    68,
-    69,
-    71,
-    84,
-    3001,
-    3002,
-    3003,
-    3004,
-    3005,
-    3006,
+    9,     # shotgun guy
+    58,    # spectre
+    3001,  # imp
+    3002,  # demon
+    3003,  # baron
+    3004,  # former human
 }
 
 PICKUP_TYPES = {
