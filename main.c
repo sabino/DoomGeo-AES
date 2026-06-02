@@ -182,6 +182,7 @@ static void clear_fix(void) {
 static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
 static u8  weapon_frame = 0xFF;
+static u8  hud_face_frame = 0xFF;
 static u8  weapon_bob_phase = 0;
 static signed char weapon_bob_x = 0;
 static signed char weapon_bob_y = 0;
@@ -1064,6 +1065,9 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     }
 }
 
+static u8 face_frame_for_health(void);
+static void set_hud_face_frame(u8 frame);
+
 static u16 weapon_ammo(void) {
     if (current_weapon == 1 && player_has_shotgun) return player_shells;
     if (current_weapon == 3 && player_has_rocket_launcher) return player_rockets;
@@ -1076,6 +1080,7 @@ static void update_status_numbers(void) {
     u16 armor = player_armor;
     if (health != shown_health) {
         draw_number3(11, 24, health, PAL_HUD);
+        set_hud_face_frame(face_frame_for_health());
         shown_health = health;
     }
     if (ammo != shown_ammo) {
@@ -1103,6 +1108,7 @@ static void force_fix_hud_redraw(void) {
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
     shown_keys = 0xFF;
+    hud_face_frame = 0xFF;
     update_status_numbers();
     draw_crosshair();
     update_center_message();
@@ -1180,6 +1186,28 @@ static void init_walls(void) {
     }
 }
 
+static u8 face_frame_for_health(void) {
+    if (player_health == 0) return 5;
+    if (player_health >= 80) return 0;
+    if (player_health >= 60) return 1;
+    if (player_health >= 40) return 2;
+    if (player_health >= 20) return 3;
+    return 4;
+}
+
+static void set_hud_face_frame(u8 frame) {
+    if (frame == hud_face_frame) return;
+    u16 frame_base = (u16)(TILE_HUD_FACE_BASE + (frame % TILE_HUD_FACE_FRAMES) * TILE_HUD_FACE_FRAME_TILES);
+    for (u16 col = 0; col < TILE_HUD_FACE_COLS; col++) {
+        u16 spr = HUD_BASE + TILE_HUD_FACE_COL + col;
+        for (u16 row = 0; row < TILE_HUD_FACE_ROWS; row++) {
+            u16 tile = (u16)(frame_base + row * TILE_HUD_FACE_COLS + col);
+            scb1_tile(spr, row, tile, PAL_HUD);
+        }
+    }
+    hud_face_frame = frame;
+}
+
 static void init_hud(void) {
     for (u16 i = 0; i < HUD_COUNT; i++) {
         u16 spr = HUD_BASE + i;
@@ -1191,6 +1219,8 @@ static void init_hud(void) {
         scb3(spr, GAME_H, 0, HUD_WIN);
         scb4(spr, i * 16);
     }
+    hud_face_frame = 0xFF;
+    set_hud_face_frame(face_frame_for_health());
 }
 
 static void set_weapon_frame(u8 frame) {

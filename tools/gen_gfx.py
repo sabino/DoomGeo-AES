@@ -44,16 +44,24 @@ HUD_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 HUD_COLS = 20
 HUD_ROWS = 2
 HUD_TILES = HUD_COLS * HUD_ROWS
+HUD_FACE_BASE = HUD_BASE + HUD_TILES
+HUD_FACE_COL = 9
+HUD_FACE_COLS = 2
+HUD_FACE_ROWS = 2
+HUD_FACE_TILES = HUD_FACE_COLS * HUD_FACE_ROWS
+HUD_FACE_FRAMES = ("STFST00", "STFST10", "STFST20", "STFST30", "STFST40", "STFDEAD0")
 BG_COLS = 20
 BG_HALF_ROWS = 6
 BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
-WEAPON_BASE = HUD_BASE + HUD_TILES
+WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 7
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
 WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
 SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
-WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
+# Bake weapon psprites slightly higher than the Neo Geo sprite top so Doom's
+# pistol frames are not pre-clipped before the status bar masks their bottom.
+WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16 + 8
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
@@ -538,6 +546,54 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     return tiles, patch_name, palette, src_w, src_h
 
 
+def stbar_with_face(wad, face_name):
+    patch_ids = wad.by_name.get("STBAR")
+    if not patch_ids:
+        raise ValueError("patch 'STBAR' not found in WAD")
+    face_ids = wad.by_name.get(face_name)
+    if not face_ids:
+        raise ValueError(f"status face patch {face_name!r} not found in WAD")
+
+    stbar = decode_patch(wad.lump_data(patch_ids[0]))
+    face_data = wad.lump_data(face_ids[0])
+    _face_w, _face_h, face_left, face_top = patch_header(face_data)
+    face = decode_patch(face_data)
+    for fy, face_row in enumerate(face):
+        dy = 0 - face_top + fy
+        if dy < 0:
+            continue
+        if dy >= len(stbar):
+            break
+        for fx, color in enumerate(face_row):
+            dx = 143 - face_left + fx
+            if color >= 0 and 0 <= dx < len(stbar[dy]):
+                stbar[dy][dx] = color
+    return stbar
+
+
+def hud_face_tiles(iwad, zip_member, face_names, palette):
+    if not iwad:
+        return [tile_solid() for _ in range(HUD_FACE_TILES * len(HUD_FACE_FRAMES))], "fallback-faces"
+
+    wad = Wad(read_wad(iwad, zip_member))
+    playpal = playpal_rgb(wad)
+    tiles = []
+    for face_name in face_names:
+        stbar = stbar_with_face(wad, face_name.upper())
+        for row in range(HUD_FACE_ROWS):
+            for col in range(HUD_FACE_COLS):
+                tile = [[0] * 16 for _ in range(16)]
+                src_col = HUD_FACE_COL + col
+                for y in range(16):
+                    sy = row * 16 + y
+                    for x in range(16):
+                        sx = src_col * 16 + x
+                        if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):
+                            tile[y][x] = quantize_color(stbar[sy][sx], playpal, palette)
+                tiles.append(tile)
+    return tiles, "+".join(face_names)
+
+
 def weapon_tiles(iwad, zip_member, patch_names):
     if not iwad:
         palette = [(16, 16, 16), (48, 48, 48), (96, 96, 96)] * 5
@@ -760,6 +816,7 @@ def main():
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
+    ap.add_argument("--face-frames", default=",".join(HUD_FACE_FRAMES), help="Comma-separated Doom status face patch frames")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
     ap.add_argument("--monster-sprites", default="3004:POSSA1,9:SPOSA1,3001:TROOA1,3002:SARGA1,58:SARGA1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:BPAKA0", help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
@@ -772,6 +829,10 @@ def main():
     wall_tiles, wall_source, wall_palette = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
     door_tiles, door_source, door_palette = wall_texture_tiles(args.iwad, args.zip_member, args.door_texture)
     hud_tiles, hud_source, hud_palette, hud_w, hud_h = patch_grid_tiles(args.iwad, args.zip_member, "STBAR", HUD_COLS, HUD_ROWS)
+    face_frames = [item.strip().upper() for item in args.face_frames.split(",") if item.strip()]
+    if len(face_frames) != len(HUD_FACE_FRAMES):
+        raise ValueError(f"expected {len(HUD_FACE_FRAMES)} status face frames, got {len(face_frames)}")
+    face_tiles, face_source = hud_face_tiles(args.iwad, args.zip_member, face_frames, hud_palette)
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
     ceiling_source, ceiling_palette = flat_solid_palette(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
     floor_source, floor_palette = flat_solid_palette(args.iwad, args.zip_member, floor_flat)
@@ -799,7 +860,7 @@ def main():
             sprite_meta,
             sprite_palettes,
         )
-    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + door_tiles[1:] + hud_tiles + weapon_cache + sprite_tiles
+    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + door_tiles[1:] + hud_tiles + face_tiles + weapon_cache + sprite_tiles
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
     c1, c2 = bytearray(), bytearray()
     for t in tiles:
@@ -852,6 +913,7 @@ def main():
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  door texture: {door_source} atlas={DOOR_ATLAS_BASE}..{DOOR_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
+    print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")
     print(f"  ceiling flat: {ceiling_source} solid backdrop palette")
     print(f"  floor flat: {floor_source} solid backdrop palette")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")

@@ -74,6 +74,12 @@ share the three projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar using large Doom `STTNUM` digit art
 quantized into the `STBAR` palette instead of debug-green minimap colors.
+The center face is now generated as six separate Doom `STFST`/death face
+windows in C-ROM and swapped by health band at runtime, while weapon frames
+start after that dedicated face block so the gun cannot accidentally read HUD
+face tiles. The pistol crop also keeps the original Doom patch offsets but
+raises the baked canvas enough to preserve the lower hand pixels before the
+status bar masks the bottom edge.
 Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
 pools now use compact Doom-like caps, and
 pickups remain in the map instead of disappearing when the matching resource is
