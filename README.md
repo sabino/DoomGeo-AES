@@ -68,6 +68,16 @@ make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
 
 This is intentionally build-time WAD compatibility: the cartridge contains the
 converted map data, not a runtime WAD loader.
+
+For visual regression work, run the native Doom comparison capture:
+
+```sh
+DOOM_MAP=E1M1 tools/capture_compare.sh
+```
+
+The script launches native Doom with the same Freedoom WAD, launches GnGeo with
+the current ROM, and writes native/Neo Geo/side-by-side screenshots under
+`.tools/screens/`.
  
 You must supply your own Neo Geo BIOS — it is copyrighted and not included.
 
