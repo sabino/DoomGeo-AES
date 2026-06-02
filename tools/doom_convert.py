@@ -367,6 +367,7 @@ def wall_texture_class(name: str) -> int:
         "BROWN1": 2,
         "SUPPORT2": 3,
         "LITE3": 4,
+        "COMPTILE": 5,
     }
     return classes.get(name, 0)
 
