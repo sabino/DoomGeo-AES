@@ -51,6 +51,7 @@ pixel work is offloaded to the scaler hardware.
 | B                   | Fire pistol       |
 | C                   | Toggle minimap    |
 | D                   | Open nearby door  |
+| D after DEAD/EXIT   | Restart level     |
 
 Turning is tuned deliberately slower than the original raycaster demo so the
 projected Doom targets can be lined up with keyboard or arcade-stick input.
@@ -82,7 +83,9 @@ stable aim point without spending any sprite slots.
 Runtime things now have a small mutable position layer, letting monsters take
 throttled chase steps toward the player while still using the compact converted
 WAD data for type, flags, and initial placement. When health reaches zero,
-movement and firing stop and the fix layer shows a compact `DEAD` message.
+movement and firing stop and the fix layer shows a compact `DEAD` message;
+pressing D resets the player, doors, pickups, monsters, and HUD for another
+run.
 
 The converter also preserves Doom door and exit linedefs as compact runtime
 trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
@@ -93,8 +96,9 @@ and raycasting through the shared `map_at()` path. Trying a nearby keyed door
 without the matching key flashes a compact fix-layer `KEY` message so the
 blocked door has readable feedback. Reaching the converted E1M1 exit cell now
 raises a fix-layer `EXIT` message and freezes player control, monster movement,
-and monster damage. This keeps level progression behavior in the ROM without
-keeping generic WAD directory/lump metadata in the cartridge.
+and monster damage until D restarts the level. This keeps level progression
+behavior in the ROM without keeping generic WAD directory/lump metadata in the
+cartridge.
 
 ## Building
 

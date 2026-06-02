@@ -1040,6 +1040,55 @@ static void update_enemy(void) {
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
 
+static void restart_level(void) {
+    prev_px = -1;
+    prev_py = -1;
+    map_on = 0;
+    bg_phase = 0xFF;
+    weapon_frame = 0xFF;
+    weapon_bob_phase = 0;
+    weapon_bob_x = 0;
+    weapon_bob_y = 0;
+    fire_timer = 0;
+    hurt_timer = 0;
+    level_complete = 0;
+    key_message_timer = 0;
+    ammo_message_timer = 0;
+    key_message_visible = 0;
+    monster_ai_tick = 0;
+    player_keys = 0;
+    player_health = 100;
+    player_armor = 0;
+    player_ammo = 50;
+    hurt_flash = 0;
+    hurt_flash_on = 0;
+
+    for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        enemy_dead[i] = 0;
+        enemy_hp[i] = 0;
+        enemy_hit_flash[i] = 0;
+        thing_type_override[i] = 0;
+    }
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        enemy_palette_def[slot] = -1;
+        enemy_tile_key[slot] = -1;
+        enemy_slot_flash[slot] = 0;
+    }
+
+    init_palettes();
+    clear_fix();
+    disable_sprites();
+    init_runtime_things();
+    rc_init();
+    init_background();
+    init_walls();
+    init_hud();
+    init_weapon();
+    hide_enemies();
+    force_fix_hud_redraw();
+}
+
 int main(void) {
     watchdog_kick();
     clear_fix();
@@ -1067,6 +1116,11 @@ int main(void) {
             if (d_now && !d_prev) open_nearby_door();
             d_prev = d_now;
         } else {
+            enum { D = 0x80 };
+            static u8 restart_prev = 0;
+            u8 restart_now = pressed & D;
+            if (restart_now && !restart_prev) restart_level();
+            restart_prev = restart_now;
             pressed = 0;
         }
         rc_render();                    /* DDA during active display          */
