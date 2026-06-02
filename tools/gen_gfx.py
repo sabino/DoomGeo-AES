@@ -94,7 +94,7 @@ WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
 WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
 DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
-WEAPON_BAKE_Y_ADJUST = -32
+WEAPON_BAKE_Y_ADJUST = -80
 
 
 def encode_tile(px):
@@ -675,9 +675,9 @@ def hud_face_tiles(iwad, zip_member, face_names, palette):
                 tile = [[0] * 16 for _ in range(16)]
                 src_col = HUD_FACE_COL + col
                 for y in range(16):
-                    sy = HUD_FACE_ROWS * 16 - 1 - (row * 16 + y)
+                    sy = row * 16 + y
                     for x in range(16):
-                        sx = src_col * 16 + x
+                        sx = src_col * 16 + (15 - x)
                         if 0 <= sy < len(stbar) and 0 <= sx < len(stbar[sy]):
                             tile[y][x] = quantize_color(stbar[sy][sx], playpal, palette)
                 tiles.append(tile)

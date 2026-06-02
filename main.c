@@ -1869,9 +1869,10 @@ static void disable_sprites(void) {
 }
 
 /* ---- floor/ceiling backdrop: BG_COUNT full-width columns ---------------
- * The generator bakes Doom flats into coarse perspective tile caches. Runtime
- * only selects the current direction/phase bucket so the expensive per-pixel
- * floor sampling stays offline.
+ * Keep the current gameplay backdrop as flat shaded bands. The textured
+ * perspective cache is still generated for experiments, but the live game uses
+ * solid tiles here because the coarse floor/ceiling texture was reading noisier
+ * than the original Doom-like wall pass.
  */
 static u8 plane_direction_bucket(int dir_x, int dir_y) {
     static const short dirs[TILE_PLANE_PERSPECTIVE_DIRS][2] = {
@@ -1908,10 +1909,7 @@ static void init_background(void) {
             u16 pal = (t < BG_SPLIT)
                 ? (u16)(PAL_CEILING_GRAD_BASE + t)
                 : (u16)(PAL_FLOOR_GRAD_BASE + (t - BG_SPLIT));
-            u16 base = (t < BG_SPLIT) ? TILE_CEILING_FLAT_BASE : TILE_FLOOR_FLAT_BASE;
-            u16 row = (t < BG_SPLIT) ? (u16)(BG_SPLIT - 1 - t) : (u16)(t - BG_SPLIT);
-            u16 tile = (u16)(base + ((row & (TILE_FLAT_ROWS - 1)) * TILE_FLAT_COLS) + (i & (TILE_FLAT_COLS - 1)));
-            scb1_tile(spr, t, tile, pal);
+            scb1_tile(spr, t, TILE_SOLID, pal);
         }
         scb2(spr, 0x0F, 0xFF);        /* full size, no shrink (16-tile ref)  */
         scb3(spr, 0, 0, BG_WIN);      /* top of screen                       */
@@ -1921,41 +1919,7 @@ static void init_background(void) {
 }
 
 static void update_background_scroll(void) {
-    int x_q8, y_q8;
-    int dir_x, dir_y, plane_x, plane_y;
-    u8 direction;
-    u8 phase_x;
-    u8 phase_y;
-    u32 key;
-    rc_player_q8(&x_q8, &y_q8);
-    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    (void)plane_x;
-    (void)plane_y;
-    direction = plane_direction_bucket(dir_x, dir_y);
-    phase_x = (u8)((x_q8 >> 7) & 1);
-    phase_y = (u8)((y_q8 >> 7) & 1);
-    key = (u32)direction
-        | ((u32)phase_x << 5)
-        | ((u32)phase_y << 6);
-    if (key == bg_scroll_key) return;
-
-    for (u16 i = 0; i < BG_COUNT; i++) {
-        u16 spr = BG_BASE + i;
-        for (u16 t = 0; t < BG_WIN; t++) {
-            u16 pal;
-            u16 tile;
-            if (t < BG_SPLIT) {
-                pal = (u16)(PAL_CEILING_GRAD_BASE + t);
-                tile = perspective_plane_tile(TILE_CEILING_PERSPECTIVE_BASE, direction, phase_x, phase_y, t, i);
-            } else {
-                u16 row = (u16)(t - BG_SPLIT);
-                pal = (u16)(PAL_FLOOR_GRAD_BASE + row);
-                tile = perspective_plane_tile(TILE_FLOOR_PERSPECTIVE_BASE, direction, phase_x, phase_y, row, i);
-            }
-            scb1_tile(spr, t, tile, pal);
-        }
-    }
-    bg_scroll_key = key;
+    bg_scroll_key = 0;
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
@@ -2054,7 +2018,8 @@ static void set_weapon_frame(u8 frame) {
         vram_addr(VRAM_SCB1 + spr * 64);
         vram_mod(1);
         for (u16 row = 0; row < WEAPON_WIN; row++) {
-            vram_w((u16)(frame_base + row * WEAPON_COUNT + i));
+            u16 src_row = (u16)(WEAPON_WIN - 1 - row);
+            vram_w((u16)(frame_base + src_row * WEAPON_COUNT + i));
             vram_w((u16)(PAL_WEAPON << 8));
         }
     }
