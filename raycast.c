@@ -60,8 +60,12 @@ static u8  bg_phase_cache = 0;
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 
+static inline int projected_height_from_inv(fix inv_dist) {
+    return (int)(((s32)WALLH * inv_dist) >> FBITS);
+}
+
 static inline int projected_height(fix dist) {
-    return (int)(((s32)WALLH * recip(dist)) >> FBITS);
+    return projected_height_from_inv(recip(dist));
 }
 
 static void update_projection_cache(void) {
@@ -167,8 +171,10 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     fix transformY = fmul(invDet, -fmul(planeY, spriteX) + fmul(planeX, spriteY));
     if (transformY < (FONE >> 3)) return 0;
 
-    int sx = (SCRW / 2) + (int)(((int64_t)(SCRW / 2) * transformX) / transformY);
-    int h = projected_height(transformY);
+    fix invY = recip(transformY);
+    fix scaleX = fmul(transformX, invY);
+    int sx = (SCRW / 2) + (int)(((s32)(SCRW / 2) * scaleX) >> FBITS);
+    int h = projected_height_from_inv(invY);
     if (h < 1) return 0;
     if (h > GAME_H) h = GAME_H;
 
@@ -222,7 +228,8 @@ void rc_render(void) {
             texbuf[x] = (u8)tex_x;
         }
 
-        int h = projected_height(perp);     /* slice height px */
+        fix inv_perp = recip(perp);
+        int h = projected_height_from_inv(inv_perp);     /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
 
