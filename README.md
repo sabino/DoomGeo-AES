@@ -57,7 +57,8 @@ table instead of doing a 64-bit divide for each projected column.
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the two projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar.
+armor counters over the Doom status bar. Pistol shots spend ammo, and close
+visible monsters apply a first-pass contact-damage tick with armor absorption.
 
 ## Building
 

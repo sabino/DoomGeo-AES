@@ -83,6 +83,7 @@ static u8  map_on = 0;              /* minimap visible?                       */
 static u8  bg_phase = 0xFF;
 static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
+static u8  hurt_timer = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
@@ -193,6 +194,34 @@ static void kill_visible_enemies(void) {
         killed = 1;
     }
     if (killed) hide_enemies();
+}
+
+static void player_take_damage(u16 amount) {
+    while (amount && player_armor) {
+        player_armor--;
+        amount--;
+    }
+    if (amount >= player_health) player_health = 0;
+    else player_health = (u16)(player_health - amount);
+}
+
+static void update_monster_damage(void) {
+    if (hurt_timer) {
+        hurt_timer--;
+        return;
+    }
+    if (player_health == 0) return;
+
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        if (thing < 0) continue;
+        if (!thing_is_monster(g_runtime_things[thing].type)) continue;
+        if (enemies[slot].dist_q8 < 520 || enemies[slot].screen_h > 96) {
+            player_take_damage(4);
+            hurt_timer = 24;
+            return;
+        }
+    }
 }
 
 static void apply_pickup(u16 thing_type) {
@@ -396,8 +425,11 @@ static void update_weapon(u8 pressed) {
     static u8 b_prev = 0;
     u8 b_now = pressed & B;
     if (b_now && !b_prev && fire_timer == 0) {
-        fire_timer = 12;
-        kill_visible_enemies();
+        if (player_ammo > 0) {
+            player_ammo--;
+            fire_timer = 12;
+            kill_visible_enemies();
+        }
     }
     b_prev = b_now;
 
@@ -560,6 +592,7 @@ int main(void) {
         rc_blit();                      /* push to VRAM during vblank         */
         update_background_phase(rc_bg_phase());
         update_enemy();
+        update_monster_damage();
         update_weapon(pressed);
         update_status_numbers();
 
