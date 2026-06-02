@@ -48,6 +48,9 @@ pixel work is offloaded to the scaler hardware.
 | B                   | Fire pistol       |
 | C                   | Toggle minimap    |
 
+Turning is tuned deliberately slower than the original raycaster demo so the
+projected Doom targets can be lined up with keyboard or arcade-stick input.
+
 ## Building
 
 The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under

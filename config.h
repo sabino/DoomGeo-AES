@@ -91,7 +91,7 @@
 
 /* ---- movement feel --------------------------------------------------- */
 #define MOVE_SPEED 0.12             
-#define ROT_COS    0.99452        
-#define ROT_SIN    0.10453        
+#define ROT_COS    0.99863        
+#define ROT_SIN    0.05234        
 
 #endif /* CONFIG_H */
