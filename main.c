@@ -548,6 +548,7 @@ static void open_nearby_door(void) {
         if (required_key && (player_keys & required_key) == 0) continue;
         if (iabs16(dx) <= 384 && iabs16(dy) <= 384) {
             g_runtime_door_open[i] = 1;
+            rc_invalidate_view();
             if (map_on) map_cell(door->x, door->y, 0, FIX_BLANK);
         }
     }

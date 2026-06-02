@@ -53,11 +53,9 @@ static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
 static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
-
-static inline u16 wall_tile(u8 tex_x, int row) {
-    int tex_y = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
-    return (u16)(TILE_WALL_ATLAS_BASE + tex_y * TILE_WALL_ATLAS_COLS + (tex_x % TILE_WALL_ATLAS_COLS));
-}
+static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
+static u8  view_dirty = 1;
+static u8  wall_upload_dirty = 1;
 
 static inline int projected_height(fix dist) {
     return (int)(((s32)WALLH * recip(dist)) >> FBITS);
@@ -71,6 +69,12 @@ static void update_projection_cache(void) {
 
 void rc_init(void) {
     init_recip_lut();
+    for (int tx = 0; tx < TILE_WALL_ATLAS_COLS; tx++) {
+        for (int row = 0; row < WALL_WIN; row++) {
+            int ty = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
+            wall_tiles[tx][row] = (u16)(TILE_WALL_ATLAS_BASE + ty * TILE_WALL_ATLAS_COLS + tx);
+        }
+    }
     for (int c = 0; c < NUM_COLS; c++) {
         cameraXbuf[c] = (fix)(((int64_t)2 * FONE * c) / (NUM_COLS - 1)) - FONE;
     }
@@ -85,6 +89,11 @@ void rc_init(void) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
     }
+    rc_invalidate_view();
+}
+
+void rc_invalidate_view(void) {
+    view_dirty = 1;
 }
 
 static void rotate(int sign) {
@@ -97,12 +106,15 @@ static void rotate(int sign) {
     planeX = fmul(planeX, cs) - fmul(planeY, sn);
     planeY = fmul(opx,    sn) + fmul(planeY, cs);
     update_projection_cache();
+    rc_invalidate_view();
 }
 
 static void try_move(fix dx, fix dy) {
     fix nx = posX + dx, ny = posY + dy;
+    fix ox = posX, oy = posY;
     if (!map_at(nx >> FBITS, posY >> FBITS)) posX = nx;
     if (!map_at(posX >> FBITS, ny >> FBITS)) posY = ny;
+    if (posX != ox || posY != oy) rc_invalidate_view();
 }
 
 void rc_input(u8 pressed) {
@@ -162,6 +174,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
 }
 
 void rc_render(void) {
+    if (!view_dirty) return;
     for (int x = 0; x < NUM_COLS; x++) {
         fix cameraX = cameraXbuf[x];
         fix rayX = dirX + fmul(planeX, cameraX);
@@ -218,9 +231,13 @@ void rc_render(void) {
         if (band >= DEPTH_BANDS) band = DEPTH_BANDS - 1;
         palbuf[x] = (u8)(PAL_DEPTH_BASE + (side ? DEPTH_BANDS : 0) + band);
     }
+    view_dirty = 0;
+    wall_upload_dirty = 1;
 }
 
 void rc_blit(void) {
+    if (!wall_upload_dirty) return;
+
     /* stream vertical shrink for every wall slice */
     vram_addr(VRAM_SCB2 + WALL_BASE);
     vram_mod(1);
@@ -235,15 +252,22 @@ void rc_blit(void) {
     for (int c = 0; c < NUM_COLS; c++) {
         if (texbuf[c] != curtex[c]) {
             u16 spr = WALL_BASE + c;
-            u16 attr = (u16)(palbuf[c] << 8);
-            vram_addr(VRAM_SCB1 + spr * 64);
-            vram_mod(1);
-            for (int t = 0; t < WALL_WIN; t++) {
-                vram_w(wall_tile(texbuf[c], t));
-                vram_w(attr);
+            u16 *tiles = wall_tiles[texbuf[c]];
+            if (palbuf[c] != curpal[c]) {
+                u16 attr = (u16)(palbuf[c] << 8);
+                vram_addr(VRAM_SCB1 + spr * 64);
+                vram_mod(1);
+                for (int t = 0; t < WALL_WIN; t++) {
+                    vram_w(tiles[t]);
+                    vram_w(attr);
+                }
+                curpal[c] = palbuf[c];
+            } else {
+                vram_addr(VRAM_SCB1 + spr * 64);
+                vram_mod(2);
+                for (int t = 0; t < WALL_WIN; t++) vram_w(tiles[t]);
             }
             curtex[c] = texbuf[c];
-            curpal[c] = palbuf[c];
             continue;
         }
         if (palbuf[c] == curpal[c]) continue;
@@ -254,4 +278,5 @@ void rc_blit(void) {
         for (int t = 0; t < WALL_WIN; t++) vram_w(attr);
         curpal[c] = palbuf[c];
     }
+    wall_upload_dirty = 0;
 }
