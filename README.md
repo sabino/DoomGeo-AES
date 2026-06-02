@@ -100,7 +100,9 @@ with `LAUN` pickup art, use `MISG` weapon frames, track rockets separately from
 bullets and shells, and apply compact splash damage around the auto-aimed
 target. Trying to fire empty flashes
 a compact fix-layer `AMMO` message instead of failing silently. Close visible
-monsters apply a first-pass contact-damage tick with armor absorption.
+monsters apply a first-pass contact-damage tick with Doom-like armor absorption:
+green armor absorbs roughly one third of incoming damage and blue armor absorbs
+roughly half.
 Pickups briefly flash compact center feedback using existing fix glyphs:
 `KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
 Former humans and shotgun guys still apply compact hitscan-style ranged damage,

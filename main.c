@@ -207,6 +207,7 @@ static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1, -1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
+static u8 player_armor_class = 0;
 static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
 static volatile u16 player_rockets = 0;
@@ -671,9 +672,12 @@ static void update_enemy_hit_flash(void) {
 }
 
 static void player_take_damage(u16 amount) {
-    while (amount && player_armor) {
-        player_armor--;
-        amount--;
+    if (amount && player_armor && player_armor_class) {
+        u16 saved = player_armor_class >= 2 ? (amount >> 1) : (amount / 3);
+        if (saved > player_armor) saved = player_armor;
+        player_armor = (u16)(player_armor - saved);
+        amount = (u16)(amount - saved);
+        if (!player_armor) player_armor_class = 0;
     }
     hurt_flash = 5;
     if (amount >= player_health) player_health = 0;
@@ -906,17 +910,20 @@ static u8 apply_pickup(u16 thing_type) {
         break;
     case 2015: /* armor bonus */
         if (player_armor >= 200) return 0;
+        if (!player_armor_class) player_armor_class = 1;
         if (player_armor < 200) player_armor++;
         pickup_message_type = 5;
         break;
     case 2018: /* green armor */
         if (player_armor >= 100) return 0;
         if (player_armor < 100) player_armor = 100;
+        player_armor_class = 1;
         pickup_message_type = 5;
         break;
     case 2019: /* blue armor */
         if (player_armor >= 200) return 0;
         if (player_armor < 200) player_armor = 200;
+        player_armor_class = 2;
         pickup_message_type = 5;
         break;
     case 2046: /* box of rockets */
@@ -1720,6 +1727,7 @@ static void restart_level(void) {
     chaingun_flash = 0;
     player_health = 100;
     player_armor = 0;
+    player_armor_class = 0;
     player_ammo = 50;
     player_shells = 0;
     player_rockets = 0;
