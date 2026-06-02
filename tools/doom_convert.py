@@ -389,8 +389,8 @@ def main() -> int:
     parser.add_argument("--zip-member", help="WAD member inside a zip archive")
     parser.add_argument("--map", default="E1M1", help="Doom map marker to convert")
     parser.add_argument("--out", required=True, help="Generated C header path")
-    parser.add_argument("--width", type=int, default=32)
-    parser.add_argument("--height", type=int, default=24)
+    parser.add_argument("--width", type=int, default=38)
+    parser.add_argument("--height", type=int, default=27)
     parser.add_argument(
         "--detail-cull",
         type=float,

@@ -43,7 +43,7 @@
 
  
 #define MAP_FIX_COL 1             
-#define MAP_FIX_ROW 2             
+#define MAP_FIX_ROW 1             
 
 /* ---- palettes -------------------------------------------------------- */
 #define PAL_WALL_LIT  1             /* N/S faces                             */

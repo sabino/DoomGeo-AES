@@ -36,6 +36,8 @@ FREEDOOM_VERSION=0.13.0
 FREEDOOM_ZIP=.tools/assets/freedoom-$(FREEDOOM_VERSION).zip
 FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_VERSION)/freedoom-$(FREEDOOM_VERSION).zip
 DOOM_MAP?=E1M1
+DOOM_MAP_WIDTH?=38
+DOOM_MAP_HEIGHT?=27
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 CUSTOM_GENERATE_TARGETS+=doom-assets
 
@@ -71,7 +73,7 @@ $(FREEDOOM_ZIP):
 	curl -L --fail --output $@ $(FREEDOOM_URL)
 
 $(DOOM_MAP_HEADER): tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --out $@
+	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@
 
 doom-assets: $(DOOM_MAP_HEADER)
 
