@@ -2229,9 +2229,7 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
     {
         int bottom = (GAME_H + h) / 2;
         int top;
-        if (thing_is_explosion(thing_type) && thing_index < 0) {
-            top = HORIZON - meta->height - 32;
-        } else if (thing_is_projectile(thing_type)) {
+        if ((thing_is_explosion(thing_type) && thing_index < 0) || thing_is_projectile(thing_type)) {
             top = (GAME_H - meta->height) / 2;
         } else {
             if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
@@ -2323,25 +2321,24 @@ static int render_visible_projectile(int found) {
     return found + 1;
 }
 
-static int render_visible_impact(int found) {
+static void render_visible_impact(u16 slot) {
     int sx, h, dist_q8;
-    if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
-    if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
-    render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0);
-    return found + 1;
+    if (!impact_active) return;
+    if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return;
+    render_type_slot(slot, -1, 9000, sx, h, dist_q8, 0);
 }
 
 static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
 
-    found = render_visible_impact(found);
     found = render_visible_projectile(found);
     found = select_visible_things(found, 1);
     found = select_visible_things(found, 2);
     found = select_visible_things(found, 3);
     found = select_visible_things(found, 4);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
+    render_visible_impact((u16)(ENEMY_VISIBLE_COUNT - 1));
 }
 
 static void restart_level(void) {

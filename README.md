@@ -165,8 +165,9 @@ feedback without spending additional sprite slots. Firing a real shot now also
 wakes nearby monsters with a compact sound-alert pass, so rooms escalate more
 like Doom instead of only reacting to the single enemy currently under the
 crosshair. Pistol, shotgun, chaingun, and rocket hits also reserve an
-independent short-lived Doom `BEXP` impact slot, so misses, wall shots, and
-impacts stay visible even while an enemy projectile is already in flight.
+independent short-lived Doom `BEXP` impact slot, placed around the projected
+view center and drawn in the front world-object slot, so misses, wall shots,
+and impacts stay visible even while an enemy projectile is already in flight.
 Monsters now keep compact per-thing hit points, so pistol shots damage targets
 over multiple hits instead of deleting every visible enemy immediately; the
 pistol uses a Doom-like visible-target autoaim and damages the visible monster
