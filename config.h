@@ -24,25 +24,26 @@
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 
 /* ---- sprite slot assignment -----------------------------------------
- * Priority: lower index = back, higher = front ("1 is in the back").
- * So the floor/ceiling backdrop sprites sit behind the wall slices.
+ * Priority: lower index = front in GnGeo/Neo Geo sprite evaluation.  Keep the
+ * HUD before the weapon slots so the Doom status bar and face mask the bottom
+ * of the pistol, matching the original screen composition.
  * Sprite #0 is unusable on this hardware.
  */
 #define BG_BASE   1                
 #define BG_COUNT  (SCRW / 16)       
 #define BG_WIN    (GAME_H / 16)     
 #define WALL_BASE (BG_BASE + BG_COUNT)   
+#define HUD_BASE  (WALL_BASE + NUM_COLS)
+#define HUD_COUNT (SCRW / 16)
+#define HUD_WIN   (HUD_H / 16)
 #define ENEMY_VISIBLE_COUNT 2
 #define ENEMY_STRIPS 3
-#define ENEMY_BASE   (WALL_BASE + NUM_COLS)
+#define ENEMY_BASE   (HUD_BASE + HUD_COUNT)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
 #define ENEMY_WIN    4
 #define WEAPON_BASE  (ENEMY_BASE + ENEMY_COUNT)
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   7
-#define HUD_BASE  (WEAPON_BASE + WEAPON_COUNT)
-#define HUD_COUNT (SCRW / 16)
-#define HUD_WIN   (HUD_H / 16)
 #define SPR_TOTAL 381               
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */
@@ -55,11 +56,7 @@
 #define TILE_HUD_BASE (TILE_WALL_ATLAS_BASE + TILE_WALL_ATLAS_COLS * TILE_WALL_ATLAS_ROWS)
 #define TILE_HUD_COLS 20
 #define TILE_HUD_ROWS 2
-#define BG_PHASES 64
-#define TILE_CEILING_BASE (TILE_HUD_BASE + TILE_HUD_COLS * TILE_HUD_ROWS)
-#define TILE_BG_PHASE_TILES (BG_COUNT * BG_SPLIT)
-#define TILE_FLOOR_BASE (TILE_CEILING_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
-#define TILE_WEAPON_BASE (TILE_FLOOR_BASE + BG_PHASES * TILE_BG_PHASE_TILES)
+#define TILE_WEAPON_BASE (TILE_HUD_BASE + TILE_HUD_COLS * TILE_HUD_ROWS)
 #define TILE_WEAPON_STRIPS 7
 #define TILE_WEAPON_ROWS 7
 #define TILE_WEAPON_FRAMES 12

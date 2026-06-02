@@ -56,7 +56,6 @@ static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
-static u8  bg_phase_cache = 0;
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 
@@ -92,7 +91,6 @@ void rc_init(void) {
     planeX = FIX(DOOM_PLANE_X);
     planeY = FIX(DOOM_PLANE_Y);
     update_projection_cache();
-    bg_phase_cache = 0;
     for (int c = 0; c < NUM_COLS; c++) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
@@ -149,18 +147,6 @@ void rc_player_cell(int *cx, int *cy) {
 void rc_player_q8(int *x_q8, int *y_q8) {
     *x_q8 = posX >> (FBITS - 8);
     *y_q8 = posY >> (FBITS - 8);
-}
-
-u8 rc_bg_phase(void) {
-    return bg_phase_cache;
-}
-
-static void update_bg_phase_cache(void) {
-    fix forward = fmul(posX, dirX) + fmul(posY, dirY);
-    fix lateral = fmul(posX, planeX) + fmul(posY, planeY);
-    u8 phase_u = (u8)((lateral >> (FBITS - 3)) & 7);
-    u8 phase_v = (u8)((forward >> (FBITS - 3)) & 7);
-    bg_phase_cache = (u8)((phase_v << 3) | phase_u);
 }
 
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
@@ -251,7 +237,6 @@ void rc_render(void) {
     }
     view_dirty = 0;
     wall_upload_dirty = 1;
-    update_bg_phase_cache();
 }
 
 void rc_blit(void) {

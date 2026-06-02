@@ -45,15 +45,16 @@ HUD_TILES = HUD_COLS * HUD_ROWS
 BG_COLS = 20
 BG_HALF_ROWS = 6
 BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
-BG_PHASES = 64
-CEILING_BASE = HUD_BASE + HUD_TILES
-FLOOR_BASE = CEILING_BASE + BG_PHASES * BG_HALF_TILES
-WEAPON_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
+WEAPON_BASE = HUD_BASE + HUD_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 7
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
 WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
 SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
+WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
+WEAPON_SCREEN_LEFT = (320 - WEAPON_STRIPS * 16) // 2
+DOOM_PSPR_SX = 1
+DOOM_PSPR_SY = 32
 
 
 def encode_tile(px):
@@ -248,6 +249,10 @@ def decode_patch(data):
     return px
 
 
+def patch_header(data):
+    return struct.unpack_from("<hhhh", data, 0)
+
+
 def compose_texture(wad, texture_name):
     pnames = parse_pnames(wad)
     textures = parse_textures(wad)
@@ -351,22 +356,6 @@ def quantize_rgb(rgb, palette):
     return best + 1
 
 
-def smooth_flat_color(flat, playpal, sx, sy):
-    indices = (
-        flat[sy & 63][sx & 63],
-        flat[sy & 63][(sx + 1) & 63],
-        flat[(sy + 1) & 63][sx & 63],
-        flat[(sy + 1) & 63][(sx + 1) & 63],
-    )
-    r = g = b = 0
-    for index in indices:
-        pr, pg, pb = playpal[index]
-        r += pr
-        g += pg
-        b += pb
-    return (r // 4, g // 4, b // 4)
-
-
 def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
     height = len(texture)
     width = len(texture[0])
@@ -464,66 +453,29 @@ def decode_flat(wad, flat_name):
     return [list(data[y * 64 : (y + 1) * 64]) for y in range(64)]
 
 
-def flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=False, phase=0):
-    tiles = []
-
-    width = cols * 16
-    height = rows * 16
-    center_x = width // 2
-
-    phase_u = phase & 7
-    phase_v = (phase >> 3) & 7
-    lateral_offset = phase_u * 8
-    forward_offset = phase_v * 8
-
-    for row in range(rows):
-        for col in range(cols):
-            tile = [[0] * 16 for _ in range(16)]
-            for y in range(16):
-                screen_y = row * 16 + y
-                if ceiling:
-                    horizon_delta = max(1, height - screen_y)
-                    shade_step = height - screen_y
-                else:
-                    horizon_delta = max(1, screen_y + 1)
-                    shade_step = screen_y
-
-                # Precompute an affine strip for this scanline. Near the
-                # horizon, distance is high and the flat compresses; near the
-                # viewer, distance drops and texels widen. This costs ROM, not
-                # 68000 time, and avoids a runtime floor-span renderer.
-                distance = (height * 48) / horizon_delta
-                forward = int(distance * 2.0)
-                for x in range(16):
-                    screen_x = col * 16 + x
-                    lateral = int((screen_x - center_x) * distance / 40.0)
-                    sx = (lateral + lateral_offset) & 63
-                    sy = (forward + forward_offset) & 63
-                    q = quantize_rgb(smooth_flat_color(flat, playpal, sx, sy), palette)
-                    if shade_step < 24 and q > 1:
-                        q -= 1
-                    if shade_step < 12 and q > 1:
-                        q -= 1
-                    tile[y][x] = q
-            tiles.append(tile)
-
-    return tiles
-
-
-def flat_phase_tiles(iwad, zip_member, flat_name, cols, rows, ceiling=False):
+def flat_solid_palette(iwad, zip_member, flat_name, ceiling=False):
     if not iwad:
-        palette = [(12, 12, 12), (36, 36, 36), (72, 72, 72)] * 5
-        return [tile_solid() for _ in range(cols * rows * BG_PHASES)], flat_name, palette
+        base = (40, 42, 48) if ceiling else (56, 48, 36)
+        return flat_name, [base] * 15
 
     wad = Wad(read_wad(iwad, zip_member))
     flat = decode_flat(wad, flat_name)
     playpal = playpal_rgb(wad)
-    palette = texture_palette(flat, playpal)
-    all_tiles = []
+    used = Counter(color for row in flat for color in row if color >= 0)
+    if used:
+        colors = [playpal[index] for index, _count in used.most_common(8)]
+        r = sum(color[0] for color in colors) // len(colors)
+        g = sum(color[1] for color in colors) // len(colors)
+        b = sum(color[2] for color in colors) // len(colors)
+    else:
+        r = g = b = 32
+    if ceiling:
+        r = r * 3 // 4
+        g = g * 3 // 4
+        b = min(255, b * 5 // 4)
+    palette = [(r, g, b)] * 15
     source = flat_name.upper()
-    for phase in range(BG_PHASES):
-        all_tiles.extend(flat_grid_tiles(flat, playpal, palette, cols, rows, ceiling=ceiling, phase=phase))
-    return all_tiles, source, palette
+    return source, palette
 
 
 def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
@@ -542,14 +494,19 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     if patch_name == "STBAR":
         face_ids = wad.by_name.get("STFST00")
         if face_ids:
-            face = decode_patch(wad.lump_data(face_ids[0]))
+            face_data = wad.lump_data(face_ids[0])
+            _face_w, _face_h, face_left, face_top = patch_header(face_data)
+            face = decode_patch(face_data)
             for fy, face_row in enumerate(face):
-                if fy >= len(patch):
+                dy = 0 - face_top + fy
+                if dy < 0:
+                    continue
+                if dy >= len(patch):
                     break
                 for fx, color in enumerate(face_row):
-                    dx = 143 + fx
-                    if color >= 0 and 0 <= dx < len(patch[fy]):
-                        patch[fy][dx] = color
+                    dx = 143 - face_left + fx
+                    if color >= 0 and 0 <= dx < len(patch[dy]):
+                        patch[dy][dx] = color
     palette_src = list(patch)
     if patch_name == "STBAR":
         for digit in range(10):
@@ -592,23 +549,30 @@ def weapon_tiles(iwad, zip_member, patch_names):
         lump_ids = wad.by_name.get(patch_name)
         if not lump_ids:
             raise ValueError(f"weapon patch {patch_name!r} not found in WAD")
-        patches.append((patch_name, decode_patch(wad.lump_data(lump_ids[0]))))
+        data = wad.lump_data(lump_ids[0])
+        _width, _height, left, top = patch_header(data)
+        patches.append((patch_name, decode_patch(data), left, top))
 
     palette_src = []
-    for _name, patch in patches:
+    for _name, patch, _left, _top in patches:
         palette_src.extend(patch)
     palette = texture_palette(palette_src, playpal)
     dst_w = WEAPON_STRIPS * 16
     dst_h = WEAPON_ROWS * 16
 
     tiles = []
-    max_w = max(len(patch[0]) for _name, patch in patches)
-    max_h = max(len(patch) for _name, patch in patches)
-    for _name, patch in patches:
+    max_w = max(len(patch[0]) for _name, patch, _left, _top in patches)
+    max_h = max(len(patch) for _name, patch, _left, _top in patches)
+    for _name, patch, left, top in patches:
         src_h = len(patch)
         src_w = len(patch[0])
-        x0 = (dst_w - src_w) // 2
-        y0 = dst_h - src_h
+        # Doom psprites are positioned from a screen-space anchor and each
+        # patch's own left/top offsets. Bake that convention offline so the
+        # 68000 only swaps complete tile frames at runtime.
+        screen_x = DOOM_PSPR_SX - left
+        screen_y = DOOM_PSPR_SY - top
+        x0 = screen_x - WEAPON_SCREEN_LEFT
+        y0 = screen_y - WEAPON_SCREEN_TOP
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
         for y, row in enumerate(patch):
@@ -630,7 +594,7 @@ def weapon_tiles(iwad, zip_member, patch_names):
                         tile[y][x] = quantize_color(canvas[row * 16 + y][strip * 16 + x], playpal, palette)
                 tiles.append(tile)
 
-    return tiles, "+".join(name for name, _patch in patches), palette, max_w, max_h
+    return tiles, "+".join(name for name, _patch, _left, _top in patches), palette, max_w, max_h
 
 
 def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
@@ -798,8 +762,8 @@ def main():
     wall_tiles, wall_source, wall_palette = wall_texture_tiles(args.iwad, args.zip_member, args.wall_texture)
     hud_tiles, hud_source, hud_palette, hud_w, hud_h = patch_grid_tiles(args.iwad, args.zip_member, "STBAR", HUD_COLS, HUD_ROWS)
     ceiling_flat, floor_flat = map_start_flats(args.iwad, args.zip_member, args.map)
-    ceiling_tiles, ceiling_source, ceiling_palette = flat_phase_tiles(args.iwad, args.zip_member, ceiling_flat, BG_COLS, BG_HALF_ROWS, ceiling=True)
-    floor_tiles, floor_source, floor_palette = flat_phase_tiles(args.iwad, args.zip_member, floor_flat, BG_COLS, BG_HALF_ROWS)
+    ceiling_source, ceiling_palette = flat_solid_palette(args.iwad, args.zip_member, ceiling_flat, ceiling=True)
+    floor_source, floor_palette = flat_solid_palette(args.iwad, args.zip_member, floor_flat)
     weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
     weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
@@ -822,7 +786,7 @@ def main():
             sprite_meta,
             sprite_palettes,
         )
-    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + hud_tiles + ceiling_tiles + floor_tiles + weapon_cache + sprite_tiles
+    tiles = [tile_blank(), wall_tiles[0], tile_solid()] + wall_tiles[1:] + hud_tiles + weapon_cache + sprite_tiles
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
     c1, c2 = bytearray(), bytearray()
     for t in tiles:
@@ -874,8 +838,8 @@ def main():
 
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
-    print(f"  ceiling flat: {ceiling_source} tile={CEILING_BASE}..{CEILING_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
-    print(f"  floor flat: {floor_source} tile={FLOOR_BASE}..{FLOOR_BASE + BG_PHASES * BG_HALF_TILES - 1} ({BG_COLS}x{BG_HALF_ROWS}x{BG_PHASES})")
+    print(f"  ceiling flat: {ceiling_source} solid backdrop palette")
+    print(f"  floor flat: {floor_source} solid backdrop palette")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")
     for thing_type, first_scale, scale_count, frame in sprite_defs:
         print(f"  monster sprite: thing={thing_type} frame={frame} scales={first_scale}..{first_scale + scale_count - 1}")
