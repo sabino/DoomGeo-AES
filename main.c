@@ -85,8 +85,11 @@ static u8  weapon_frame = 0xFF;
 static u8  fire_timer = 0;
 static u8  hurt_timer = 0;
 static u8  level_complete = 0;
+static u8  monster_ai_tick = 0;
 static u8  enemy_dead[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
+static short thing_x_q8[NG_RUNTIME_THING_COUNT];
+static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1, -1};
 static volatile u16 player_health = 100;
@@ -112,6 +115,13 @@ static void hide_enemies(void);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
+}
+
+static void init_runtime_things(void) {
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        thing_x_q8[i] = g_runtime_things[i].x_q8;
+        thing_y_q8[i] = g_runtime_things[i].y_q8;
+    }
 }
 
 static u8 thing_is_monster(u16 thing_type) {
@@ -203,14 +213,14 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (!thing_is_monster(g_runtime_things[thing_index].type)) return 0;
     {
-        short x = g_runtime_things[thing_index].x_q8;
-        short y = g_runtime_things[thing_index].y_q8;
+        short x = thing_x_q8[thing_index];
+        short y = thing_y_q8[thing_index];
         u8 hp = monster_hp(thing_index);
         if (damage >= hp) hp = 0;
         else hp = (u8)(hp - damage);
 
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-            if (thing_is_monster(g_runtime_things[i].type) && g_runtime_things[i].x_q8 == x && g_runtime_things[i].y_q8 == y) {
+            if (thing_is_monster(g_runtime_things[i].type) && thing_x_q8[i] == x && thing_y_q8[i] == y) {
                 enemy_hp[i] = hp;
                 if (hp == 0) {
                     enemy_dead[i] = 1;
@@ -270,6 +280,43 @@ static void update_monster_damage(void) {
     }
 }
 
+static u8 can_monster_step(short x_q8, short y_q8) {
+    int cx = x_q8 >> 8;
+    int cy = y_q8 >> 8;
+    if (map_at(cx, cy)) return 0;
+    if (map_at((x_q8 - 52) >> 8, cy)) return 0;
+    if (map_at((x_q8 + 52) >> 8, cy)) return 0;
+    if (map_at(cx, (y_q8 - 52) >> 8)) return 0;
+    if (map_at(cx, (y_q8 + 52) >> 8)) return 0;
+    return 1;
+}
+
+static void update_monster_ai(void) {
+    int px, py;
+    if (++monster_ai_tick & 7) return;
+    rc_player_q8(&px, &py);
+    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        int dx, dy, adx, ady;
+        short nx, ny;
+        if (enemy_dead[i] || !thing_is_monster(g_runtime_things[i].type)) continue;
+        dx = px - thing_x_q8[i];
+        dy = py - thing_y_q8[i];
+        adx = iabs16(dx);
+        ady = iabs16(dy);
+        if (adx + ady > 2304) continue;
+        if (adx < 288 && ady < 288) continue;
+
+        nx = thing_x_q8[i];
+        ny = thing_y_q8[i];
+        if (adx > ady) nx = (short)(nx + (dx < 0 ? -12 : 12));
+        else ny = (short)(ny + (dy < 0 ? -12 : 12));
+        if (can_monster_step(nx, ny)) {
+            thing_x_q8[i] = nx;
+            thing_y_q8[i] = ny;
+        }
+    }
+}
+
 static void apply_pickup(u16 thing_type) {
     switch (thing_type) {
     case 2007: /* clip */
@@ -314,7 +361,7 @@ static void collect_nearby_pickups(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         const NgRuntimeThing *thing = &g_runtime_things[i];
         if (enemy_dead[i] || !thing_is_pickup(thing->type)) continue;
-        if (iabs16(px - thing->x_q8) <= 96 && iabs16(py - thing->y_q8) <= 96) {
+        if (iabs16(px - thing_x_q8[i]) <= 96 && iabs16(py - thing_y_q8[i]) <= 96) {
             apply_pickup(thing->type);
             enemy_dead[i] = 1;
             hide_enemies();
@@ -566,7 +613,7 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
 static u8 enemy_coord_selected(int count, short x, short y) {
     for (int slot = 0; slot < count; slot++) {
         int thing = enemies[slot].thing_index;
-        if (thing >= 0 && g_runtime_things[thing].x_q8 == x && g_runtime_things[thing].y_q8 == y) return 1;
+        if (thing >= 0 && thing_x_q8[thing] == x && thing_y_q8[thing] == y) return 1;
     }
     return 0;
 }
@@ -633,8 +680,8 @@ static int select_visible_things(int found, u8 want_monsters) {
         u8 is_monster = thing_is_monster(thing->type);
         if (enemy_dead[i]) continue;
         if (want_monsters != is_monster) continue;
-        if (enemy_coord_selected(found, thing->x_q8, thing->y_q8)) continue;
-        if (!rc_project_point(thing->x_q8, thing->y_q8, &sx, &h, &dist_q8)) continue;
+        if (enemy_coord_selected(found, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
         if (enemy_obscured_by_weapon(sx, h)) continue;
 
         render_thing_slot((u16)found, i, sx, h, dist_q8);
@@ -665,10 +712,12 @@ int main(void) {
     update_status_numbers();
     draw_crosshair();
     rc_init();
+    init_runtime_things();
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;    
         rc_input(pressed);
+        update_monster_ai();
         collect_nearby_pickups();
         check_exit_reached();
         rc_render();                    /* DDA during active display          */
