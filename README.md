@@ -37,20 +37,37 @@ pixel work is offloaded to the scaler hardware.
 
 ## Building
 
-Requires [ngdevkit](https://github.com/dciabrin/ngdevkit) 
+The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under
+`.tools/ngdevkit-local`; `.tools/` is ignored by git so the toolchain and WAD
+downloads stay repo-local without being committed.
  
 
 ```sh
 # graphics + sound ROMs (self-contained tile encoder)
 python3 tools/gen_gfx.py
 
-# compile and assemble the cartridge
+# compile, convert Freedoom E1M1, and assemble the cartridge
 make
+
+# run with the local GnGeo and known-good keyboard mapping
+SDL_VIDEODRIVER=x11 make gngeo
 ```
 
 `tools/gen_gfx.py` emits the C/S/M/V ROMs directly in the Neo Geo's planar
 format, so the only ngdevkit dependency is the m68k toolchain. See the comments
 at the top of each tool for details.
+
+`tools/doom_convert.py` reads a Doom-format WAD at build time and emits a compact
+grid header for the Neo Geo raycaster. By default, `make` downloads Freedoom
+0.13.0 into `.tools/assets/` and converts `E1M1`:
+
+```sh
+make DOOM_MAP=E1M2
+make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
+```
+
+This is intentionally build-time WAD compatibility: the cartridge contains the
+converted map data, not a runtime WAD loader.
  
 You must supply your own Neo Geo BIOS — it is copyrighted and not included.
 
