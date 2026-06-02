@@ -1220,6 +1220,7 @@ static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, 
 static int select_visible_things(int found, u8 want_monsters) {
     ThingCandidate candidates[ENEMY_VISIBLE_COUNT];
     int count = 0;
+    if (found >= ENEMY_VISIBLE_COUNT) return found;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) candidates[slot].thing_index = -1;
 
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
