@@ -184,7 +184,6 @@ static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
 static u16 shown_score = 0xFFFF;
 static u8 shown_keys = 0xFF;
-static u8 shown_weapon = 0xFF;
 
 enum {
     PLAYER_MAX_BULLETS = 200,
@@ -744,7 +743,6 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_shells, 8, PLAYER_MAX_SHELLS);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        shown_weapon = 0xFF;
         pickup_message_weapon = 2;
         pickup_message_type = 2;
         break;
@@ -755,7 +753,6 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_ammo, 20, PLAYER_MAX_BULLETS);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        shown_weapon = 0xFF;
         pickup_message_weapon = 3;
         pickup_message_type = 2;
         break;
@@ -766,7 +763,6 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_rockets, 2, PLAYER_MAX_ROCKETS);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        shown_weapon = 0xFF;
         pickup_message_weapon = 4;
         pickup_message_type = 2;
         break;
@@ -1024,27 +1020,20 @@ static void update_status_numbers(void) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
-    u8 weapon = current_weapon;
-    if (!player_has_weapon(weapon)) weapon = 0;
-    weapon++;
     if (health != shown_health) {
-        draw_number3(3, 26, health, PAL_HUD);
+        draw_number3(11, 26, health, PAL_HUD);
         shown_health = health;
     }
-    if (weapon != shown_weapon) {
-        fix_poke(16, 26, PAL_HUD, (u16)(FIX_DIGIT_BASE + weapon));
-        shown_weapon = weapon;
-    }
     if (ammo != shown_ammo) {
-        draw_number3(18, 26, ammo, PAL_HUD);
+        draw_number3(5, 26, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
     if (armor != shown_armor) {
-        draw_number3(33, 26, armor, PAL_HUD);
+        draw_number3(27, 26, armor, PAL_HUD);
         shown_armor = armor;
     }
     if (player_score != shown_score) {
-        draw_number3(24, 26, player_score, PAL_HUD);
+        draw_number3(17, 26, player_score, PAL_HUD);
         shown_score = player_score;
     }
     if (player_keys != shown_keys) {
@@ -1065,7 +1054,6 @@ static void force_fix_hud_redraw(void) {
     shown_armor = 0xFFFF;
     shown_score = 0xFFFF;
     shown_keys = 0xFF;
-    shown_weapon = 0xFF;
     update_status_numbers();
     draw_crosshair();
     update_center_message();
@@ -1194,7 +1182,6 @@ static void toggle_weapon(void) {
     }
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
-    shown_weapon = 0xFF;
 }
 
 static void set_weapon_position(signed char bob_x, signed char bob_y) {
@@ -1247,7 +1234,6 @@ static void update_weapon(u8 pressed) {
             damage_shotgun_spread();
         } else if (!fire_prev && current_weapon == 0 && player_ammo > 0) {
             current_weapon = 0;
-            shown_weapon = 0xFF;
             player_ammo--;
             fire_timer = 12;
             damage_best_visible_enemy(1);
@@ -1272,7 +1258,7 @@ static void update_weapon(u8 pressed) {
         fire_timer--;
     }
     if (frame != weapon_frame) set_weapon_frame(frame);
-    update_weapon_bob(pressed);
+    update_weapon_bob(fire_timer ? 0 : pressed);
 }
 
 static void init_weapon(void) {

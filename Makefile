@@ -35,10 +35,13 @@ Z80LDFLAGS=
 FREEDOOM_VERSION=0.13.0
 FREEDOOM_ZIP=.tools/assets/freedoom-$(FREEDOOM_VERSION).zip
 FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_VERSION)/freedoom-$(FREEDOOM_VERSION).zip
+DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
+DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
+DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
 DOOM_MAP_WIDTH?=38
 DOOM_MAP_HEIGHT?=27
-DOOM_WALL_TEXTURE?=BASE2
+DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
@@ -81,8 +84,12 @@ $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(FREEDOOM_URL)
 
-$(DOOM_MAP_HEADER): tools/doom_convert.py $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+$(DOOM_SHAREWARE_ZIP):
+	mkdir -p $(dir $@)
+	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
+
+$(DOOM_MAP_HEADER): tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 
@@ -116,8 +123,8 @@ $(CROM2): rom/c2.bin
 rom/c1.bin rom/c2.bin rom/s1.bin rom/m1.bin rom/v1.bin: $(GFX_STAMP)
 	@test -f $@
 
-$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(DOOM_MAP_HEADER) $(FREEDOOM_ZIP) | $(BUILDDIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(FREEDOOM_ZIP) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER)
 	touch $@
 
 $(GFX_HEADER): $(GFX_STAMP)

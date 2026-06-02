@@ -49,8 +49,8 @@ BG_PHASES = 64
 CEILING_BASE = HUD_BASE + HUD_TILES
 FLOOR_BASE = CEILING_BASE + BG_PHASES * BG_HALF_TILES
 WEAPON_BASE = FLOOR_BASE + BG_PHASES * BG_HALF_TILES
-WEAPON_STRIPS = 6
-WEAPON_ROWS = 6
+WEAPON_STRIPS = 7
+WEAPON_ROWS = 7
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
 WEAPON_FRAMES = ("PISGA0", "PISGB0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
 SPRITE_CACHE_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
@@ -488,8 +488,19 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
     if not lump_ids:
         raise ValueError(f"patch {patch_name!r} not found in WAD")
 
-    patch = decode_patch(wad.lump_data(lump_ids[0]))
     playpal = playpal_rgb(wad)
+    patch = decode_patch(wad.lump_data(lump_ids[0]))
+    if patch_name == "STBAR":
+        face_ids = wad.by_name.get("STFST00")
+        if face_ids:
+            face = decode_patch(wad.lump_data(face_ids[0]))
+            for fy, face_row in enumerate(face):
+                if fy >= len(patch):
+                    break
+                for fx, color in enumerate(face_row):
+                    dx = 143 + fx
+                    if color >= 0 and 0 <= dx < len(patch[fy]):
+                        patch[fy][dx] = color
     palette = texture_palette(patch, playpal)
     src_h = len(patch)
     src_w = len(patch[0])
@@ -575,7 +586,7 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
     sprite_name = sprite_name.upper()
     lump_ids = wad.by_name.get(sprite_name)
     if not lump_ids:
-        raise ValueError(f"sprite frame {sprite_name!r} not found in WAD")
+        return [], [], [], start_tile
     patch = decode_patch(wad.lump_data(lump_ids[0]))
     playpal = playpal_rgb(wad)
     palette = texture_palette(patch, playpal)
@@ -630,6 +641,8 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     for thing_type, frame in specs:
         first_scale = len(metas)
         frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile)
+        if not frame_meta:
+            continue
         tiles.extend(frame_tiles)
         metas.extend(frame_meta)
         palettes.append(palette)
