@@ -8,6 +8,8 @@
 #include "map.h"
 
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
+static u8 hurt_flash = 0;
+static u8 hurt_flash_on = 0;
 
 /* ---- palette setup --------------------------------------------------- */
 static void init_palettes(void) {
@@ -71,6 +73,59 @@ static void init_palettes(void) {
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(r, g, b));
     }
     REG_BACKDROP = RGB(0, 0, 0);
+}
+
+static void restore_play_palettes(void) {
+    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
+        pal_set(PAL_CEILING, (u16)(i + 1), RGB(g_ceiling_palette_rgb[i][0], g_ceiling_palette_rgb[i][1], g_ceiling_palette_rgb[i][2]));
+    }
+    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(g_floor_palette_rgb[i][0], g_floor_palette_rgb[i][1], g_floor_palette_rgb[i][2]));
+    }
+    for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
+        pal_set(PAL_HUD, (u16)(i + 1), RGB(g_hud_palette_rgb[i][0], g_hud_palette_rgb[i][1], g_hud_palette_rgb[i][2]));
+    }
+    for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
+        pal_set(PAL_WEAPON, (u16)(i + 1), RGB(g_weapon_palette_rgb[i][0], g_weapon_palette_rgb[i][1], g_weapon_palette_rgb[i][2]));
+    }
+    for (int b = 0; b < DEPTH_BANDS; b++) {
+        int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
+        for (int s = 0; s < 2; s++) {
+            int sf = s ? 140 : 256;
+            u16 pal = PAL_DEPTH_BASE + s * DEPTH_BANDS + b;
+            for (int i = 0; i < WALL_PALETTE_COLORS; i++) {
+                int r = g_wall_palette_rgb[i][0] * fn / 256 * sf / 256;
+                int g = g_wall_palette_rgb[i][1] * fn / 256 * sf / 256;
+                int bl = g_wall_palette_rgb[i][2] * fn / 256 * sf / 256;
+                pal_set(pal, (u16)(i + 1), RGB((u8)r, (u8)g, (u8)bl));
+            }
+        }
+    }
+}
+
+static void set_hurt_palettes(void) {
+    for (int i = 1; i < 16; i++) {
+        pal_set(PAL_CEILING, (u16)i, RGB(31, 2, 2));
+        pal_set(PAL_FLOOR, (u16)i, RGB(28, 2, 1));
+        pal_set(PAL_HUD, (u16)i, RGB(31, 4, 4));
+        pal_set(PAL_WEAPON, (u16)i, RGB(31, 5, 4));
+    }
+    for (int p = 0; p < DEPTH_BANDS * 2; p++) {
+        for (int i = 1; i < 16; i++) pal_set((u16)(PAL_DEPTH_BASE + p), (u16)i, RGB(28, 2, 2));
+    }
+}
+
+static void update_hurt_flash(void) {
+    if (hurt_flash) {
+        if (!hurt_flash_on) {
+            set_hurt_palettes();
+            hurt_flash_on = 1;
+        }
+        hurt_flash--;
+    } else if (hurt_flash_on) {
+        restore_play_palettes();
+        hurt_flash_on = 0;
+    }
 }
 
 /* ---- clear the fix layer */
@@ -260,6 +315,7 @@ static void player_take_damage(u16 amount) {
         player_armor--;
         amount--;
     }
+    hurt_flash = 5;
     if (amount >= player_health) player_health = 0;
     else player_health = (u16)(player_health - amount);
 }
@@ -784,6 +840,7 @@ int main(void) {
         rc_render();                    /* DDA during active display          */
         wait_vblank();
         watchdog_kick();
+        update_hurt_flash();
         rc_blit();                      /* push to VRAM during vblank         */
         update_background_phase(rc_bg_phase());
         update_enemy();
