@@ -90,15 +90,18 @@ readable.
   walk frames across the available Doom angle groups. Runtime sprite selection
   tracks a coarse monster-facing vector so visible enemies are no longer locked
   to a single front-facing frame.
+- The same monsters also bake front-facing attack frames. A short runtime attack
+  timer swaps the visible sprite to those frames when a monster fires, throws a
+  projectile, or bites.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
   mutable position layer. Awakened monsters follow a coarse player distance
   field so they can move around converted E1M1 walls instead of getting stuck
   on direct-line chase.
 - Hitscan, projectile, and melee monsters can damage the player only from
-  rendered world-sprite slots, so hidden/off-screen things do not attack through
-  the Neo Geo sprite fallback path. Player weapon hits also target rendered
-  enemies only, keeping combat feedback tied to visible sprites. Imps/Barons
-  can launch visible fireball sprites.
+  readable on-screen world-sprite slots, so hidden/off-screen things do not
+  attack through the Neo Geo sprite fallback path. Player weapon hits also
+  target rendered enemies only, keeping combat feedback tied to visible sprites.
+  Imps/Barons can launch visible fireball sprites.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
   coarse wall depth buffer.

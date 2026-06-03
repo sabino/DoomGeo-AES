@@ -51,6 +51,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - Monster sprite definitions include a compact Doom angle bucket. The runtime
   stores one coarse facing vector per thing and picks from the baked rotation
   frames while keeping the same limited world-sprite slot count.
+- A reserved attack angle bucket carries front-facing attack frames. Runtime
+  attack timers briefly select that bucket for melee, hitscan, and projectile
+  attacks instead of allocating extra sprites.
 - Registered/commercial-only psprite lumps that are missing from shareware are
   replaced with pistol placeholder frames at build time, so the same runtime
   weapon table can be tested with shareware and then rebuilt with exact
@@ -76,7 +79,8 @@ current runtime accepts several compromises:
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as
-  non-visible so hidden/off-screen monsters cannot drive melee or ranged damage.
+  non-visible. Combat applies a stricter readable-slot gate so hidden,
+  off-screen, or edge-only monsters cannot drive melee or ranged damage.
 - Monster chase uses a periodically refreshed grid distance field from the
   player, which is cheaper and more reliable on the converted map than asking
   each monster to solve local wall avoidance independently. That same movement

@@ -301,6 +301,7 @@ static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
+static u8  enemy_attack_anim[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_x[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_y[NG_RUNTIME_THING_COUNT];
@@ -392,6 +393,18 @@ static void update_weapon_flash(void) {
 }
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
+
+static u8 enemy_slot_is_readable(u16 slot) {
+    int center_x;
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    if (enemies[slot].thing_index < 0) return 0;
+    if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) return 0;
+    if (enemies[slot].screen_x + enemies[slot].screen_w < 16) return 0;
+    if (enemies[slot].screen_x > SCRW - 16) return 0;
+    center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
+    if (center_x < 24 || center_x > SCRW - 24) return 0;
+    return 1;
+}
 
 static void reset_enemy_slot_cache(void);
 static void hide_enemy_slot(u16 slot);
@@ -822,7 +835,7 @@ static u8 monster_view_angle_bucket(int thing_index) {
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
     int first = -1;
     int first_angle = -1;
-    u8 wanted_angle = thing_is_monster(thing_type) ? monster_view_angle_bucket(thing_index) : 0;
+    u8 wanted_angle = thing_is_monster(thing_type) ? ((thing_index >= 0 && enemy_attack_anim[thing_index]) ? 9 : monster_view_angle_bucket(thing_index)) : 0;
     u8 wanted_anim = thing_is_monster(thing_type) ? (u8)((monster_ai_tick >> 3) & 1) : 0;
     u8 angle_hits = 0;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
@@ -1171,6 +1184,7 @@ static void update_enemy_hit_flash(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (enemy_hit_flash[i]) enemy_hit_flash[i]--;
         if (enemy_attack_cooldown[i]) enemy_attack_cooldown[i]--;
+        if (enemy_attack_anim[i]) enemy_attack_anim[i]--;
         if (explosion_timer[i]) {
             explosion_timer[i]--;
             if (!explosion_timer[i]) {
@@ -1313,7 +1327,7 @@ static u8 update_close_monster_melee(void) {
         int thing = enemies[slot].thing_index;
         u16 type;
         if (thing < 0) continue;
-        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
         type = runtime_thing_type(thing);
         if (enemy_dead[thing] || !thing_is_monster(type)) continue;
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
@@ -1321,6 +1335,7 @@ static u8 update_close_monster_melee(void) {
             player_take_damage(4);
             enemy_awake[thing] = 1;
             enemy_attack_cooldown[thing] = 32;
+            enemy_attack_anim[thing] = 10;
             hurt_timer = 18;
             return 1;
         }
@@ -1343,7 +1358,7 @@ static void update_monster_damage(void) {
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
-        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
@@ -1351,8 +1366,10 @@ static void update_monster_damage(void) {
             if (projectile) {
                 if (!spawn_monster_projectile(thing, projectile, ranged_damage)) continue;
                 enemy_attack_cooldown[thing] = 72;
+                enemy_attack_anim[thing] = 12;
                 return;
             }
+            enemy_attack_anim[thing] = 10;
             player_take_damage(ranged_damage);
             enemy_attack_cooldown[thing] = 64;
             hurt_timer = 32;
@@ -3097,6 +3114,7 @@ static void restart_level(void) {
         enemy_hit_flash[i] = 0;
         enemy_awake[i] = 0;
         enemy_attack_cooldown[i] = 0;
+        enemy_attack_anim[i] = 0;
         enemy_hidden_timer[i] = 0;
         monster_face_x[i] = 0;
         monster_face_y[i] = 1;
