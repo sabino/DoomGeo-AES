@@ -68,7 +68,9 @@ readable.
 - BFG spends 40 cells and applies heavy damage to visible rendered targets.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
   usable ammo.
-- Muzzle and impact feedback use palette flashes and projected explosion sprites.
+- Muzzle and impact feedback use palette flashes and projected explosion
+  sprites. Monster fireballs now spawn the same impact burst when they hit a
+  wall or the player instead of disappearing silently.
 
 ## Things, Pickups, And Enemies
 

@@ -1390,12 +1390,14 @@ static void update_projectile(void) {
     projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
     projectile_y_q8 = (short)(projectile_y_q8 + projectile_dy_q8);
     if (map_at(projectile_x_q8 >> 8, projectile_y_q8 >> 8)) {
+        spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         projectile_active = 0;
         return;
     }
     visible = project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8);
     rc_player_q8(&px, &py);
     if (iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
+        spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         if (visible) player_take_damage(projectile_damage);
         projectile_active = 0;
         return;
