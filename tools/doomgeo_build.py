@@ -22,6 +22,9 @@ DEFAULT_LOCAL_PREFIX = Path(".tools") / "ngdevkit-local" / "usr"
 ROM_ZIP = Path("build") / "rom" / "puzzledp.zip"
 ROM_ELF = Path("build") / "rom.elf"
 BIOS_ZIP = Path("build") / "rom" / "neogeo.zip"
+ASM_ROM_ZIP = Path("build") / "asm-rom" / "puzzledp.zip"
+ASM_ROM_ELF = Path("build") / "asm" / "doomgeo_asm.elf"
+ASM_BIOS_ZIP = Path("build") / "asm-rom" / "neogeo.zip"
 REQUIRED_TOOLS = (
     "m68k-neogeo-elf-gcc",
     "m68k-neogeo-elf-objcopy",
@@ -242,10 +245,11 @@ def build(root: Path, prefix_arg: str | None, target: str, run_emulator: bool) -
         run(["make", "gngeo"], cwd=root, env=env)
 
 
-def package_artifacts(root: Path, out_dir: Path) -> None:
+def package_artifacts(root: Path, out_dir: Path, variant: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
+    artifacts = (ASM_ROM_ZIP, ASM_ROM_ELF, ASM_BIOS_ZIP) if variant == "asm" else (ROM_ZIP, ROM_ELF, BIOS_ZIP)
     copied = 0
-    for artifact in (ROM_ZIP, ROM_ELF, BIOS_ZIP):
+    for artifact in artifacts:
         source = root / artifact
         if source.exists():
             shutil.copy2(source, out_dir / source.name)
@@ -255,13 +259,20 @@ def package_artifacts(root: Path, out_dir: Path) -> None:
         raise BuildError("no build artifacts found; run build first")
 
 
-def html_page() -> str:
-    return """<!doctype html>
+def html_page(
+    game_name: str,
+    subtitle: str,
+    game_url: str,
+    download_url: str,
+    extra_link: str | None = None,
+) -> str:
+    extra_action = f'\n      <a class="button" href="{extra_link}">Open ASM Build</a>' if extra_link else ""
+    template = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DoomGeo-MVS</title>
+  <title>__GAME_NAME__</title>
   <style>
     :root {
       color-scheme: dark;
@@ -332,23 +343,24 @@ def html_page() -> str:
   <main>
     <header>
       <div>
-        <h1>DoomGeo-MVS</h1>
-        <p>Neo Geo Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.</p>
+        <h1>__GAME_NAME__</h1>
+        <p>__SUBTITLE__</p>
       </div>
     </header>
     <div id="game-wrap">
       <div id="game"></div>
     </div>
     <div class="actions">
-      <a class="button" href="rom/puzzledp.zip">Download ROM</a>
+      <a class="button" href="__DOWNLOAD_URL__">Download ROM</a>
       <a class="button" href="rom/neogeo.zip">Download null BIOS</a>
+      __EXTRA_ACTION__
     </div>
   </main>
   <script>
     window.EJS_player = "#game";
     window.EJS_core = "fbneo";
-    window.EJS_gameName = "DoomGeo-MVS";
-    window.EJS_gameUrl = "rom/puzzledp.zip";
+    window.EJS_gameName = "__GAME_NAME__";
+    window.EJS_gameUrl = "__GAME_URL__";
     window.EJS_biosUrl = "rom/neogeo.zip";
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
     window.EJS_startOnLoaded = false;
@@ -357,9 +369,22 @@ def html_page() -> str:
 </body>
 </html>
 """
+    return (
+        template.replace("__GAME_NAME__", game_name)
+        .replace("__SUBTITLE__", subtitle)
+        .replace("__GAME_URL__", game_url)
+        .replace("__DOWNLOAD_URL__", download_url)
+        .replace("__EXTRA_ACTION__", extra_action)
+    )
 
 
-def build_pages(root: Path, out_dir: Path, rom_source: Path | None, bios_source: Path | None) -> None:
+def build_pages(
+    root: Path,
+    out_dir: Path,
+    rom_source: Path | None,
+    bios_source: Path | None,
+    asm_rom_source: Path | None,
+) -> None:
     rom = (root / rom_source).resolve() if rom_source else root / ROM_ZIP
     bios = (root / bios_source).resolve() if bios_source else root / BIOS_ZIP
     if not rom.exists():
@@ -370,7 +395,32 @@ def build_pages(root: Path, out_dir: Path, rom_source: Path | None, bios_source:
     rom_out.mkdir(parents=True, exist_ok=True)
     shutil.copy2(rom, rom_out / "puzzledp.zip")
     shutil.copy2(bios, rom_out / "neogeo.zip")
-    (out_dir / "index.html").write_text(html_page(), encoding="utf-8")
+    (out_dir / "index.html").write_text(
+        html_page(
+            "DoomGeo-MVS",
+            "Neo Geo Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.",
+            "rom/puzzledp.zip",
+            "rom/puzzledp.zip",
+            "asm.html" if asm_rom_source else None,
+        ),
+        encoding="utf-8",
+    )
+    if asm_rom_source:
+        asm_rom = (root / asm_rom_source).resolve()
+        if not asm_rom.exists():
+            raise BuildError(f"ASM ROM not found: {asm_rom}")
+        asm_out = rom_out / "asm"
+        asm_out.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asm_rom, asm_out / "puzzledp.zip")
+        (out_dir / "asm.html").write_text(
+            html_page(
+                "DoomGeo-MVS ASM",
+                "A separate 68000 assembly cartridge build with a controller-driven Neo Geo sprite scene.",
+                "rom/asm/puzzledp.zip",
+                "rom/asm/puzzledp.zip",
+            ),
+            encoding="utf-8",
+        )
     print_step(f"wrote GitHub Pages site to {out_dir}")
 
 
@@ -444,11 +494,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     package = sub.add_parser("package", help="copy build artifacts into an output directory")
     package.add_argument("--out", type=Path, default=Path("dist") / "rom")
+    package.add_argument("--variant", choices=("c", "asm"), default="c")
 
     pages = sub.add_parser("pages", help="build a GitHub Pages playable web bundle")
     pages.add_argument("--out", type=Path, default=Path("dist") / "pages")
     pages.add_argument("--rom", type=Path, default=None)
     pages.add_argument("--bios", type=Path, default=None)
+    pages.add_argument("--asm-rom", type=Path, default=None, help="optional ASM ROM zip to expose at asm.html")
 
     remove = sub.add_parser("uninstall", help="remove repo-local installed tools")
     remove.add_argument("--all", action="store_true", help="also remove cached WADs/downloaded packages")
@@ -478,10 +530,10 @@ def main(argv: list[str] | None = None) -> int:
             build(root, args.tools_prefix, args.target, args.run)
             return 0
         if args.command == "package":
-            package_artifacts(root, (root / args.out).resolve())
+            package_artifacts(root, (root / args.out).resolve(), args.variant)
             return 0
         if args.command == "pages":
-            build_pages(root, (root / args.out).resolve(), args.rom, args.bios)
+            build_pages(root, (root / args.out).resolve(), args.rom, args.bios, args.asm_rom)
             return 0
         if args.command == "uninstall":
             uninstall(root, args.all, args.dry_run)

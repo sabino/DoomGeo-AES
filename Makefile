@@ -127,7 +127,58 @@ face-test-rom: $(FACE_TEST_CART)
 face-test-gngeo: $(FACE_TEST_CART)
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(FACE_TEST_ROM) $(GAMEROM)
 
-.PHONY: face-test-rom face-test-gngeo
+ASM_ROM=$(BUILDDIR)/asm-rom
+ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
+ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx
+ASM_ELF=$(BUILDDIR)/asm/doomgeo_asm.elf
+ASM_PROM=$(ASM_ROM)/202-p1.p1
+ASM_CART=$(ASM_ROM)/$(GAMEROM).zip
+ASM_SOUND_DRIVER=$(NGSHAREDIR)/nullsound_driver.ihx
+
+$(BUILDDIR)/%.o: %.S | $(BUILDDIR)
+	mkdir -p $(dir $@)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $< -o $@
+
+$(ASM_ELF): $(BUILDDIR)/asm/doomgeo_asm.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(ASM_ROM):
+	mkdir -p $@
+
+$(ASM_ASSET_ROM):
+	mkdir -p $@
+
+$(ASM_GFX_STAMP): tools/gen_asm_gfx.py | $(ASM_ASSET_ROM)
+	$(PYTHON) tools/gen_asm_gfx.py --out-dir $(ASM_ASSET_ROM)
+	touch $@
+
+$(ASM_PROM): $(ASM_ELF) | $(ASM_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(ASM_ROM)/202-c1.c1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/c1.bin $@
+$(ASM_ROM)/202-c2.c2: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/c2.bin $@
+$(ASM_ROM)/202-s1.s1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/s1.bin $@
+$(ASM_ROM)/202-m1.m1: $(ASM_SOUND_DRIVER) | $(ASM_ROM)
+	$(Z80SDOBJCOPY) -I ihex -O binary $< $@ --pad-to $(MROMSIZE)
+$(ASM_ROM)/202-v1.v1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/v1.bin $@
+
+$(ASM_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(ASM_ROM)
+	cp $< $@
+
+$(ASM_CART): $(ASM_PROM) $(ASM_ROM)/202-c1.c1 $(ASM_ROM)/202-c2.c2 $(ASM_ROM)/202-s1.s1 $(ASM_ROM)/202-m1.m1 $(ASM_ROM)/202-v1.v1 $(ASM_ROM)/neogeo.zip
+	cd $(ASM_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+asm-rom: $(ASM_CART)
+
+asm-gngeo: $(ASM_CART)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
+
+.PHONY: face-test-rom face-test-gngeo asm-rom asm-gngeo
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
