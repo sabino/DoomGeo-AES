@@ -1763,14 +1763,14 @@ static void draw_counter_value(u16 col_right, u16 row, u16 value) {
 }
 
 static void render_ammo_counters(void) {
-    draw_counter_value(34, 24, player_ammo);
-    draw_counter_value(38, 24, player_max_bullets);
-    draw_counter_value(34, 25, player_shells);
-    draw_counter_value(38, 25, player_max_shells);
-    draw_counter_value(34, 26, player_rockets);
-    draw_counter_value(38, 26, player_max_rockets);
-    draw_counter_value(34, 27, player_cells);
-    draw_counter_value(38, 27, player_max_cells);
+    draw_counter_value(34, 25, player_ammo);
+    draw_counter_value(38, 25, player_max_bullets);
+    draw_counter_value(34, 26, player_shells);
+    draw_counter_value(38, 26, player_max_shells);
+    draw_counter_value(34, 27, player_rockets);
+    draw_counter_value(38, 27, player_max_rockets);
+    draw_counter_value(34, 28, player_cells);
+    draw_counter_value(38, 28, player_max_cells);
 }
 
 static u8 face_frame_for_health(void);
