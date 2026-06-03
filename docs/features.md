@@ -68,6 +68,8 @@ readable.
 - BFG spends 40 cells and applies heavy damage to visible rendered targets.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
   usable ammo.
+- The C-button weapon cycle now prefers weapons that are both owned and ready
+  to fire, then falls back to owned empty/melee weapons only if needed.
 - Muzzle and impact feedback use palette flashes and projected explosion
   sprites. Monster fireballs now spawn the same impact burst when they hit a
   wall or the player instead of disappearing silently.

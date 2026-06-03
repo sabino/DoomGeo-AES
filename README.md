@@ -46,7 +46,7 @@ drawing pixels.
 | D-pad Left / Right | Turn |
 | Hold A + Left/Right | Strafe |
 | B | Fire weapon |
-| C | Toggle weapon |
+| C | Cycle to next ready weapon |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart level |

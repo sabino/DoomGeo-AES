@@ -2798,9 +2798,22 @@ static void set_weapon_frame(u8 frame) {
 }
 
 static void toggle_weapon(void) {
+    u8 start = current_weapon;
     for (u8 i = 0; i < WEAPON_TOTAL; i++) {
-        current_weapon = (u8)((current_weapon + 1) % WEAPON_TOTAL);
-        if (player_has_weapon(current_weapon)) break;
+        u8 weapon = (u8)((start + i + 1) % WEAPON_TOTAL);
+        if (weapon_has_ammo(weapon)) {
+            current_weapon = weapon;
+            weapon_frame = 0xFF;
+            shown_ammo = 0xFFFF;
+            return;
+        }
+    }
+    for (u8 i = 0; i < WEAPON_TOTAL; i++) {
+        u8 weapon = (u8)((start + i + 1) % WEAPON_TOTAL);
+        if (player_has_weapon(weapon)) {
+            current_weapon = weapon;
+            break;
+        }
     }
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
