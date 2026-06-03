@@ -1,0 +1,59 @@
+# Architecture Notes
+
+DoomGeo-AES uses the original Neo Geo raycaster idea from the video reference:
+do not draw pixels at runtime. Instead, prepare graphics in C-ROM format and let
+the video chip scale vertical sprite strips.
+
+## Runtime Shape
+
+- The 68000 keeps the player, doors, pickups, monsters, projectiles, HUD state,
+  and palette timers in normal RAM.
+- The wall renderer casts one fixed-point DDA ray per screen column and updates
+  sprite control blocks.
+- Background planes, walls, weapon strips, visible things, and HUD each have
+  reserved sprite ranges so the project can reason about the 96-sprites-per-
+  scanline limit.
+- The fix layer is used for minimap, status digits, key/weapon indicators, and
+  short gameplay messages because it always draws over sprites.
+
+## Build-Time WAD Conversion
+
+`tools/doom_convert.py` is the map bridge. It reads the WAD on the host machine
+and emits generated C headers/sources under `build/`:
+
+- Coarse grid collision/render map.
+- Per-cell wall texture class and texture phase.
+- Door/exit trigger tables.
+- Damage and secret bit grids.
+- Runtime thing list with supported Doom thing types.
+- Full compact arrays for vertices, linedefs, sidedefs, sectors, segs,
+  subsectors, nodes, reject, and blockmap for future higher-fidelity work.
+
+The ROM does not load a WAD at runtime.
+
+## Graphics Conversion
+
+`tools/gen_gfx.py` creates Neo Geo graphics ROM data directly:
+
+- Doom wall textures are precomposed from `TEXTURE1`/`PNAMES`/patches into tile
+  strip atlases.
+- Doom flats are sampled into tile banks and perspective plane caches.
+- Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
+  projectiles, and effects are pre-baked into C-ROM tiles and palettes.
+- Weapon/fire frames and sprite scale levels are generated offline so the 68000
+  does not compose Doom patches during play.
+
+## Why Not Exact Doom Yet
+
+The Neo Geo has no normal framebuffer and the 68000 cannot read C-ROM texture
+pixels. That makes classic Doom's column/span renderer a poor direct fit. The
+current runtime accepts several compromises:
+
+- Grid/coarse wall representation instead of arbitrary wall segments.
+- One projected wall height per column instead of multiple clipped subsector
+  spans.
+- Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
+- A small number of visible world-sprite slots for monsters/pickups/projectiles.
+
+The generated full map data is kept so later work can experiment with more
+Doom-like traversal without redoing the WAD parsing layer.

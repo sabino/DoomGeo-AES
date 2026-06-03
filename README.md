@@ -1,329 +1,239 @@
 # DoomGeo-AES
 
-A real-time, first-person raycaster demonstration for the SNK Neo Geo AES, written
-in C.
+DoomGeo-AES is a Neo Geo AES research prototype that pushes Doom-like gameplay
+through the hardware the way the machine wants to draw: sprite strips, pre-baked
+graphics, fix-layer UI, and very small runtime data.
 
-This was made purely for research purposes to understand the complexities of rendering realtime "3D"
-on the Neo Geo. The code is unoptimized and could be built to run much faster. 
+It is not a framebuffer Doom source port. The build tools read Doom-format WAD
+data offline, convert the map and assets into Neo Geo-friendly structures, and
+the 68000 runtime drives the scene by updating sprite control blocks rather than
+drawing pixels.
 
-<img width="960" height="672" alt="Current Neo Geo Doom prototype with Doom wall and door textures, shaded floor and ceiling, pistol HUD, pickups, and live counters" src="docs/screenshots/doom-neogeo-current.png" />
+![Current DoomGeo-AES gameplay](docs/screenshots/doomgeo-aes-current-gameplay.png)
 
-## How it works
+## Current State
 
-Every frame, for each of 64 screen columns:
+| Area | Status |
+| --- | --- |
+| WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things. |
+| Rendering | 64 sprite-column wall raycaster, Doom wall/door atlases, depth palettes, and sprite-backed floor/ceiling approximation. |
+| HUD | Doom `STBAR`, face frames, key/weapon indicators, and large red status digits. Digit placement still needs final alignment. |
+| Weapons | Pistol, shotgun, chaingun, and rocket launcher are playable. Fist, chainsaw, plasma rifle, and BFG are still missing. |
+| Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters, barrels, corpses, drops, projectiles, and compact AI are present. |
+| Map | Fix-layer minimap with player, walls, pickups, threats, doors, and exits. It needs an instant/faster redraw pass. |
+| Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
+| Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
 
-1. Cast a ray through a 2D grid map until it hits a wall.
-2. Measure the perpendicular distance and turn it into a slice height
-3. Write a vertical-shrink value, a Y position, and a palette into the sprite
-   control block for that column's sprite.
+## Screenshots
 
-The video chip then scales each precomposed Doom wall-texture column to the
-computed height. Floor and ceiling use a sprite-backed approximation of Doom
-floor casting: the converter still reads the player-start Doom flats, but now
-bakes each plane into 16 view-direction buckets, 2x2 movement phases, and 6x20
-screen-tile perspective caches. Runtime only chooses the current bucket from
-the raycaster's direction and half-cell player phase, so each 16x16 backdrop
-tile already contains perspective-sampled flat pixels instead of a raw flat
-block. The backdrop tilemap cache is keyed only by those visible buckets, so
-small player steps no longer re-upload the whole plane when the selected baked
-view is unchanged. The baked sampler uses a denser Doom-flat texel scale,
-keeping the planes tied to the wall perspective while making the near floor
-read as a receding textured surface without adding more per-scanline sprites.
-The runtime row palettes bias the nearest floor tiles brighter and keep the
-ceiling darker, so the sampled flats read as visible 3D surfaces instead of a
-black void.
-The wall path now carries a compact per-cell texture-class grid alongside the
-solid map. Normal walls still keep the preferred `STARTAN3` atlas, common
-`BROWNGRN`, `BROWN1`, `SUPPORT2`, `LITE3`, `COMPTILE`, `DOORSTOP`, and
-`BROWN144` E1M1 linedefs can select their own precomposed atlases, and converted
-closed-door cells use `BIGDOOR2`; each atlas has its own distance-shaded palette
-range. The converter also emits a compact
-per-cell texture phase from Doom sidedef offsets and distance along each solid
-linedef, so wall columns no longer all restart at the same coarse grid-cell
-edge. When several Doom linedefs collapse into the same coarse Neo Geo cell, the
-converter keeps higher-priority distinctive textures such as door trim,
-computer panels, lights, and wide brown panels instead of letting later generic
-walls overwrite them. Doom pistol frames and the status-face set are baked with Doom patch
-offsets while keeping the bottom 32-pixel `STBAR` as a separate HUD surface.
-The weapon bake keeps the cropped psprite window raised above the face slot, and
-the first pistol firing frame precomposes Doom's `PISFA0` flash over `PISGB0`
-so the gun reads as the original weapon instead of colliding visually with the
-status face.
-The pistol animates through the intended Doom firing patches when B is pressed;
-walking and strafing nudge the strips with a small hardware-position bob so
-movement feels less static without adding any sprite slots. Real shots also
-pulse the weapon palette and backdrop for a few frames instead of rewriting the
-full wall/floor/ceiling depth palette set on the firing frame, and successful
-pickups add a short warm bonus flash, giving muzzle and item feedback through
-cheap palette updates while the project still uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
-the renderer projects up to three visible monster candidates with the same camera
-math as the wall renderer while staying within the Neo Geo's
-96-sprites-per-scanline ceiling in the worst case. Each visible thing now gets a
-four-strip by five-row sprite window, matching the wider/taller offline Doom
-object bakes instead of cropping large pickups or boss frames down to the old
-three-strip proof-of-concept window. Active monster projectiles reserve the
-first visible world-sprite slot so incoming fire stays readable,
-then visible monsters/barrels are selected before useful pickups, and corpses
-only use slots left after collectible gameplay-critical objects; full or
-otherwise unusable pickups are fallback candidates after corpses;
-candidates are ranked by distance and screen relevance each frame, and tiny
-candidates hidden under the pistol overlay are skipped. The converter only emits
-monster thing types that currently have pre-scaled sprite frames (`POSS`,
-`SPOS`, `TROO`, `SARG`, `BOSS`) and live palettes, and the live monster entries
-now bake Doom `A/B` frames so the 68000 can alternate poses without composing
-sprites or adding visible sprite slots. Unsupported later-Doom IDs do not
-silently fall back to the wrong enemy art. The pistol clears
-the currently rendered target set as the initial combat proof of concept. The
-optional minimap is drawn on the fix (text) layer, which always composites over
-sprites; it now overlays compact markers for live threats, pickups, closed
-doors, and exits so the converted map is more useful for actual navigation.
+| Current gameplay | Minimap overlay |
+| --- | --- |
+| ![Current wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) | ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
 
-All arithmetic is 16.16 . Rotation uses constant cos/sin multiplies. The whole
-renderer writes only a few control words per column per frame; the expensive
-pixel work is offloaded to the scaler hardware.
- 
+| HUD work-in-progress | Native Doom comparison |
+| --- | --- |
+| ![Current HUD status bar and known number placement issue](docs/screenshots/doomgeo-aes-current-hud.png) | ![Native Doom beside the Neo Geo prototype](docs/screenshots/doomgeo-aes-native-comparison.png) |
+
 ## Controls
 
-| Input               | Action            |
-|---------------------|-------------------|
-| D-pad Up / Down     | Move forward/back |
-| D-pad Left / Right  | Turn              |
-| Hold A + Left/Right | Strafe            |
-| B                   | Fire weapon       |
-| C                   | Toggle minimap    |
-| D                   | Use facing door   |
-| Hold A + D          | Toggle weapon     |
-| D after DEAD/EXIT   | Restart level     |
+| Input | Action |
+| --- | --- |
+| D-pad Up / Down | Move forward/back |
+| D-pad Left / Right | Turn |
+| Hold A + Left/Right | Strafe |
+| B | Fire weapon |
+| C | Toggle minimap |
+| D | Use facing door |
+| Hold A + D | Toggle weapon |
+| D after DEAD/EXIT | Restart level |
 
-Turning is tuned deliberately slower than the original raycaster demo so the
-projected Doom targets can be lined up with keyboard or arcade-stick input.
-Player movement keeps the original axis-separated slide feel, but collision now
-tests a small Doom-like body radius instead of only the player's center cell, so
-corners and closed doors behave less like thin grid lines.
-The converter preserves the Doom player start depth on cardinal-facing starts
-while using the nearest safe lateral grid center, which keeps the opening view
-closer to the WAD without putting the player against coarse converted walls.
+The default GnGeo keyboard mapping is:
 
-The wall and sprite projection heights use the raycaster's reciprocal lookup
-table for the common near and mid range, with an exact reciprocal fallback for
-long corridors so far geometry keeps shrinking instead of saturating to one
-distance band.
+| Neo Geo | Keyboard |
+| --- | --- |
+| A / B / C / D | `Z` / `X` / `A` / `S` |
+| Start / Coin | `1` / `3` |
+| D-pad | Arrow keys |
+| Menu | `Esc` |
 
-Runtime WAD things now include common Doom pickups as well as monsters. Pickups
-share the three projected world-sprite slots to preserve the Neo Geo scanline
-budget, disappear when touched, and update live fix-layer health, ammo, and
-armor counters over the Doom status bar using large Doom `STTNUM` digit art
-quantized into the `STBAR` palette instead of debug-green minimap colors. The
-large red counters are intentionally placed inside the bottom `STBAR` rows, over
-the original Doom labels, so they behave as part of the status bar rather than
-floating above it on the playfield. The weapon sprite chain is also allocated
-before the world-object slots, keeping the held gun inside the Neo Geo's first
-96 evaluated sprites on busy gameplay scanlines; the HUD sprites live on the
-non-gameplay rows at the bottom of the screen.
-The status bar also overlays compact `1`-`4` weapon indicators in the Doom
-`ARMS` area: unowned slots stay dim, owned slots use the HUD palette, and the
-active weapon is highlighted so weapon cycling is readable during play.
-The center face is now generated from Doom's straight, left/right turn,
-`STFOUCH`, `STFEVL`, and death face windows in C-ROM. It swaps by health band,
-cycles the straight face variants, glances while turning, briefly shows the
-matching pain face when damage lands, and uses the evil grin when a weapon is
-picked up. Weapon frames start after that dedicated face block and both runtime
-frame setters clamp to their own generated banks, so the gun cannot accidentally
-read HUD face tiles or vice versa. The base `STBAR` rows and the dedicated face
-crop are corrected for the Neo Geo sprite-chain row order, keeping the Doom
-labels and face readable while the weapon strip path stays in its own bank.
-The pistol crop keeps the original Doom patch offsets inside an eight-row Neo
-Geo strip window, but raises the baked image enough that the lower hand no
-longer reads as part of the status face.
-Clips, shells, and rockets are tracked separately. Bullet, shell, and rocket
-pools now use compact Doom-like caps, and
-pickups remain in the map instead of disappearing when the matching resource is
-already full, but the renderer gives currently collectible pickups first claim
-on scarce world-sprite slots. Shotgun guys now drop a shotgun pickup, and collecting one equips
-Doom's shotgun frames, adds shells, and makes B fire a wider spread shot that
-can hit a second visible target for reduced damage. Chaingun pickups are also
-converted from Doom thing type `2002`, rendered with the `MGUN` pickup sprite,
-and equip a third weapon slot that uses the `CHGG` weapon frames for a faster
-held-fire bullet stream. Rocket launchers now convert from thing type `2003`
-with `LAUN` pickup art, use `MISG` weapon frames, track rockets separately from
-bullets and shells, and apply compact splash damage around the auto-aimed
-target or a traced wall impact when no visible target is selected. Trying to fire empty flashes
-a compact fix-layer `AMMO` message instead of failing silently, and firing an
-empty selected weapon first auto-selects another owned weapon with usable ammo.
-Backpacks now convert from Doom thing type `8`, use `BPAK` art, double the
-compact ammo caps, and grant a small ammo/shell/rocket refill; thing type
-`2048` now uses the correct `AMMO` box art instead of backpack art.
-Supercharge pickups now convert from Doom thing type `2013`, use `SOUL` art,
-and raise health toward 200 through the existing status-face and health path.
-The weapon psprite bake now uses the same eight-row top position as the runtime
-Neo Geo sprite chain, with the Doom hand/gun patches raised inside that window
-so the pistol reads as a held weapon above the status bar.
-Close live monsters apply a first-pass contact-damage tick from runtime position,
-even if they are not currently selected for one of the scarce visible sprite
-slots. Damage still goes through Doom-like armor absorption: green armor absorbs
-roughly one third of incoming damage and blue armor absorbs roughly half. When
-armor absorbs part of a hit, the status bar armor digits briefly brighten so the
-player can tell that armor, not only health, took the impact.
-Pickups briefly flash compact center feedback using existing fix glyphs:
-`KEY`, `AMMO`, `MED`, `ARM`, or weapon digits `2`/`3`/`4`.
-Former humans and shotgun guys still apply compact hitscan-style ranged damage,
-while imps and Barons now launch projected Doom fireball sprites (`BAL1`/`BAL7`)
-that travel toward the player and deal damage on impact. This gives the player
-visible pressure to move, aim, and use doors instead of only avoiding contact.
-Each live monster also keeps a tiny attack cooldown: waking, getting hit, melee
-swipes, hitscan attacks, and projectile launches all pace their next attack
-independently, so combat pressure is readable instead of every visible enemy
-sharing one abrupt global damage rhythm.
-Combat uses a compact line-of-sight
-sample against the converted map, so closed doors and walls block player shots,
-shotgun spread targets, monster ranged damage, and monster chase wake-up. Damage
-briefly tints the playfield red by swapping palettes during vblank, giving clear
-feedback without spending additional sprite slots. Firing a real shot now also
-wakes nearby monsters with a compact sound-alert pass, so rooms escalate more
-like Doom instead of only reacting to the single enemy currently under the
-crosshair. Pistol, shotgun, chaingun, and rocket hits also reserve an
-independent short-lived Doom `BEXP` impact slot, placed around the projected
-view center and drawn in the front world-object slot, so misses, wall shots,
-and impacts stay visible even while an enemy projectile is already in flight.
-Monsters now keep compact per-thing hit points, so pistol shots damage targets
-over multiple hits instead of deleting every visible enemy immediately; the
-pistol uses a Doom-like visible-target autoaim and damages the visible monster
-closest to the crosshair instead of damaging every visible target at once.
-Pistol, shotgun, and rocket target selection now rejects projected candidates
-outside the actual playfield, so weapons cannot silently choose an off-screen
-monster just because the map line-of-sight trace still reaches it.
-Surviving monsters flash briefly when hit, making shots readable without
-spending extra sprite slots; the same short timer also pauses their chase and
-attack logic, creating a compact Doom-like pain reaction. Former humans briefly
-show their corpse frame before becoming clip pickups, and shotgun guys do the
-same before becoming shotgun pickups, reusing the existing projected pickup
-path. Other killed monsters now turn into projected Doom corpse frames
-(`TROOR0`, `SARGN0`, `BOSSO0`, etc.) so fights leave a readable battlefield
-state instead of simply deleting every dead thing.
-Kills still add a small capped internal score for combat bookkeeping, but the
-visible status bar keeps Doom's ammo, health, face, armor, and key fields
-instead of drawing a custom score over the face slot. Explosive barrel thing
-type `2035` is converted from the WAD, rendered with the `BAR1` sprite, and can
-be shot to apply compact radius damage to nearby monsters, barrels, and the
-player; detonated barrels briefly swap to a precomposed `BEXP` sprite before
-disappearing. A tiny fix-layer center marker gives the player a stable aim point
-without spending any sprite slots.
-Runtime things now have a small mutable position layer, letting monsters take
-throttled chase steps toward the player while still using the compact converted
-WAD data for type, flags, and initial placement. Monsters now keep a compact
-awake bit after seeing or being hit by the player, so they continue pursuit
-around corners instead of stopping the moment line of sight is broken. Chase
-movement also tries the alternate axis when the preferred step is blocked, and
-keeps a small separation radius between live monsters. This reduces stuck or
-stacked enemies and makes the projected world-sprite slots more readable. When
-health reaches zero, movement, firing, and active projectiles
-stop and the fix layer shows a compact `DEAD` message; pressing D resets the
-player, doors, pickups, monsters, and HUD for another run. Restart also clears
-the button-edge latches used by fire, doors, weapon toggle, minimap, and
-restart so stale held inputs do not leak into the next run.
+## Build And Run
 
-The converter also preserves Doom door and exit linedefs as compact runtime
-trigger lists, and keycard/skull pickups set compact blue/red/yellow inventory
-bits. The status bar shows compact `B`, `R`, and `Y` key indicators that brighten
-when the matching key is collected. Pressing D traces forward from the player
-and opens the first converted door cell in front of the view, with a short
-forgiving fallback for slightly off-center doors. Keyed door specials require
-the matching key, and connected cells from the same converted door open as a
-single group. Opened doors affect both movement and raycasting through the
-shared `map_at()` path. Opened doors flash a compact `DOR` center message;
-trying a facing keyed door without the matching key flashes `KEY`, so door
-interactions have readable feedback. Reaching the
-converted E1M1 exit cell now
-raises a fix-layer `EXIT` message with compact `K`, `I`, and `S` stat rows for
-kills, collected pickups, and found secrets, then freezes player control,
-monster movement, monster damage, and active projectiles until D restarts the level. This keeps
-level progression behavior in the ROM without keeping generic WAD
-directory/lump metadata in the cartridge.
-Converted damaging sector specials now emit a tiny floor-damage grid, so E1M1
-nukage cells periodically hurt the player through the same armor, hurt flash,
-and status-face path as monster damage.
-Secret sectors also emit a compact bit grid. Entering a secret cell for the
-first time flashes a fix-layer `SEC` message, giving the map a basic Doom-style
-exploration reward without storing generic WAD metadata at runtime.
-
-## Building
-
-The `doom-neogeo-port` branch expects a local ngdevkit/GnGeo install under
-`.tools/ngdevkit-local`; `.tools/` is ignored by git so the toolchain and WAD
-downloads stay repo-local without being committed.
- 
+Tools and downloaded WAD data are kept under `.tools/`, which is ignored by git.
 
 ```sh
-# graphics + sound ROMs (self-contained tile encoder)
-python3 tools/gen_gfx.py
-
-# compile, convert Freedoom E1M1, and assemble the cartridge
-make
-
-# run with the local GnGeo and known-good keyboard mapping
+python3 tools/doomgeo_build.py install
+python3 tools/doomgeo_build.py doctor
+python3 tools/doomgeo_build.py build
 SDL_VIDEODRIVER=x11 make gngeo
 ```
 
-The automation helper wraps the same Makefile and is the entrypoint used by CI:
-
-```sh
-python3 tools/doomgeo_build.py doctor
-python3 tools/doomgeo_build.py install
-python3 tools/doomgeo_build.py build
-python3 tools/doomgeo_build.py build --target asm-rom
-python3 tools/doomgeo_build.py package --out dist/rom
-python3 tools/doomgeo_build.py pages --out dist/pages
-```
-
-On Windows, run the packaged `doomgeo-build.exe install --method msys2` from an
-MSYS2 UCRT64 shell to install the native ngdevkit toolchain. `doomgeo-build
-uninstall` removes the repo-local toolchain under
-`.tools/ngdevkit-local`; `doomgeo-build uninstall --all` also removes cached
-WAD/package downloads. `doomgeo-plan` only tracks `docs/release-plan.md` and
-does not build or modify generated assets. GitHub Actions packages both helpers
-as standalone Linux and Windows binaries, builds the ROM on Ubuntu 24.04 and
-Windows/MSYS2, and publishes a GitHub Pages bundle that loads the generated
-cartridge through the EmulatorJS FBNeo WebAssembly/asm.js frontend. The Pages
-site also publishes a separate 68000 assembly cartridge at `asm.html`; that ROM
-is built from `asm/doomgeo_asm.S` with dedicated assets from
-`tools/gen_asm_gfx.py`. Because FBNeo validates arcade romsets by CRC, the Pages
-bundle keeps `puzzledp` only as an internal driver/chip compatibility identity,
-while the downloadable cartridge packages are named `doomgeo-aes.zip` and
-`doomgeo-aes-asm.zip`. The raw development ROM artifacts remain the generated
-homebrew data.
-
-`tools/gen_gfx.py` emits the C/S/M/V ROMs directly in the Neo Geo's planar
-format, so the only ngdevkit dependency is the m68k toolchain. See the comments
-at the top of each tool for details.
-
-`tools/doom_convert.py` reads a Doom-format WAD at build time and emits a compact
-grid header for the Neo Geo raycaster. By default, `make` downloads Freedoom
-0.13.0 into `.tools/assets/` and converts `E1M1`:
+Useful variants:
 
 ```sh
 make DOOM_MAP=E1M2
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
-```
-
-This is intentionally build-time WAD compatibility: the cartridge contains the
-converted map data, not a runtime WAD loader.
-
-For visual regression work, run the native Doom comparison capture:
-
-```sh
+python3 tools/doomgeo_build.py build --target asm-rom
+python3 tools/doomgeo_build.py pages --out dist/pages
 DOOM_MAP=E1M1 tools/capture_compare.sh
 ```
 
-The script launches native Doom with the same `DOOM_IWAD` used by the ROM
-conversion, launches GnGeo with the current ROM, and writes native/Neo
-Geo/side-by-side screenshots under `.tools/screens/`.
- 
-You must supply your own Neo Geo BIOS — it is copyrighted and not included.
+You must provide your own Neo Geo BIOS for local emulation. The browser package
+uses an FBNeo-compatible packaging path, but that does not rename the project:
+`DoomGeo-AES` is the game name; `puzzledp` is only the private FBNeo driver/chip
+identity used so the arcade core accepts the generated homebrew ROM zip.
 
-I've only tested this with [gngeo](https://github.com/dciabrin/gngeo) It may not render correctly on real hardware
- 
+## Documentation
+
+- [Feature Inventory](docs/features.md)
+- [Architecture Notes](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
+- [Reference Port Notes](docs/reference-ports.md)
+- [Build and Packaging](docs/build-packaging.md)
+- [Release Plan](docs/release-plan.md)
+- [Video Reference Transcript](VIDEO-REF.md)
+
+## Reference Ports
+
+These projects are useful references, but code is not copied into this branch:
+
+- [doomgeneric](https://github.com/ozkl/doomgeneric) shows a compact platform
+  API around Doom's tick/frame/input model.
+- [PureDOOM](https://github.com/Daivuk/PureDOOM) shows a single-header,
+  callback-oriented Doom source packaging style and a clear license section.
+- [id Software DOOM](https://github.com/id-Software/DOOM) is the historical
+  source release used for license and architecture context.
+
+Any future code import from these projects must be deliberate, attributed, and
+license-compatible. Current work adapts ideas and terminology only.
+
+## License And Assets
+
+DoomGeo-AES is research/homebrew work derived from this repo's Neo Geo raycaster
+code plus original conversion/runtime code written here. It does not include a
+commercial Doom IWAD, a Neo Geo BIOS, or proprietary id Software game data. The
+default build downloads shareware/Freedoom-compatible WAD data under `.tools/`
+for local conversion.
+
+The official id Software DOOM source release is distributed under GPL-2.0. The
+historical DOOM Source Code License text, included below because several Doom
+ports keep it visible for provenance, is not a grant for commercial Doom asset
+redistribution.
+
+<details>
+<summary>Historical DOOM Source Code License text</summary>
+
+```text
+      LIMITED USE SOFTWARE LICENSE AGREEMENT
+
+        This Limited Use Software License Agreement (the "Agreement")
+is a legal agreement between you, the end-user, and Id Software, Inc.
+("ID").  By downloading or purchasing the software material, which
+includes source code (the "Source Code"), artwork data, music and
+software tools (collectively, the "Software"), you are agreeing to
+be bound by the terms of this Agreement.  If you do not agree to the
+terms of this Agreement, promptly destroy the Software you may have
+downloaded or copied.
+
+ID SOFTWARE LICENSE
+
+1.      Grant of License.  ID grants to you the right to use the
+Software.  You have no ownership or proprietary rights in or to the
+Software, or the Trademark. For purposes of this section, "use" means
+loading the Software into RAM, as well as installation on a hard disk
+or other storage device. The Software, together with any archive copy
+thereof, shall be destroyed when no longer used in accordance with
+this Agreement, or when the right to use the Software is terminated.
+You agree that the Software will not be shipped, transferred or
+exported into any country in violation of the U.S. Export
+Administration Act (or any other law governing such matters) and that
+you will not utilize, in any other manner, the Software in violation
+of any applicable law.
+
+2.      Permitted Uses.  For educational purposes only, you, the
+end-user, may use portions of the Source Code, such as particular
+routines, to develop your own software, but may not duplicate the
+Source Code, except as noted in paragraph 4.  The limited right
+referenced in the preceding sentence is hereinafter referred to as
+"Educational Use."  By so exercising the Educational Use right you
+shall not obtain any ownership, copyright, proprietary or other
+interest in or to the Source Code, or any portion of the Source
+Code.  You may dispose of your own software in your sole discretion.
+With the exception of the Educational Use right, you may not
+otherwise use the Software, or an portion of the Software, which
+includes the Source Code, for commercial gain.
+
+3.      Prohibited Uses:  Under no circumstances shall you, the
+end-user, be permitted, allowed or authorized to commercially exploit
+the Software. Neither you nor anyone at your direction shall do any
+of the following acts with regard to the Software, or any portion
+thereof:
+
+        Rent;
+
+        Sell;
+
+        Lease;
+
+        Offer on a pay-per-play basis;
+
+        Distribute for money or any other consideration; or
+
+        In any other manner and through any medium whatsoever
+commercially exploit or use for any commercial purpose.
+
+Notwithstanding the foregoing prohibitions, you may commercially
+exploit the software you develop by exercising the Educational Use
+right, referenced in paragraph 2. hereinabove.
+
+4.      Copyright.  The Software and all copyrights related thereto
+(including all characters and other images generated by the Software
+or depicted in the Software) are owned by ID and is protected by
+United States  copyright laws and international treaty provisions.
+Id shall retain exclusive ownership and copyright in and to the
+Software and all portions of the Software and you shall have no
+ownership or other proprietary interest in such materials. You must
+treat the Software like any other copyrighted material. You may not
+otherwise reproduce, copy or disclose to others, in whole or in any
+part, the Software.  You may not copy the written materials
+accompanying the Software.  You agree to use your best efforts to
+see that any user of the Software licensed hereunder complies with
+this Agreement.
+
+5.      NO WARRANTIES.  ID DISCLAIMS ALL WARRANTIES, BOTH EXPRESS
+IMPLIED, INCLUDING BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE WITH RESPECT
+TO THE SOFTWARE.  THIS LIMITED WARRANTY GIVES YOU SPECIFIC LEGAL
+RIGHTS.  YOU MAY HAVE OTHER RIGHTS WHICH VARY FROM JURISDICTION TO
+JURISDICTION.  ID DOES NOT WARRANT THAT THE OPERATION OF THE SOFTWARE
+WILL BE UNINTERRUPTED, ERROR FREE OR MEET YOUR SPECIFIC REQUIREMENTS.
+THE WARRANTY SET FORTH ABOVE IS IN LIEU OF ALL OTHER EXPRESS
+WARRANTIES WHETHER ORAL OR WRITTEN.  THE AGENTS, EMPLOYEES,
+DISTRIBUTORS, AND DEALERS OF ID ARE NOT AUTHORIZED TO MAKE
+MODIFICATIONS TO THIS WARRANTY, OR ADDITIONAL WARRANTIES ON BEHALF
+OF ID.
+
+        Exclusive Remedies.  The Software is being offered to you
+free of any charge.  You agree that you have no remedy against ID, its
+affiliates, contractors, suppliers, and agents for loss or damage
+caused by any defect or failure in the Software regardless of the form
+of action, whether in contract, tort, includinegligence, strict
+liability or otherwise, with regard to the Software.  This Agreement
+shall be construed in accordance with and governed by the laws of the
+State of Texas.  Copyright and other proprietary matters will be
+governed by United States laws and international treaties.  IN ANY
+CASE, ID SHALL NOT BE LIABLE FOR LOSS OF DATA, LOSS OF PROFITS, LOST
+SAVINGS, SPECIAL, INCIDENTAL, CONSEQUENTIAL, INDIRECT OR OTHER
+SIMILAR DAMAGES ARISING FROM BREACH OF WARRANTY, BREACH OF CONTRACT,
+NEGLIGENCE, OR OTHER LEGAL THEORY EVEN IF ID OR ITS AGENT HAS BEEN
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGES, OR FOR ANY CLAIM BY ANY
+OTHER PARTY. Some jurisdictions do not allow the exclusion or
+limitation of incidental or consequential damages, so the above
+limitation or exclusion may not apply to you.
+```
+
+</details>
+
 ## Acknowledgements
 
-Built against the [ngdevkit](https://github.com/dciabrin/ngdevkit) toolchain.
-Hardware details cross-referenced from the
-[Neo Geo Development Wiki](https://wiki.neogeodev.org).  
+Built against [ngdevkit](https://github.com/dciabrin/ngdevkit). Hardware details
+were cross-referenced with the [Neo Geo Development Wiki](https://wiki.neogeodev.org).
