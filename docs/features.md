@@ -62,7 +62,9 @@ readable.
 - Former humans, shotgun guys, imps, demons/spectres, Barons, and barrels have
   partial gameplay support.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
-  mutable position layer for simple chase behavior.
+  mutable position layer. Awakened monsters follow a coarse player distance
+  field so they can move around converted E1M1 walls instead of getting stuck
+  on direct-line chase.
 - Hitscan, projectile, and melee monsters can damage the player only from
   rendered world-sprite slots, so hidden/off-screen things do not attack through
   the Neo Geo sprite fallback path. Imps/Barons can launch visible fireball

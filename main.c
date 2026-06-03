@@ -328,6 +328,10 @@ static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static u8 secret_found_bits[MAP_SECRET_BYTES ? MAP_SECRET_BYTES : 1];
+static u8 monster_path_dist[MAP_H][MAP_W];
+static u16 monster_path_queue[MAP_W * MAP_H];
+static u8 monster_path_valid = 0;
+static u8 monster_path_timer = 0;
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
@@ -410,6 +414,8 @@ static int iabs16(int value) {
 }
 
 #define WORLD_Q8(value) ((value) * MAP_RENDER_SCALE)
+#define MONSTER_RADIUS_Q8 48
+#define MONSTER_SEPARATION_Q8 96
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
@@ -1196,7 +1202,7 @@ static u8 monster_step_occupied(int self, short x_q8, short y_q8) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         if (i == self) continue;
         if (enemy_dead[i] || (!thing_is_monster(runtime_thing_type(i)) && !thing_is_barrel(runtime_thing_type(i)))) continue;
-        if (iabs16(x_q8 - thing_x_q8[i]) < WORLD_Q8(128) && iabs16(y_q8 - thing_y_q8[i]) < WORLD_Q8(128)) return 1;
+        if (iabs16(x_q8 - thing_x_q8[i]) < MONSTER_SEPARATION_Q8 && iabs16(y_q8 - thing_y_q8[i]) < MONSTER_SEPARATION_Q8) return 1;
     }
     return 0;
 }
@@ -1205,10 +1211,10 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
     int cx = x_q8 >> 8;
     int cy = y_q8 >> 8;
     if (map_at(cx, cy)) return 0;
-    if (map_at((x_q8 - WORLD_Q8(52)) >> 8, cy)) return 0;
-    if (map_at((x_q8 + WORLD_Q8(52)) >> 8, cy)) return 0;
-    if (map_at(cx, (y_q8 - WORLD_Q8(52)) >> 8)) return 0;
-    if (map_at(cx, (y_q8 + WORLD_Q8(52)) >> 8)) return 0;
+    if (map_at((x_q8 - MONSTER_RADIUS_Q8) >> 8, cy)) return 0;
+    if (map_at((x_q8 + MONSTER_RADIUS_Q8) >> 8, cy)) return 0;
+    if (map_at(cx, (y_q8 - MONSTER_RADIUS_Q8) >> 8)) return 0;
+    if (map_at(cx, (y_q8 + MONSTER_RADIUS_Q8) >> 8)) return 0;
     if (monster_step_occupied(self, x_q8, y_q8)) return 0;
     return 1;
 }
@@ -1216,8 +1222,8 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
 static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
     short x = thing_x_q8[i];
     short y = thing_y_q8[i];
-    short sx = (short)(dx < 0 ? -WORLD_Q8(12) : WORLD_Q8(12));
-    short sy = (short)(dy < 0 ? -WORLD_Q8(12) : WORLD_Q8(12));
+    short sx = (short)(dx < 0 ? -WORLD_Q8(18) : WORLD_Q8(18));
+    short sy = (short)(dy < 0 ? -WORLD_Q8(18) : WORLD_Q8(18));
 
     if (adx > ady) {
         if (can_monster_step(i, (short)(x + sx), y)) {
@@ -1234,10 +1240,95 @@ static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
     }
 }
 
+static void rebuild_monster_path(void) {
+    int px, py;
+    u16 head = 0;
+    u16 tail = 0;
+    rc_player_cell(&px, &py);
+    for (u16 y = 0; y < MAP_H; y++) {
+        for (u16 x = 0; x < MAP_W; x++) monster_path_dist[y][x] = 0xFF;
+    }
+    if (map_at(px, py)) {
+        monster_path_valid = 0;
+        return;
+    }
+    monster_path_dist[py][px] = 0;
+    monster_path_queue[tail++] = (u16)(py * MAP_W + px);
+    while (head < tail) {
+        u16 cell = monster_path_queue[head++];
+        u8 d;
+        int x = cell % MAP_W;
+        int y = cell / MAP_W;
+        static const signed char dirs[4][2] = {
+            { 1,  0}, {-1,  0}, { 0,  1}, { 0, -1}
+        };
+        d = monster_path_dist[y][x];
+        if (d >= 254) continue;
+        for (u8 i = 0; i < 4; i++) {
+            int nx = x + dirs[i][0];
+            int ny = y + dirs[i][1];
+            if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+            if (map_at(nx, ny)) continue;
+            if (monster_path_dist[ny][nx] != 0xFF) continue;
+            monster_path_dist[ny][nx] = (u8)(d + 1);
+            monster_path_queue[tail++] = (u16)(ny * MAP_W + nx);
+        }
+    }
+    monster_path_valid = 1;
+}
+
+static void refresh_monster_path(void) {
+    if (!monster_path_valid || monster_path_timer == 0) {
+        rebuild_monster_path();
+        monster_path_timer = 12;
+    } else {
+        monster_path_timer--;
+    }
+}
+
+static u8 move_monster_along_path(int i) {
+    int cx = thing_x_q8[i] >> 8;
+    int cy = thing_y_q8[i] >> 8;
+    u8 best_dist;
+    int best_x;
+    int best_y;
+    static const signed char dirs[4][2] = {
+        { 1,  0}, {-1,  0}, { 0,  1}, { 0, -1}
+    };
+    if (!monster_path_valid) return 0;
+    if (cx < 0 || cy < 0 || cx >= MAP_W || cy >= MAP_H) return 0;
+    best_dist = monster_path_dist[cy][cx];
+    if (best_dist == 0xFF || best_dist == 0) return 0;
+    best_x = cx;
+    best_y = cy;
+    for (u8 dir = 0; dir < 4; dir++) {
+        int nx = cx + dirs[dir][0];
+        int ny = cy + dirs[dir][1];
+        u8 d;
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+        d = monster_path_dist[ny][nx];
+        if (d < best_dist) {
+            best_dist = d;
+            best_x = nx;
+            best_y = ny;
+        }
+    }
+    if (best_x == cx && best_y == cy) return 0;
+    {
+        int target_x = (best_x << 8) + 128;
+        int target_y = (best_y << 8) + 128;
+        int dx = target_x - thing_x_q8[i];
+        int dy = target_y - thing_y_q8[i];
+        move_monster_toward(i, dx, dy, iabs16(dx), iabs16(dy));
+    }
+    return 1;
+}
+
 static void update_monster_ai(void) {
     int px, py;
-    if (++monster_ai_tick & 7) return;
+    if (++monster_ai_tick & 3) return;
     rc_player_q8(&px, &py);
+    refresh_monster_path();
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, adx, ady;
         if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
@@ -1246,16 +1337,14 @@ static void update_monster_ai(void) {
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);
         ady = iabs16(dy);
-        if (adx + ady > WORLD_Q8(3072)) continue;
+        if (adx + ady > WORLD_Q8(4608)) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)) continue;
         if (!enemy_awake[i]) {
-            if (adx + ady > WORLD_Q8(2304)) continue;
-            if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
             enemy_awake[i] = 1;
             enemy_attack_cooldown[i] = 28;
         }
 
-        move_monster_toward(i, dx, dy, adx, ady);
+        if (!move_monster_along_path(i)) move_monster_toward(i, dx, dy, adx, ady);
     }
 }
 
@@ -2614,6 +2703,8 @@ static void restart_level(void) {
     pickup_message_type = 0;
     key_message_visible = 0;
     monster_ai_tick = 0;
+    monster_path_valid = 0;
+    monster_path_timer = 0;
     projectile_active = 0;
     projectile_type = 0;
     projectile_timer = 0;

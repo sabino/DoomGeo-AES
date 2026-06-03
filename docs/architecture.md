@@ -59,6 +59,9 @@ current runtime accepts several compromises:
 - Thing projection samples neighboring wall columns before culling, and slots
   that do not draw any strips are treated as non-visible so hidden/off-screen
   monsters cannot drive melee or ranged damage.
+- Monster chase uses a periodically refreshed grid distance field from the
+  player, which is cheaper and more reliable on the converted map than asking
+  each monster to solve local wall avoidance independently.
 
 The generated full map data is kept so later work can experiment with more
 Doom-like traversal without redoing the WAD parsing layer.
