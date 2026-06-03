@@ -57,8 +57,9 @@ current runtime accepts several compromises:
   spans.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The current runtime uses 40 wall columns so five 4-strip world things can fit
-  alongside the backdrop and weapon under the 96-sprites-per-scanline limit.
+  The current runtime uses a fallback 20-column wall pass so eight 4-strip
+  world things can fit alongside the backdrop and weapon under the
+  96-sprites-per-scanline limit.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as

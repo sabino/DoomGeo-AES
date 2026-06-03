@@ -128,12 +128,6 @@ static void set_bonus_palettes(void) {
         set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
         set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
     }
-    for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
-        u8 r = clamp31(g_hud_palette_rgb[i][0] + 5);
-        u8 g = clamp31(g_hud_palette_rgb[i][1] + 4);
-        u8 b = g_hud_palette_rgb[i][2];
-        pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
-    }
     for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
         u8 r = clamp31(g_weapon_palette_rgb[i][0] + 5);
         u8 g = clamp31(g_weapon_palette_rgb[i][1] + 4);
@@ -214,10 +208,7 @@ static void restore_play_palettes(void) {
 }
 
 static void set_hurt_palettes(void) {
-    for (int i = 1; i < 16; i++) {
-        pal_set(PAL_HUD, (u16)i, RGB(31, 4, 4));
-        pal_set(PAL_WEAPON, (u16)i, RGB(31, 5, 4));
-    }
+    REG_BACKDROP = RGB(10, 0, 0);
 }
 
 static void update_hurt_flash(void) {
@@ -240,7 +231,7 @@ static void update_hurt_flash(void) {
         }
         muzzle_flash--;
     } else if (palette_effect) {
-        if (palette_effect == 2) REG_BACKDROP = RGB(0, 0, 0);
+        if (palette_effect == 1 || palette_effect == 2) REG_BACKDROP = RGB(0, 0, 0);
         else restore_play_palettes();
         palette_effect = 0;
     }
@@ -903,21 +894,6 @@ static int best_visible_enemy(void) {
         }
     }
     if (best_thing >= 0) return best_thing;
-
-    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
-        int sx, h, dist_q8;
-        int score;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
-        if (enemy_dead[thing]) continue;
-        if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
-        if (!weapon_target_project(thing, &sx, &h, &dist_q8)) continue;
-        if (iabs16(sx - SCRW / 2) > 70 && h < 112) continue;
-        score = iabs16(sx - SCRW / 2) + (dist_q8 >> 7);
-        if (score < best_score) {
-            best_score = score;
-            best_thing = thing;
-        }
-    }
     return best_thing;
 }
 

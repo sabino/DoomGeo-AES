@@ -18,7 +18,10 @@ readable.
 
 ## Rendering
 
-- 40 wall-column sprites cover the 320-pixel screen in 8-pixel strips.
+- 20 wall-column sprites cover the 320-pixel screen in 16-pixel strips.
+- This fallback renderer deliberately spends less sprite budget on wall detail
+  so monsters, pickups, projectiles, corpses, and weapon sprites remain visible
+  under the Neo Geo scanline limit.
 - Each frame casts fixed-point rays, computes projected wall height, and writes
   Neo Geo sprite shrink/position data.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
@@ -73,11 +76,12 @@ readable.
   on direct-line chase.
 - Hitscan, projectile, and melee monsters can damage the player only from
   rendered world-sprite slots, so hidden/off-screen things do not attack through
-  the Neo Geo sprite fallback path. Imps/Barons can launch visible fireball
-  sprites.
+  the Neo Geo sprite fallback path. Player weapon hits also target rendered
+  enemies only, keeping combat feedback tied to visible sprites. Imps/Barons
+  can launch visible fireball sprites.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
-  coarse 40-column wall depth buffer.
+  coarse wall depth buffer.
 - Barrels explode and can apply radius damage.
 - Killed monsters leave corpse frames or drops where implemented.
 

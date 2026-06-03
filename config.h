@@ -13,8 +13,8 @@
  * NUM_COLS wall columns, each COLW pixels wide. COLW must divide SCRW.
  * Sprite horizontal width = HSHRINK+1, so HSHRINK = COLW-1.
  */
-#define NUM_COLS 40                 /* 40 walls + 20 backdrop leaves thing budget */
-#define COLW     (SCRW / NUM_COLS)  /* 8 px                                  */
+#define NUM_COLS 20                 /* fallback wall pass prioritizes visible things */
+#define COLW     (SCRW / NUM_COLS)
 #define HSHRINK  (COLW - 1)        
  
 #define BG_SPLIT  (BG_WIN / 2)
@@ -35,11 +35,11 @@
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 /*
  * Runtime sprite budget on active playfield scanlines:
- *   20 backdrop + 40 wall columns + 20 thing strips + 7 weapon strips = 87.
+ *   20 backdrop + 20 wall columns + 32 thing strips + 7 weapon strips = 79.
  * Neo Geo evaluates 96 sprites per scanline, so this leaves enough headroom
  * for several visible Doom things while keeping the weapon in front.
  */
-#define ENEMY_VISIBLE_COUNT 5
+#define ENEMY_VISIBLE_COUNT 8
 #define ENEMY_STRIPS 4
 #define ENEMY_BASE   (WALL_BASE + NUM_COLS)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
