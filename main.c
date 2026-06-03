@@ -398,6 +398,7 @@ static void update_weapon_flash(void) {
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
+static void reset_enemy_slot_cache(void);
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
 static void map_cell(int mx, int my, u16 pal, u16 tile);
@@ -1948,7 +1949,7 @@ static void update_status_numbers(u8 pressed) {
     render_hud_value((u16)(HUD_VALUE_BASE + 6), HUD_FRAG_X, frags, 2, PAL_HUD);
     shown_frags = frags;
     if (armor_flash_timer) {
-        render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_MAP_PLAYER);
+        render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_HUD);
         shown_armor = 0xFFFF;
         armor_flash_timer--;
     } else {
@@ -2399,6 +2400,14 @@ static void hide_enemy_slot(u16 slot) {
     enemy_tile_key[slot] = -1;
 }
 
+static void reset_enemy_slot_cache(void) {
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        enemy_palette_def[slot] = -1;
+        enemy_tile_key[slot] = -1;
+        enemy_slot_flash[slot] = 0;
+    }
+}
+
 static void hide_enemies(void) {
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
 }
@@ -2419,10 +2428,6 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
             }
         }
     }
-}
-
-static u8 enemy_obscured_by_weapon(int sx, int h) {
-    return h < 80 && sx > (SCRW / 2 - 40) && sx < (SCRW / 2 + 40);
 }
 
 static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
@@ -2525,7 +2530,6 @@ static int select_visible_things(int found, u8 pass) {
         if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
-        if (enemy_obscured_by_weapon(sx, h)) continue;
 
         score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
         insert_at = count;
@@ -2663,11 +2667,7 @@ static void restart_level(void) {
         thing_type_override[i] = 0;
         death_drop_type[i] = 0;
     }
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        enemy_palette_def[slot] = -1;
-        enemy_tile_key[slot] = -1;
-        enemy_slot_flash[slot] = 0;
-    }
+    reset_enemy_slot_cache();
 
     init_palettes();
     clear_fix();
@@ -2678,6 +2678,7 @@ static void restart_level(void) {
     init_walls();
     init_hud();
     init_weapon();
+    reset_enemy_slot_cache();
     hide_enemies();
     force_fix_hud_redraw();
 }

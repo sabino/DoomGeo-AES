@@ -24,32 +24,33 @@
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 
 /* ---- sprite slot assignment -----------------------------------------
- * Priority: lower index = back on Neo Geo sprite evaluation.  Weapon slots
- * stay immediately after the 84 backdrop+wall sprites so the gun is still in
- * the first 96 sprites on busy scanlines; HUD lives on non-gameplay rows.
+ * Priority: lower index = back on Neo Geo sprite evaluation. One world thing
+ * sits behind the gun, so centered enemies are still visible but the weapon
+ * correctly overlays them. HUD lives on non-gameplay rows.
  * Sprite #0 is unusable on this hardware.
  */
 #define BG_BASE   1                
 #define BG_COUNT  (SCRW / 16)       
 #define BG_WIN    (GAME_H / 16)     
 #define WALL_BASE (BG_BASE + BG_COUNT)   
-#define WEAPON_BASE  (WALL_BASE + NUM_COLS) /* keep gun inside the first 96 sprites/line */
-#define WEAPON_COUNT 7
-#define WEAPON_WIN   8
-#define WEAPON_Y_OFFSET 0
 /*
  * Runtime sprite budget on active playfield scanlines:
- *   20 backdrop + 64 wall columns + 7 weapon strips = 91 sprites.
+ *   20 backdrop + 64 wall columns + 4 thing strips + 7 weapon strips = 95.
  * Neo Geo evaluates 96 sprites per scanline, so only one 4-strip world thing
- * can be guaranteed visible without clipping/tint artifacts.
+ * can be guaranteed visible without clipping/tint artifacts until the wall
+ * renderer gets a purpose-built low-sprite fallback.
  */
 #define ENEMY_VISIBLE_COUNT 1
 #define ENEMY_STRIPS 4
-#define ENEMY_BASE   (WEAPON_BASE + WEAPON_COUNT)
+#define ENEMY_BASE   (WALL_BASE + NUM_COLS)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
 #define ENEMY_WIN    5
 #define ENEMY_GROUND_LIFT 2         /* keeps prescaled Doom sprites seated on the raycast floor */
-#define HUD_BASE  (ENEMY_BASE + ENEMY_COUNT)
+#define WEAPON_BASE  (ENEMY_BASE + ENEMY_COUNT) /* keep gun inside the first 96 sprites/line */
+#define WEAPON_COUNT 7
+#define WEAPON_WIN   8
+#define WEAPON_Y_OFFSET 0
+#define HUD_BASE  (WEAPON_BASE + WEAPON_COUNT)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
 #define HUD_Y_OFFSET 0              /* STBAR starts exactly at the playfield edge */
