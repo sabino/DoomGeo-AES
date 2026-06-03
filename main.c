@@ -2404,11 +2404,25 @@ static void render_hud_keys(void) {
 }
 
 static void draw_weapon_status(void) {
-    u16 bits = weapon_status_bits() & 0x3F;
-    for (u8 weapon = 0; weapon < WEAPON_TOTAL; weapon++) {
+    static const u8 arms_weapons[6] = {
+        WEAPON_PISTOL, WEAPON_SHOTGUN, WEAPON_CHAINGUN,
+        WEAPON_ROCKET, WEAPON_PLASMA, WEAPON_BFG
+    };
+    static const u8 arms_cols[3] = {11, 13, 15};
+    u16 bits = weapon_status_bits();
+
+    for (u8 col = 11; col < 20; col++) {
+        fix_poke(col, HUD_FIX_TOP_ROW, 0, FIX_BLANK);
+        fix_poke(col, HUD_FIX_BOTTOM_ROW, 0, FIX_BLANK);
+    }
+
+    for (u8 i = 0; i < 6; i++) {
+        u8 weapon = arms_weapons[i];
+        u8 row = (i < 3) ? HUD_FIX_TOP_ROW : HUD_FIX_BOTTOM_ROW;
+        u8 col = arms_cols[i % 3];
         u16 pal = (bits & (1 << weapon)) ? PAL_HUD : PAL_MAP_WALL;
         if (weapon == current_weapon) pal = PAL_HUD;
-        fix_poke((u16)(12 + weapon), HUD_FIX_BOTTOM_ROW, pal, (u16)(FIX_DIGIT_BASE + weapon + 1));
+        fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + i + 2));
     }
     shown_weapon_status = weapon_status_bits();
 }
