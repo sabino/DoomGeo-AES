@@ -23,12 +23,33 @@ all: cart bios
 # location of generated and compiled content
 BUILDDIR=build
 # all directories that contain source to be compiled
-SRCDIRS=assets
+SRCDIRS=
 # default build flags, can be overriden per target
 CFLAGS=-I$(BUILDDIR) -std=c99 -fomit-frame-pointer -Os -g
 LDFLAGS=
 Z80FLAGS=
 Z80LDFLAGS=
+
+# Build-time Doom WAD conversion. The generated header is intentionally kept
+# in BUILDDIR so cart builds can swap maps without touching committed sources.
+FREEDOOM_VERSION=0.13.0
+FREEDOOM_ZIP=.tools/assets/freedoom-$(FREEDOOM_VERSION).zip
+FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_VERSION)/freedoom-$(FREEDOOM_VERSION).zip
+DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
+DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
+DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
+DOOM_MAP?=E1M1
+DOOM_MAP_WIDTH?=76
+DOOM_MAP_HEIGHT?=54
+DOOM_WALL_TEXTURE?=STARTAN3
+DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
+DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
+DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
+DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
+GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
+GFX_ROM_DIR?=rom
+GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
+CUSTOM_GENERATE_TARGETS+=doom-assets
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
@@ -52,8 +73,174 @@ include emu.mk
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
+
+$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
+
+FACE_TEST_ROM=$(BUILDDIR)/face-test-rom
+FACE_TEST_ASSET_ROM=$(BUILDDIR)/face-test-assets
+FACE_TEST_GFX_STAMP=$(FACE_TEST_ASSET_ROM)/.generated-gfx
+FACE_TEST_ELF=$(BUILDDIR)/face_test.elf
+FACE_TEST_PROM=$(FACE_TEST_ROM)/202-p1.p1
+FACE_TEST_CART=$(FACE_TEST_ROM)/$(GAMEROM).zip
+
+$(BUILDDIR)/face_test.o: $(GFX_HEADER)
+$(FACE_TEST_ELF): $(BUILDDIR)/face_test.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(FACE_TEST_ROM):
+	mkdir -p $@
+
+$(FACE_TEST_ASSET_ROM):
+	mkdir -p $@
+
+$(FACE_TEST_GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(FACE_TEST_ASSET_ROM)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
+	touch $@
+
+$(FACE_TEST_PROM): $(FACE_TEST_ELF) | $(FACE_TEST_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(FACE_TEST_ROM)/202-c1.c1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/c1.bin $@
+$(FACE_TEST_ROM)/202-c2.c2: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/c2.bin $@
+$(FACE_TEST_ROM)/202-s1.s1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/s1.bin $@
+$(FACE_TEST_ROM)/202-m1.m1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/m1.bin $@
+$(FACE_TEST_ROM)/202-v1.v1: $(FACE_TEST_GFX_STAMP) | $(FACE_TEST_ROM)
+	cp $(FACE_TEST_ASSET_ROM)/v1.bin $@
+
+$(FACE_TEST_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(FACE_TEST_ROM)
+	cp $< $@
+
+$(FACE_TEST_CART): $(FACE_TEST_PROM) $(FACE_TEST_ROM)/202-c1.c1 $(FACE_TEST_ROM)/202-c2.c2 $(FACE_TEST_ROM)/202-s1.s1 $(FACE_TEST_ROM)/202-m1.m1 $(FACE_TEST_ROM)/202-v1.v1 $(FACE_TEST_ROM)/neogeo.zip
+	cd $(FACE_TEST_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+face-test-rom: $(FACE_TEST_CART)
+
+face-test-gngeo: $(FACE_TEST_CART)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(FACE_TEST_ROM) $(GAMEROM)
+
+HUD_TEST_ROM=$(BUILDDIR)/hud-test-rom
+HUD_TEST_ELF=$(BUILDDIR)/hud_test.elf
+HUD_TEST_PROM=$(HUD_TEST_ROM)/202-p1.p1
+HUD_TEST_CART=$(HUD_TEST_ROM)/$(GAMEROM).zip
+
+$(BUILDDIR)/hud_test.o: $(GFX_HEADER)
+$(HUD_TEST_ELF): $(BUILDDIR)/hud_test.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(HUD_TEST_ROM):
+	mkdir -p $@
+
+$(HUD_TEST_PROM): $(HUD_TEST_ELF) | $(HUD_TEST_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(HUD_TEST_ROM)/202-c1.c1: $(GFX_STAMP) | $(HUD_TEST_ROM)
+	cp rom/c1.bin $@
+$(HUD_TEST_ROM)/202-c2.c2: $(GFX_STAMP) | $(HUD_TEST_ROM)
+	cp rom/c2.bin $@
+$(HUD_TEST_ROM)/202-s1.s1: $(GFX_STAMP) | $(HUD_TEST_ROM)
+	cp rom/s1.bin $@
+$(HUD_TEST_ROM)/202-m1.m1: $(GFX_STAMP) | $(HUD_TEST_ROM)
+	cp rom/m1.bin $@
+$(HUD_TEST_ROM)/202-v1.v1: $(GFX_STAMP) | $(HUD_TEST_ROM)
+	cp rom/v1.bin $@
+
+$(HUD_TEST_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(HUD_TEST_ROM)
+	cp $< $@
+
+$(HUD_TEST_CART): $(HUD_TEST_PROM) $(HUD_TEST_ROM)/202-c1.c1 $(HUD_TEST_ROM)/202-c2.c2 $(HUD_TEST_ROM)/202-s1.s1 $(HUD_TEST_ROM)/202-m1.m1 $(HUD_TEST_ROM)/202-v1.v1 $(HUD_TEST_ROM)/neogeo.zip
+	cd $(HUD_TEST_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+hud-test-rom: $(HUD_TEST_CART)
+
+hud-test-gngeo: $(HUD_TEST_CART)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(HUD_TEST_ROM) $(GAMEROM)
+
+key-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
+	cp $(ROM)/neogeo.zip build/key-test-rom/neogeo.zip
+
+key-test-gngeo:
+	$(MAKE) key-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-test-rom $(GAMEROM)
+
+ASM_ROM=$(BUILDDIR)/asm-rom
+ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
+ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx
+ASM_ELF=$(BUILDDIR)/asm/doomgeo_asm.elf
+ASM_PROM=$(ASM_ROM)/202-p1.p1
+ASM_CART=$(ASM_ROM)/$(GAMEROM).zip
+ASM_SOUND_DRIVER=$(NGSHAREDIR)/nullsound_driver.ihx
+
+$(BUILDDIR)/%.o: %.S | $(BUILDDIR)
+	mkdir -p $(dir $@)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $< -o $@
+
+$(ASM_ELF): $(BUILDDIR)/asm/doomgeo_asm.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(ASM_ROM):
+	mkdir -p $@
+
+$(ASM_ASSET_ROM):
+	mkdir -p $@
+
+$(ASM_GFX_STAMP): tools/gen_asm_gfx.py | $(ASM_ASSET_ROM)
+	$(PYTHON) tools/gen_asm_gfx.py --out-dir $(ASM_ASSET_ROM)
+	touch $@
+
+$(ASM_PROM): $(ASM_ELF) | $(ASM_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(ASM_ROM)/202-c1.c1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/c1.bin $@
+$(ASM_ROM)/202-c2.c2: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/c2.bin $@
+$(ASM_ROM)/202-s1.s1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/s1.bin $@
+$(ASM_ROM)/202-m1.m1: $(ASM_SOUND_DRIVER) | $(ASM_ROM)
+	$(Z80SDOBJCOPY) -I ihex -O binary $< $@ --pad-to $(MROMSIZE)
+$(ASM_ROM)/202-v1.v1: $(ASM_GFX_STAMP) | $(ASM_ROM)
+	cp $(ASM_ASSET_ROM)/v1.bin $@
+
+$(ASM_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(ASM_ROM)
+	cp $< $@
+
+$(ASM_CART): $(ASM_PROM) $(ASM_ROM)/202-c1.c1 $(ASM_ROM)/202-c2.c2 $(ASM_ROM)/202-s1.s1 $(ASM_ROM)/202-m1.m1 $(ASM_ROM)/202-v1.v1 $(ASM_ROM)/neogeo.zip
+	cd $(ASM_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+asm-rom: $(ASM_CART)
+
+asm-gngeo: $(ASM_CART)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo asm-rom asm-gngeo
+
+$(FREEDOOM_ZIP):
+	mkdir -p $(dir $@)
+	curl -L --fail --output $@ $(FREEDOOM_URL)
+
+$(DOOM_SHAREWARE_ZIP):
+	mkdir -p $(dir $@)
+	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
+
+$(DOOM_MAP_HEADER): tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+
+$(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
+
+doom-assets: $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE)
 
 
 
@@ -65,7 +252,7 @@ $(PROM1): $(ELF)
 # latin characters for printing ASCII string, and tiles that are
 # displayed during the attract mode.
 # Note: build rules (%.gif -> %.fix) are defined in Makefile.build
-$(SROM1): rom/s1.bin
+$(SROM1): $(GFX_ROM_DIR)/s1.bin
 
 
 
@@ -77,8 +264,21 @@ $(SROM1): rom/s1.bin
 # By default, this makefile creates CROMs with tiles for displaying a ngdevkit
 # logo during the attract mode.
 # Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
-$(CROM1): rom/c1.bin
-$(CROM2): rom/c2.bin
+$(CROM1): $(GFX_ROM_DIR)/c1.bin
+$(CROM2): $(GFX_ROM_DIR)/c2.bin
+
+$(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)/m1.bin $(GFX_ROM_DIR)/v1.bin: $(GFX_STAMP)
+	@test -f $@
+
+$(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	touch $@
+
+$(GFX_ROM_DIR):
+	mkdir -p $@
+
+$(GFX_HEADER): $(GFX_STAMP)
+	@test -f $@
 
 
 
@@ -121,7 +321,6 @@ $(MROM1): $(SOUND_DRIVER)
 #     the right ROM bank based on your input assets
 # Those actions can be achieved by creating custom make targets
 # that get invoked automatically when added to the variable below.
-CUSTOM_GENERATE_TARGETS=
 
 
 

@@ -20,7 +20,7 @@ PROM1=$(ROM)/202-p1.p1
 # PROM2SIZE=4194304
 
 # sprite ROM
-CROMSIZE=1048576
+CROMSIZE=2097152
 CROM1=$(ROM)/202-c1.c1
 # use variable CROMxSIZE to customize the size of a particular ROM
 # by default, CROMSIZE value is used for every CROM

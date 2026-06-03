@@ -56,7 +56,7 @@ $(BUILDDIR) $(ROM):
 # This target triggers the generation of assets that must be present prior
 # to building the project (including custom generate targets)
 $(BUILDDIR)/.generated: | $(SRCDIRS:%=$(BUILDDIR)/%)
-	find setup -mindepth 1 -maxdepth 1 -type d -print | xargs -r -n1 $(MAKE) -C
+	[ ! -d setup ] || find setup -mindepth 1 -maxdepth 1 -type d -print | xargs -r -n1 $(MAKE) -C
 	echo $(CUSTOM_GENERATE_TARGETS) | xargs -r $(MAKE)
 	touch $@
 
@@ -183,12 +183,12 @@ $(ROM)/$(notdir $(BIOSROM)): | $(ROM)
 # Build rules for housekeeping
 
 clean:
-	find . \( -name '*~' -or -name '*.o' -or -name '*.rel' -or -name '*.elf' -or -name '*.ihx' \) -delete
+	find . \( -path './.tools' -or -path './.git' \) -prune -o \( -name '*~' -or -name '*.o' -or -name '*.rel' -or -name '*.elf' -or -name '*.ihx' \) -exec rm -f {} +
 
 distclean:
 	rm -rf build
 	$(MAKE) clean
-	find setup -mindepth 1 -maxdepth 1 -type d -print | xargs -I{} -r -n1 $(MAKE) -C {} distclean
+	[ ! -d setup ] || find setup -mindepth 1 -maxdepth 1 -type d -print | xargs -I{} -r -n1 $(MAKE) -C {} distclean
 
 
 .PHONY: clean distclean
@@ -226,5 +226,3 @@ $(1): export LD_LIBRARY_PATH=$(NGLIBDIR):$(LD_LIBRARY_PATH)
 endif
 )
 endef
-
-

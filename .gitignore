@@ -1,4 +1,11 @@
 build/main.o
+.tools/
+dist/
+*.spec
+__pycache__/
+tools/__pycache__/
+rom/
+build/
 build/raycast.o
 build/rom.elf
 build/.generated
