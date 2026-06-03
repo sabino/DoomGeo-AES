@@ -34,6 +34,8 @@ The ROM does not load a WAD at runtime.
 The keycard verification ROM is built through recursive Make targets with
 `DOOM_MAP=E1M2`, `BUILDDIR=build/key-test`, and `ROM=build/key-test-rom`,
 keeping its generated map and object files separate from the default E1M1 build.
+The target also copies the local `neogeo.zip` BIOS package into the isolated
+ROM directory so `make key-test-gngeo` can boot that ROM directly.
 
 ## Graphics Conversion
 

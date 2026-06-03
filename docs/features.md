@@ -45,6 +45,8 @@ readable.
   ARMOR fields with the Doom red-number palette.
 - Weapon indicators, key indicators, and short messages (`KEY`, `AMMO`, `MED`,
   `ARM`, `DOR`, `SEC`, `EXIT`, `DEAD`) use fix-layer glyphs.
+- Locked-door messages include the required key color glyph, so the E1M2 red
+  keycard path can be verified visually instead of only through generated data.
 - The crosshair marker has been cleared from the current runtime path.
 
 ## Weapons And Combat
@@ -75,6 +77,8 @@ readable.
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
   changing the default map.
+- The E1M2 key-test conversion currently includes one red keycard and a six-cell
+  red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma
   rifle, and BFG thing IDs. Pickup sprites use exact WAD frames when present;
   missing shareware-only frames are skipped instead of breaking the build.

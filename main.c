@@ -269,7 +269,9 @@ static u8  door_message_timer = 0;
 static u8  secret_message_timer = 0;
 static u8  pickup_message_timer = 0;
 static u8  pickup_message_type = 0;
+static u8  pickup_message_key = 0;
 static u8  key_message_visible = 0;
+static u8  missing_key_bits = 0;
 static u8  monster_ai_tick = 0;
 static u8  projectile_active = 0;
 static u16 projectile_type = 0;
@@ -1530,6 +1532,7 @@ static u8 apply_pickup(u16 thing_type) {
         if (player_keys & key) return 0;
         player_keys |= key;
         shown_keys = 0xFF;
+        pickup_message_key = key;
         pickup_message_type = 1;
         pickup_message_timer = 35;
         bonus_flash = 10;
@@ -1726,12 +1729,21 @@ static void draw_dead_message(void) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_DEAD_D);
 }
 
-static void draw_key_message(void) {
-    const u16 col = (SCRW / 16) - 1;
+static u8 key_glyph_for_bits(u8 key_bits) {
+    if (key_bits & 1) return 0; /* blue */
+    if (key_bits & 2) return 1; /* red */
+    if (key_bits & 4) return 2; /* yellow */
+    return 2;
+}
+
+static void draw_key_message_for(u8 key_bits) {
+    const u16 col = (SCRW / 16) - 2;
     const u16 row = (GAME_H / 16) - 2;
+    u8 key = key_glyph_for_bits(key_bits);
     fix_poke(col, row, PAL_MAP_PLAYER, FIX_KEY_MSG_K);
     fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
-    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, (u16)(FIX_KEY_BASE + 2));
+    fix_poke((u16)(col + 2), row, (u16)(PAL_HUD_KEY_BASE + key), (u16)(FIX_KEY_BASE + key));
+    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_KEY_MSG_K);
 }
 
 static void draw_ammo_message(void) {
@@ -1801,7 +1813,7 @@ static void draw_exit_stats(void) {
 static void draw_pickup_message(void) {
     switch (pickup_message_type) {
     case 1:
-        draw_key_message();
+        draw_key_message_for(pickup_message_key);
         break;
     case 2:
         draw_weapon_pickup_message();
@@ -1833,7 +1845,7 @@ static void update_center_message(void) {
         draw_exit_stats();
     } else if (key_message_timer) {
         clear_center_message();
-        draw_key_message();
+        draw_key_message_for(missing_key_bits);
         key_message_timer--;
         key_message_visible = 1;
     } else if (ammo_message_timer) {
@@ -1859,6 +1871,7 @@ static void update_center_message(void) {
     } else if (key_message_visible) {
         clear_center_message();
         key_message_visible = 0;
+        missing_key_bits = 0;
     }
 }
 
@@ -2011,6 +2024,7 @@ static void open_door_index(u16 door_index) {
     u8 in_group[NG_RUNTIME_DOOR_COUNT];
     u8 opened = 0;
     if (required_key && (player_keys & required_key) == 0) {
+        missing_key_bits = required_key;
         key_message_timer = 60;
         return;
     }
@@ -2216,12 +2230,12 @@ static void render_hud_keys(void) {
 
     for (u16 key = 0; key < HUD_KEY_COUNT; key++) {
         u16 spr = (u16)(HUD_KEY_BASE + key);
+        load_hud_key_palette(key);
         scb2(spr, 0x0F, 0x00);
         scb3(spr, SCRH + 32, 0, 1);
         scb4(spr, 0);
         fix_poke(key_col, key_row[key], 0, FIX_BLANK);
         if (player_keys & key_bits[key]) {
-            load_hud_key_palette(key);
             fix_poke(key_col, key_row[key], (u16)(PAL_HUD_KEY_BASE + key), (u16)(FIX_KEY_BASE + key));
             continue;
         }
@@ -2963,11 +2977,13 @@ static void restart_level(void) {
     level_complete = 0;
     bg_scroll_key = 0xFFFFFFFFUL;
     key_message_timer = 0;
+    missing_key_bits = 0;
     ammo_message_timer = 0;
     door_message_timer = 0;
     secret_message_timer = 0;
     pickup_message_timer = 0;
     pickup_message_type = 0;
+    pickup_message_key = 0;
     key_message_visible = 0;
     monster_ai_tick = 0;
     monster_path_valid = 0;

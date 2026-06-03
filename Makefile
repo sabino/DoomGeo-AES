@@ -168,9 +168,11 @@ hud-test-gngeo: $(HUD_TEST_CART)
 
 key-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
+	cp $(ROM)/neogeo.zip build/key-test-rom/neogeo.zip
 
 key-test-gngeo:
-	$(MAKE) gngeo DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
+	$(MAKE) key-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-test-rom $(GAMEROM)
 
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets

@@ -30,9 +30,13 @@ drawing pixels.
 | --- | --- |
 | ![Current wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) | ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
 
-| HUD work-in-progress | Native Doom comparison |
+| HUD work-in-progress | Keycard test ROM |
 | --- | --- |
-| ![Current HUD status bar and known number placement issue](docs/screenshots/doomgeo-aes-current-hud.png) | ![Native Doom beside the Neo Geo prototype](docs/screenshots/doomgeo-aes-native-comparison.png) |
+| ![Current HUD status bar and known number placement issue](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
+
+| Native Doom comparison |
+| --- |
+| ![Native Doom beside the Neo Geo prototype](docs/screenshots/doomgeo-aes-native-comparison.png) |
 
 ## Controls
 
