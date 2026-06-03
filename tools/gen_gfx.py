@@ -97,7 +97,9 @@ WEAPON_FRAMES = ("PISGA0", "PISGB0+PISFA0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB
 HUD_KEYCARD_FRAMES = ("BKEYA0", "RKEYA0", "YKEYA0")
 HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 HUD_KEYCARD_TILES = len(HUD_KEYCARD_FRAMES)
-CEILING_PERSPECTIVE_BASE = HUD_KEYCARD_BASE + HUD_KEYCARD_TILES
+HUD_DIGIT_BASE = HUD_KEYCARD_BASE + HUD_KEYCARD_TILES
+HUD_DIGIT_TILES = 10
+CEILING_PERSPECTIVE_BASE = HUD_DIGIT_BASE + HUD_DIGIT_TILES
 FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 SPRITE_CACHE_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 # Must match main.c/config.h's weapon sprite-chain top. If this differs, the
@@ -862,6 +864,38 @@ def hud_keycard_tiles(iwad, zip_member):
     return tiles, "+".join(sources)
 
 
+def hud_digit_tiles(iwad, zip_member, palette):
+    if not iwad:
+        return [tile_solid() for _ in range(10)], "fallback-digits"
+
+    wad = Wad(read_wad(iwad, zip_member))
+    playpal = playpal_rgb(wad)
+    tiles = []
+    sources = []
+    for digit in range(10):
+        frame = f"STTNUM{digit}"
+        lump_ids = wad.by_name.get(frame)
+        if not lump_ids:
+            tiles.append(tile_blank())
+            sources.append(f"{frame}:missing")
+            continue
+        patch = decode_patch(wad.lump_data(lump_ids[0]))
+        tile = tile_blank()
+        x0 = max(0, (16 - len(patch[0])) // 2)
+        y0 = max(0, (16 - len(patch)) // 2)
+        for sy, row in enumerate(patch):
+            dy = y0 + sy
+            if dy >= 16:
+                break
+            for sx, color in enumerate(row):
+                dx = x0 + sx
+                if color >= 0 and 0 <= dx < 16:
+                    tile[dy][dx] = quantize_color(color, playpal, palette)
+        tiles.append(tile)
+        sources.append(frame)
+    return tiles, "+".join(sources)
+
+
 def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
     if not iwad:
         return [], [], [], start_tile
@@ -1072,6 +1106,7 @@ def main():
     weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
     weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     hud_key_tiles, hud_key_source = hud_keycard_tiles(args.iwad, args.zip_member)
+    hud_digit_cache, hud_digit_source = hud_digit_tiles(args.iwad, args.zip_member, hud_palette)
     scales = [float(item) for item in args.sprite_scales.split(",") if item.strip()]
     monster_specs = parse_monster_sprites(args.monster_sprites or f"3001:{args.sprite_frame}")
     sprite_tiles, sprite_defs, sprite_meta, sprite_palettes = monster_sprite_tiles(args.iwad, args.zip_member, monster_specs, scales)
@@ -1107,6 +1142,7 @@ def main():
         + face_tiles
         + weapon_cache
         + hud_key_tiles
+        + hud_digit_cache
         + ceiling_perspective_tiles
         + floor_perspective_tiles
         + sprite_tiles
@@ -1164,6 +1200,7 @@ def main():
 
     print(f"  wall texture: {wall_source} mip={WALL_MIP_TILE} atlas={WALL_ATLAS_BASE}..{WALL_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  HUD keycards: {hud_key_source} tiles={HUD_KEYCARD_BASE}..{HUD_KEYCARD_BASE + HUD_KEYCARD_TILES - 1}")
+    print(f"  HUD digits: {hud_digit_source} tiles={HUD_DIGIT_BASE}..{HUD_DIGIT_BASE + HUD_DIGIT_TILES - 1}")
     for idx, source in enumerate(wall_alt_sources):
         base = WALL_ALT_ATLAS_BASE + idx * WALL_ATLAS_TILES
         print(f"  alt wall texture {idx + 1}: {source} atlas={base}..{base + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")

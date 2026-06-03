@@ -3,17 +3,18 @@
 #include "doom_gfx_generated.h"
 
 #define HUD_TEST_KEY_BASE 300
+#define HUD_TEST_DIGIT_BASE 320
 #define HUD_TEST_BAR_BASE 120
 #define HUD_TEST_KEY_COUNT 3
 
 enum {
     HUD_FIX_TOP_ROW = (GAME_H / 8) + 1,
     HUD_FIX_BOTTOM_ROW = HUD_FIX_TOP_ROW + 1,
-    HUD_NUM_ROW = 25,
-    HUD_AMMO_COL = 2,
-    HUD_HEALTH_COL = 9,
-    HUD_FRAG_COL = 17,
-    HUD_ARMOR_COL = 24
+    HUD_NUM_Y = GAME_H - 7,
+    HUD_AMMO_X = 16,
+    HUD_HEALTH_X = 72,
+    HUD_FRAG_X = 136,
+    HUD_ARMOR_X = 192
 };
 
 enum {
@@ -34,17 +35,33 @@ typedef struct HudOffset {
 static HudOffset offsets[HUD_ITEM_COUNT];
 static u8 selected_item = HUD_ITEM_BAR;
 static u8 bar_variant = 0;
+static u8 size_variant[HUD_ITEM_COUNT];
 static u8 prev_input = 0;
 static u8 repeat_tick = 0;
 
 static const HudOffset default_offsets[HUD_ITEM_COUNT] = {
     { 0, 0 }, /* BAR: render variant only */
-    { 0, 0 }, /* AMMO: fix-cell offset */
-    { 0, 0 }, /* HEALTH: fix-cell offset */
-    { 0, 0 }, /* FRAG: fix-cell offset */
-    { 0, 0 }, /* ARMOR: fix-cell offset */
+    { 0, 0 }, /* AMMO: sprite pixel offset */
+    { 0, 0 }, /* HEALTH: sprite pixel offset */
+    { 0, 0 }, /* FRAG: sprite pixel offset */
+    { 0, 0 }, /* ARMOR: sprite pixel offset */
     { 0, 0 }, /* KEYS: sprite pixel offset */
 };
+
+typedef struct DigitSize {
+    u8 hshrink;
+    u8 vshrink;
+    u8 spacing;
+} DigitSize;
+
+static const DigitSize digit_sizes[] = {
+    { 0x0F, 0xFF, 16 },
+    { 0x0E, 0xEF, 15 },
+    { 0x0D, 0xDF, 14 },
+    { 0x0C, 0xCF, 13 },
+};
+
+#define DIGIT_SIZE_COUNT ((u8)(sizeof(digit_sizes) / sizeof(digit_sizes[0])))
 
 static const u16 key_thing_types[HUD_TEST_KEY_COUNT] = {
     5,  /* blue keycard */
@@ -65,15 +82,6 @@ static void load_key_palette(u16 key, int def_idx) {
         u8 g = g_enemy_palette_rgb[def_idx][i][1];
         u8 b = g_enemy_palette_rgb[def_idx][i][2];
         pal_set((u16)(PAL_ENEMY_BASE + key), (u16)(i + 1), RGB(r, g, b));
-    }
-}
-
-static void set_key_sprite_tiles(u16 key, const DoomSpriteScale *meta) {
-    u16 spr = (u16)(HUD_TEST_KEY_BASE + key);
-    u16 pal = (u16)(PAL_ENEMY_BASE + key);
-    for (u16 row = 0; row < HUD_WIN; row++) {
-        u16 tile = (row < meta->rows) ? (u16)(meta->tile_base + row * meta->strips) : TILE_BLANK;
-        scb1_tile(spr, row, tile, pal);
     }
 }
 
@@ -115,37 +123,6 @@ static void draw_compact_two(u16 col, u16 row, int value, u16 pal) {
     draw_compact_digit((u16)(col + 1), row, (u16)value, pal);
 }
 
-static void draw_big_number3(u16 col, u16 row, u16 value, u16 pal) {
-    u8 digits[3];
-    if (value > 999) value = 999;
-    digits[0] = (u8)(value / 100);
-    digits[1] = (u8)((value / 10) % 10);
-    digits[2] = (u8)(value % 10);
-    for (u16 i = 0; i < 3; i++) {
-        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
-        u16 x = (u16)(col + i * 2);
-        fix_poke(x, row, pal, tile);
-        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
-        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
-        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
-    }
-}
-
-static void draw_big_number2(u16 col, u16 row, u16 value, u16 pal) {
-    u8 digits[2];
-    if (value > 99) value = 99;
-    digits[0] = (u8)(value / 10);
-    digits[1] = (u8)(value % 10);
-    for (u16 i = 0; i < 2; i++) {
-        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
-        u16 x = (u16)(col + i * 2);
-        fix_poke(x, row, pal, tile);
-        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
-        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
-        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
-    }
-}
-
 static u16 clamp_fix_col(int col) {
     if (col < 0) return 0;
     if (col > 39) return 39;
@@ -163,20 +140,20 @@ static void draw_marker_for_item(u8 item) {
     int row = 24;
     switch (item) {
     case HUD_ITEM_AMMO:
-        col = HUD_AMMO_COL + offsets[HUD_ITEM_AMMO].x;
-        row = HUD_NUM_ROW + offsets[HUD_ITEM_AMMO].y - 1;
+        col = (HUD_AMMO_X + offsets[HUD_ITEM_AMMO].x) / 8;
+        row = (HUD_NUM_Y + offsets[HUD_ITEM_AMMO].y) / 8 - 1;
         break;
     case HUD_ITEM_HEALTH:
-        col = HUD_HEALTH_COL + offsets[HUD_ITEM_HEALTH].x;
-        row = HUD_NUM_ROW + offsets[HUD_ITEM_HEALTH].y - 1;
+        col = (HUD_HEALTH_X + offsets[HUD_ITEM_HEALTH].x) / 8;
+        row = (HUD_NUM_Y + offsets[HUD_ITEM_HEALTH].y) / 8 - 1;
         break;
     case HUD_ITEM_FRAG:
-        col = HUD_FRAG_COL + offsets[HUD_ITEM_FRAG].x;
-        row = HUD_NUM_ROW + offsets[HUD_ITEM_FRAG].y - 1;
+        col = (HUD_FRAG_X + offsets[HUD_ITEM_FRAG].x) / 8;
+        row = (HUD_NUM_Y + offsets[HUD_ITEM_FRAG].y) / 8 - 1;
         break;
     case HUD_ITEM_ARMOR:
-        col = HUD_ARMOR_COL + offsets[HUD_ITEM_ARMOR].x;
-        row = HUD_NUM_ROW + offsets[HUD_ITEM_ARMOR].y - 1;
+        col = (HUD_ARMOR_X + offsets[HUD_ITEM_ARMOR].x) / 8;
+        row = (HUD_NUM_Y + offsets[HUD_ITEM_ARMOR].y) / 8 - 1;
         break;
     case HUD_ITEM_KEYS:
         col = 35 + (offsets[HUD_ITEM_KEYS].x / 8);
@@ -201,6 +178,7 @@ static void draw_top_indicator(void) {
     } else {
         draw_compact_two(21, 2, offsets[selected_item].x, PAL_MAP_PLAYER);
         draw_compact_two(24, 2, offsets[selected_item].y, PAL_MAP_PLAYER);
+        if (selected_item != HUD_ITEM_KEYS) draw_compact_digit(27, 2, size_variant[selected_item], PAL_MAP_PLAYER);
     }
 }
 
@@ -229,31 +207,38 @@ static void render_hud_bar(void) {
     }
 }
 
+static void render_sprite_number(u16 base_spr, u8 item, int base_x, u16 value, u8 digits_count) {
+    u8 digits[3] = { 0, 0, 0 };
+    const DigitSize *size = &digit_sizes[size_variant[item]];
+    if (digits_count == 2) {
+        if (value > 99) value = 99;
+        digits[0] = (u8)(value / 10);
+        digits[1] = (u8)(value % 10);
+    } else {
+        if (value > 999) value = 999;
+        digits[0] = (u8)(value / 100);
+        digits[1] = (u8)((value / 10) % 10);
+        digits[2] = (u8)(value % 10);
+    }
+    for (u8 i = 0; i < 3; i++) {
+        u16 spr = (u16)(base_spr + i);
+        if (i >= digits_count) {
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            continue;
+        }
+        scb1_tile(spr, 0, (u16)(TILE_HUD_DIGIT_BASE + digits[i]), PAL_HUD);
+        scb2(spr, size->hshrink, size->vshrink);
+        scb3(spr, HUD_NUM_Y + offsets[item].y, 0, 1);
+        scb4(spr, (u16)(base_x + offsets[item].x + i * size->spacing));
+    }
+}
+
 static void render_values(void) {
-    draw_big_number3(
-        clamp_fix_col(HUD_AMMO_COL + offsets[HUD_ITEM_AMMO].x),
-        clamp_fix_row(HUD_NUM_ROW + offsets[HUD_ITEM_AMMO].y),
-        50,
-        PAL_HUD
-    );
-    draw_big_number3(
-        clamp_fix_col(HUD_HEALTH_COL + offsets[HUD_ITEM_HEALTH].x),
-        clamp_fix_row(HUD_NUM_ROW + offsets[HUD_ITEM_HEALTH].y),
-        100,
-        PAL_HUD
-    );
-    draw_big_number2(
-        clamp_fix_col(HUD_FRAG_COL + offsets[HUD_ITEM_FRAG].x),
-        clamp_fix_row(HUD_NUM_ROW + offsets[HUD_ITEM_FRAG].y),
-        0,
-        PAL_HUD
-    );
-    draw_big_number3(
-        clamp_fix_col(HUD_ARMOR_COL + offsets[HUD_ITEM_ARMOR].x),
-        clamp_fix_row(HUD_NUM_ROW + offsets[HUD_ITEM_ARMOR].y),
-        0,
-        PAL_HUD
-    );
+    render_sprite_number(HUD_TEST_DIGIT_BASE + 0, HUD_ITEM_AMMO, HUD_AMMO_X, 50, 3);
+    render_sprite_number(HUD_TEST_DIGIT_BASE + 3, HUD_ITEM_HEALTH, HUD_HEALTH_X, 100, 3);
+    render_sprite_number(HUD_TEST_DIGIT_BASE + 6, HUD_ITEM_FRAG, HUD_FRAG_X, 0, 2);
+    render_sprite_number(HUD_TEST_DIGIT_BASE + 8, HUD_ITEM_ARMOR, HUD_ARMOR_X, 0, 3);
 }
 
 static void render_keycards(void) {
@@ -293,12 +278,24 @@ static void reset_selected(void) {
         return;
     }
     offsets[selected_item] = default_offsets[selected_item];
+    size_variant[selected_item] = 0;
     render_all();
 }
 
 static void reset_all(void) {
     for (u8 i = 0; i < HUD_ITEM_COUNT; i++) offsets[i] = default_offsets[i];
+    for (u8 i = 0; i < HUD_ITEM_COUNT; i++) size_variant[i] = 0;
     bar_variant = 0;
+    render_all();
+}
+
+static void resize_selected(signed char delta) {
+    if (selected_item == HUD_ITEM_BAR || selected_item == HUD_ITEM_KEYS) return;
+    if (delta < 0) {
+        size_variant[selected_item] = (u8)((size_variant[selected_item] + DIGIT_SIZE_COUNT - 1) % DIGIT_SIZE_COUNT);
+    } else {
+        size_variant[selected_item] = (u8)((size_variant[selected_item] + 1) % DIGIT_SIZE_COUNT);
+    }
     render_all();
 }
 
@@ -318,16 +315,16 @@ static void move_selected(signed char dx, signed char dy) {
         if (o->y < -24) o->y = -24;
         if (o->y > 24) o->y = 24;
     } else {
-        if (o->x < -16) o->x = -16;
-        if (o->x > 16) o->x = 16;
-        if (o->y < -6) o->y = -6;
-        if (o->y > 4) o->y = 4;
+        if (o->x < -48) o->x = -48;
+        if (o->x > 48) o->x = 48;
+        if (o->y < -24) o->y = -24;
+        if (o->y > 24) o->y = 24;
     }
     render_all();
 }
 
 static void update_input(void) {
-    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, FACE = 0xF0 };
+    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, BTN_A = 0x10, BTN_B = 0x20, BTN_C = 0x40, BTN_D = 0x80 };
     u8 pressed = (u8)~REG_P1CNT;
     u8 edge = (u8)(pressed & ~prev_input);
     u8 arrows = (u8)(pressed & (UP | DOWN | LEFT | RIGHT));
@@ -339,10 +336,13 @@ static void update_input(void) {
         repeat_tick = 0;
     }
 
-    if (edge & FACE) {
+    if (edge & BTN_A) {
         selected_item = (u8)((selected_item + 1) % HUD_ITEM_COUNT);
         render_all();
     }
+    if (edge & BTN_B) reset_selected();
+    if (edge & BTN_C) resize_selected(-1);
+    if (edge & BTN_D) resize_selected(1);
     if (step & LEFT) move_selected(-1, 0);
     if (step & RIGHT) move_selected(1, 0);
     if (step & UP) move_selected(0, -1);
