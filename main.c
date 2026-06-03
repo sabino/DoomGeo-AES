@@ -2559,7 +2559,7 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
         if (game_active()) {
-            enum { A = 0x10, D = 0x80 };
+            enum { D = 0x80 };
             u8 d_now = pressed & D;
             rc_input(pressed);
             update_floor_damage();
@@ -2568,8 +2568,7 @@ int main(void) {
             collect_nearby_pickups();
             check_exit_reached();
             if (d_now && !door_prev) {
-                if (pressed & A) toggle_weapon();
-                else open_nearby_door();
+                open_nearby_door();
             }
             door_prev = d_now;
         } else {
@@ -2596,15 +2595,19 @@ int main(void) {
         update_status_numbers(pressed);
         update_center_message();
 
-        /* button C toggles the minimap  */
+        /* C cycles weapons. Hold A+C for the slower debug minimap toggle. */
         {
-            enum { C = 0x40 };          /* P1 bit 6                            */
+            enum { A = 0x10, C = 0x40 };
             u8 c_now = pressed & C;
             if (c_now && !map_prev) {
-                map_on = !map_on;
-                if (map_on) { draw_minimap(); prev_px = -1; }  /* -1 forces marker repaint */
-                else          clear_minimap();
-                force_fix_hud_redraw();
+                if (pressed & A) {
+                    map_on = !map_on;
+                    if (map_on) { draw_minimap(); prev_px = -1; }  /* -1 forces marker repaint */
+                    else          clear_minimap();
+                    force_fix_hud_redraw();
+                } else {
+                    toggle_weapon();
+                }
             }
             map_prev = c_now;
         }

@@ -42,9 +42,9 @@ drawing pixels.
 | D-pad Left / Right | Turn |
 | Hold A + Left/Right | Strafe |
 | B | Fire weapon |
-| C | Toggle minimap |
+| C | Toggle weapon |
 | D | Use facing door |
-| Hold A + D | Toggle weapon |
+| Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart level |
 
 The default GnGeo keyboard mapping is:
