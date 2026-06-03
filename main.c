@@ -2465,6 +2465,7 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
     enemies[slot].screen_x = sx - meta->width / 2;
     enemies[slot].screen_w = meta->width;
     {
+        u8 rendered = 0;
         int bottom = (GAME_H + h) / 2;
         int top;
         if ((thing_is_explosion(thing_type) && thing_index < 0) || thing_is_projectile(thing_type)) {
@@ -2481,11 +2482,17 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
                 scb2(spr, 0x0F, 0xFF);
                 scb3(spr, top, 0, meta->rows);
                 scb4(spr, (u16)strip_x);
+                rendered = 1;
             } else {
                 scb2(spr, 0x0F, 0x00);
                 scb3(spr, SCRH + 32, 0, 1);
                 scb4(spr, 0);
             }
+        }
+        if (!rendered) {
+            enemies[slot].thing_index = -1;
+            enemies[slot].screen_w = 0;
+            enemies[slot].screen_h = 0;
         }
     }
 }
@@ -2530,6 +2537,7 @@ static int select_visible_things(int found, u8 pass) {
         if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+        if (sx < -48 || sx > SCRW + 48) continue;
 
         score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
         insert_at = count;

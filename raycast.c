@@ -202,7 +202,18 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
 
     if (sx >= 0 && sx < SCRW) {
         int col = sx / COLW;
-        if (col >= 0 && col < NUM_COLS && transformY > distbuf[col] + (FONE >> 3)) return 0;
+        if (col >= 0 && col < NUM_COLS) {
+            u8 visible = 0;
+            for (int dc = -2; dc <= 2; dc++) {
+                int sample_col = col + dc;
+                if (sample_col < 0 || sample_col >= NUM_COLS) continue;
+                if (transformY <= distbuf[sample_col] + (FONE >> 3)) {
+                    visible = 1;
+                    break;
+                }
+            }
+            if (!visible) return 0;
+        }
     }
 
     *screen_x = sx;
