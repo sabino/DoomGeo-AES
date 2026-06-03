@@ -63,8 +63,10 @@ readable.
   partial gameplay support.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
   mutable position layer for simple chase behavior.
-- Hitscan monsters and projectile monsters both damage the player. Imps/Barons
-  can launch visible fireball sprites.
+- Hitscan, projectile, and melee monsters can damage the player only from
+  rendered world-sprite slots, so hidden/off-screen things do not attack through
+  the Neo Geo sprite fallback path. Imps/Barons can launch visible fireball
+  sprites.
 - Barrels explode and can apply radius damage.
 - Killed monsters leave corpse frames or drops where implemented.
 

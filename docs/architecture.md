@@ -58,7 +58,7 @@ current runtime accepts several compromises:
   alongside the backdrop and weapon under the 96-sprites-per-scanline limit.
 - Thing projection samples neighboring wall columns before culling, and slots
   that do not draw any strips are treated as non-visible so hidden/off-screen
-  monsters cannot drive ranged damage.
+  monsters cannot drive melee or ranged damage.
 
 The generated full map data is kept so later work can experiment with more
 Doom-like traversal without redoing the WAD parsing layer.

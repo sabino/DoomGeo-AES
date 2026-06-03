@@ -155,12 +155,8 @@ static void restore_weapon_palette(void) {
 }
 
 static void restore_counter_palette(void) {
-    for (int i = 0; i < HUD_SMALL_DIGIT_PALETTE_COLORS; i++) {
-        u8 r = (u8)((g_hud_small_digit_palette_rgb[i][0] * 4) / 5);
-        u8 g = (u8)((g_hud_small_digit_palette_rgb[i][1] * 4) / 5);
-        u8 b = (u8)((g_hud_small_digit_palette_rgb[i][2] * 4) / 5);
-        pal_set(PAL_AMMO_COUNTER, (u16)(i + 1), RGB(r, g, b));
-    }
+    for (int i = 1; i < 15; i++) pal_set(PAL_AMMO_COUNTER, (u16)i, RGB(5, 3, 0));
+    pal_set(PAL_AMMO_COUNTER, 15, RGB(20, 17, 4));
 }
 
 static void set_weapon_flash_palette(void) {
@@ -1144,8 +1140,12 @@ static void update_projectile(void) {
 static u8 update_close_monster_melee(void) {
     int px, py;
     rc_player_q8(&px, &py);
-    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
-        u16 type = runtime_thing_type(thing);
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        u16 type;
+        if (thing < 0) continue;
+        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        type = runtime_thing_type(thing);
         if (enemy_dead[thing] || !thing_is_monster(type)) continue;
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
         if (iabs16(px - thing_x_q8[thing]) < WORLD_Q8(288) && iabs16(py - thing_y_q8[thing]) < WORLD_Q8(288)) {
@@ -1174,6 +1174,7 @@ static void update_monster_damage(void) {
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
+        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
@@ -1889,17 +1890,22 @@ static u8 weapon_status_bits(void) {
     return (u8)(bits | (current_weapon << 4));
 }
 
-static void load_hud_key_palette(u16 key, int def_idx) {
-    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
-        u8 r = g_enemy_palette_rgb[def_idx][i][0];
-        u8 g = g_enemy_palette_rgb[def_idx][i][1];
-        u8 b = g_enemy_palette_rgb[def_idx][i][2];
-        pal_set((u16)(PAL_HUD_KEY_BASE + key), (u16)(i + 1), RGB(r, g, b));
+static void load_hud_key_palette(u16 key) {
+    static const u8 key_rgb[HUD_KEY_COUNT][3] = {
+        {4, 8, 26},   /* blue */
+        {24, 2, 2},   /* red */
+        {24, 19, 4},  /* yellow */
+    };
+    for (int i = 1; i < 16; i++) {
+        u8 shade = (u8)(8 + i);
+        u8 r = (u8)((key_rgb[key][0] * shade) / 23);
+        u8 g = (u8)((key_rgb[key][1] * shade) / 23);
+        u8 b = (u8)((key_rgb[key][2] * shade) / 23);
+        pal_set((u16)(PAL_HUD_KEY_BASE + key), (u16)i, RGB(r, g, b));
     }
 }
 
 static void render_hud_keys(void) {
-    static const u16 key_thing_types[HUD_KEY_COUNT] = {5, 13, 6};
     static const u8 key_bits[HUD_KEY_COUNT] = {1, 2, 4};
     static const u8 key_y[HUD_KEY_COUNT] = {194, 204, 214};
 
@@ -1910,17 +1916,11 @@ static void render_hud_keys(void) {
             scb3(spr, SCRH + 32, 0, 1);
             continue;
         }
-        int def_idx = enemy_sprite_def_for_type(key_thing_types[key]);
-        if (def_idx < 0) {
-            scb2(spr, 0x0F, 0x00);
-            scb3(spr, SCRH + 32, 0, 1);
-            continue;
-        }
-        load_hud_key_palette(key, def_idx);
+        load_hud_key_palette(key);
         scb1_tile(spr, 0, (u16)(TILE_HUD_KEYCARD_BASE + key), (u16)(PAL_HUD_KEY_BASE + key));
         scb2(spr, 0x08, 0x7F);
         scb3(spr, key_y[key], 0, 1);
-        scb4(spr, 236);
+        scb4(spr, 240);
     }
     shown_keys = player_keys;
 }
