@@ -49,27 +49,35 @@ readable.
 
 ## Weapons And Combat
 
-- Implemented weapons: fist, pistol, shotgun, chaingun, rocket launcher, and
-  chainsaw.
+- Implemented runtime weapons: fist, pistol, shotgun, chaingun, rocket
+  launcher, plasma rifle, BFG, and chainsaw.
+- The shareware WAD does not contain the original `PLSG`/`BFGG` weapon patches
+  or `CELL`/`CELP` pickup sprites. Shareware builds therefore keep placeholder
+  psprite frames for plasma/BFG, while registered/commercial WAD builds can
+  bake the real art through the same C-ROM path.
 - Pistol/chaingun use compact hitscan-style targeting.
+- Plasma rifle uses rapid cell-ammo visible-target damage.
 - Fist/chainsaw use close-range rendered-slot melee checks, so they only hit
   visible nearby targets.
 - Shotgun uses spread damage and can hit multiple visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
+- BFG spends 40 cells and applies heavy damage to visible rendered targets.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
   usable ammo.
 - Muzzle and impact feedback use palette flashes and projected explosion sprites.
 
 ## Things, Pickups, And Enemies
 
-- Runtime things include common E1M1 pickups, keys, ammo, armor, health,
-  backpack, weapons, barrels, monsters, projectiles, corpses, and explosions.
+- Runtime things include common E1M1 pickups, keys, ammo, cell ammo, armor,
+  health, backpack, weapons, barrels, monsters, projectiles, corpses, and
+  explosions.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
   changing the default map.
-- The chainsaw pickup uses the Doom `CSAWA0` world sprite and switches to the
-  chainsaw weapon when collected.
+- Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma
+  rifle, and BFG thing IDs. Pickup sprites use exact WAD frames when present;
+  missing shareware-only frames are skipped instead of breaking the build.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
 - Former humans, shotgun guys, imps, demons/spectres, Barons, and barrels have

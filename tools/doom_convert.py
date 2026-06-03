@@ -506,9 +506,12 @@ PICKUP_TYPES = {
     38,    # red skull
     39,    # yellow skull
     40,    # blue skull
+    17,    # cell pack
     2001,  # shotgun
     2002,  # chaingun
     2003,  # rocket launcher
+    2004,  # plasma rifle
+    2006,  # BFG 9000
     2007,  # clip
     2008,  # shells
     2010,  # rocket
@@ -520,6 +523,7 @@ PICKUP_TYPES = {
     2018,  # green armor
     2019,  # blue armor
     2046,  # box of rockets
+    2047,  # cell charge
     2048,  # ammo box
     2035,  # explosive barrel
 }

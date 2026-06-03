@@ -15,9 +15,10 @@ after the current documentation pass.
 
 ## Gameplay And Assets
 
-- Add missing registered/commercial-WAD weapons: plasma rifle and BFG.
-- Expand weapon selection and ammo rules once a non-shareware WAD asset path is
-  available for plasma/BFG sprites and pickups.
+- Replace the current shareware plasma/BFG placeholder psprites with exact art
+  by testing a registered/commercial WAD path.
+- Improve plasma/BFG fidelity: projectile visuals, BFG trace behavior, and
+  visible pickup sprites when the source WAD provides them.
 - Complete enemy sprite coverage, rotations, animation states, pain/death
   frames, and more faithful thing placement.
 - Continue tuning line-of-sight, wall-depth fallback, and encounter placement

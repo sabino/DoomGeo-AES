@@ -287,6 +287,8 @@ static u8  player_keys = 0;
 static u8  player_has_shotgun = 0;
 static u8  player_has_chaingun = 0;
 static u8  player_has_rocket_launcher = 0;
+static u8  player_has_plasma = 0;
+static u8  player_has_bfg = 0;
 static u8  player_has_chainsaw = 0;
 static u8  player_has_backpack = 0;
 static u8  current_weapon = 0;
@@ -346,9 +348,11 @@ enum {
     WEAPON_SHOTGUN = 1,
     WEAPON_CHAINGUN = 2,
     WEAPON_ROCKET = 3,
-    WEAPON_FIST = 4,
-    WEAPON_CHAINSAW = 5,
-    WEAPON_TOTAL = 6
+    WEAPON_PLASMA = 4,
+    WEAPON_BFG = 5,
+    WEAPON_FIST = 6,
+    WEAPON_CHAINSAW = 7,
+    WEAPON_TOTAL = 8
 };
 
 typedef struct EnemyDraw {
@@ -495,11 +499,14 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 38:
     case 39:
     case 40:
+    case 17:
     case 2007:
     case 2001:
     case 2002:
     case 2003:
+    case 2004:
     case 2005:
+    case 2006:
     case 2008:
     case 2010:
     case 2011:
@@ -510,6 +517,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2018:
     case 2019:
     case 2046:
+    case 2047:
     case 2048:
         return 1;
     default:
@@ -528,10 +536,14 @@ static u8 pickup_is_collectible(u16 thing_type) {
         return !player_has_chaingun || player_ammo < player_max_bullets;
     case 2003: /* rocket launcher */
         return !player_has_rocket_launcher || player_rockets < player_max_rockets;
+    case 2004: /* plasma rifle */
+        return !player_has_plasma || player_cells < player_max_cells;
     case 2005: /* chainsaw */
         return !player_has_chainsaw;
+    case 2006: /* BFG 9000 */
+        return !player_has_bfg || player_cells < player_max_cells;
     case 8:    /* backpack */
-        return !player_has_backpack || player_ammo < player_max_bullets || player_shells < player_max_shells || player_rockets < player_max_rockets;
+        return !player_has_backpack || player_ammo < player_max_bullets || player_shells < player_max_shells || player_rockets < player_max_rockets || player_cells < player_max_cells;
     case 2007: /* clip */
     case 2048: /* ammo box */
         return player_ammo < player_max_bullets;
@@ -540,6 +552,9 @@ static u8 pickup_is_collectible(u16 thing_type) {
     case 2010: /* rocket */
     case 2046: /* box of rockets */
         return player_rockets < player_max_rockets;
+    case 17:   /* cell pack */
+    case 2047: /* cell charge */
+        return player_cells < player_max_cells;
     case 2011: /* stimpack */
     case 2012: /* medikit */
         return player_health < 100;
@@ -586,6 +601,10 @@ static u8 player_has_weapon(u8 weapon) {
         return player_has_chaingun;
     case WEAPON_ROCKET:
         return player_has_rocket_launcher;
+    case WEAPON_PLASMA:
+        return player_has_plasma;
+    case WEAPON_BFG:
+        return player_has_bfg;
     case WEAPON_FIST:
         return 1;
     case WEAPON_CHAINSAW:
@@ -605,6 +624,10 @@ static u8 weapon_has_ammo(u8 weapon) {
         return player_has_chaingun && player_ammo > 0;
     case WEAPON_ROCKET:
         return player_has_rocket_launcher && player_rockets > 0;
+    case WEAPON_PLASMA:
+        return player_has_plasma && player_cells > 0;
+    case WEAPON_BFG:
+        return player_has_bfg && player_cells >= 40;
     case WEAPON_FIST:
         return 1;
     case WEAPON_CHAINSAW:
@@ -615,7 +638,7 @@ static u8 weapon_has_ammo(u8 weapon) {
 }
 
 static u8 switch_to_ready_weapon(void) {
-    static const u8 fallback_order[] = {WEAPON_SHOTGUN, WEAPON_CHAINGUN, WEAPON_PISTOL, WEAPON_ROCKET, WEAPON_CHAINSAW, WEAPON_FIST};
+    static const u8 fallback_order[] = {WEAPON_SHOTGUN, WEAPON_CHAINGUN, WEAPON_PLASMA, WEAPON_ROCKET, WEAPON_PISTOL, WEAPON_BFG, WEAPON_CHAINSAW, WEAPON_FIST};
     if (weapon_has_ammo(current_weapon)) return 1;
     for (u16 i = 0; i < sizeof(fallback_order); i++) {
         u8 weapon = fallback_order[i];
@@ -734,18 +757,48 @@ static u8 monster_hp(int thing_index) {
     return enemy_hp[thing_index];
 }
 
+static int first_sprite_def_for_type(u16 thing_type) {
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
+    }
+    return -1;
+}
+
+static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
+    switch (thing_type) {
+    case 17:   /* cell pack */
+    case 2047: /* cell charge */
+        return 2048; /* ammo box */
+    case 2004: /* plasma rifle */
+    case 2006: /* BFG 9000 */
+        return 2003; /* rocket launcher pickup */
+    case 38:   /* red skull */
+        return 13;
+    case 39:   /* yellow skull */
+        return 6;
+    case 40:   /* blue skull */
+        return 5;
+    default:
+        return 0;
+    }
+}
+
 static int enemy_sprite_def_for_type(u16 thing_type) {
     int first = -1;
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
         if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
-        if (first < 0) {
-            first = i;
-            continue;
-        }
+        if (first < 0) first = i;
         /* Duplicate baked monster defs are the next animation frame. Pickups,
            corpses, projectiles, and effects keep their first exact frame. */
         if (thing_is_monster(thing_type) && ((monster_ai_tick >> 3) & 1)) return i;
         return first;
+    }
+    if (thing_is_pickup(thing_type)) {
+        u16 fallback_type = fallback_sprite_type_for_missing_pickup(thing_type);
+        if (fallback_type) {
+            int fallback = first_sprite_def_for_type(fallback_type);
+            if (fallback >= 0) return fallback;
+        }
     }
     return first >= 0 ? first : 0;
 }
@@ -1040,6 +1093,18 @@ static void damage_shotgun_spread(void) {
     damage_visible_enemy(targets[0], 5);
     damage_visible_enemy(targets[1], 2);
     damage_visible_enemy(targets[2], 1);
+}
+
+static void damage_bfg_visible_targets(void) {
+    int primary = best_visible_enemy();
+    spawn_weapon_impact_for_target(primary);
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        if (thing < 0) continue;
+        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        damage_visible_enemy(thing, thing == primary ? 18 : 9);
+    }
 }
 
 static void alert_monsters_by_sound(void) {
@@ -1521,6 +1586,17 @@ static u8 apply_pickup(u16 thing_type) {
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
+    case 2004: /* plasma rifle */
+        if (player_has_plasma && player_cells >= player_max_cells) return 0;
+        player_has_plasma = 1;
+        current_weapon = WEAPON_PLASMA;
+        add_capped_u16(&player_cells, 40, player_max_cells);
+        weapon_frame = 0xFF;
+        shown_ammo = 0xFFFF;
+        pickup_message_weapon = 5;
+        pickup_message_type = 2;
+        face_evil_timer = 70;
+        break;
     case 2005: /* chainsaw */
         if (player_has_chainsaw) return 0;
         player_has_chainsaw = 1;
@@ -1528,6 +1604,17 @@ static u8 apply_pickup(u16 thing_type) {
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
         pickup_message_weapon = 1;
+        pickup_message_type = 2;
+        face_evil_timer = 70;
+        break;
+    case 2006: /* BFG 9000 */
+        if (player_has_bfg && player_cells >= player_max_cells) return 0;
+        player_has_bfg = 1;
+        current_weapon = WEAPON_BFG;
+        add_capped_u16(&player_cells, 40, player_max_cells);
+        weapon_frame = 0xFF;
+        shown_ammo = 0xFFFF;
+        pickup_message_weapon = 7;
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -1541,6 +1628,14 @@ static u8 apply_pickup(u16 thing_type) {
         break;
     case 2010: /* rocket */
         if (!add_capped_u16(&player_rockets, 1, player_max_rockets)) return 0;
+        pickup_message_type = 3;
+        break;
+    case 2047: /* cell charge */
+        if (!add_capped_u16(&player_cells, 20, player_max_cells)) return 0;
+        pickup_message_type = 3;
+        break;
+    case 17:   /* cell pack */
+        if (!add_capped_u16(&player_cells, 100, player_max_cells)) return 0;
         pickup_message_type = 3;
         break;
     case 2011: /* stimpack */
@@ -2084,6 +2179,7 @@ static u16 weapon_ammo(void) {
     if (current_weapon == WEAPON_FIST || current_weapon == WEAPON_CHAINSAW) return 0;
     if (current_weapon == WEAPON_SHOTGUN && player_has_shotgun) return player_shells;
     if (current_weapon == WEAPON_ROCKET && player_has_rocket_launcher) return player_rockets;
+    if ((current_weapon == WEAPON_PLASMA && player_has_plasma) || (current_weapon == WEAPON_BFG && player_has_bfg)) return player_cells;
     return player_ammo;
 }
 
@@ -2092,6 +2188,8 @@ static u16 weapon_status_bits(void) {
     if (player_has_shotgun) bits |= (1 << WEAPON_SHOTGUN);
     if (player_has_chaingun) bits |= (1 << WEAPON_CHAINGUN);
     if (player_has_rocket_launcher) bits |= (1 << WEAPON_ROCKET);
+    if (player_has_plasma) bits |= (1 << WEAPON_PLASMA);
+    if (player_has_bfg) bits |= (1 << WEAPON_BFG);
     if (player_has_chainsaw) bits |= (1 << WEAPON_CHAINSAW);
     return (u16)(bits | (current_weapon << 8));
 }
@@ -2552,6 +2650,27 @@ static void update_weapon(u8 pressed) {
             trigger_weapon_flash();
             alert_monsters_by_sound();
             damage_rocket_target();
+        } else if (current_weapon == WEAPON_PLASMA && player_has_plasma) {
+            if (player_cells > 0) {
+                player_cells--;
+                fire_timer = 5;
+                chaingun_flash ^= 1;
+                trigger_weapon_flash();
+                alert_monsters_by_sound();
+                fire_single_target_damage(3);
+            } else if (!fire_prev) {
+                ammo_message_timer = 45;
+            }
+        } else if (!fire_prev && current_weapon == WEAPON_BFG && player_has_bfg) {
+            if (player_cells >= 40) {
+                player_cells = (u16)(player_cells - 40);
+                fire_timer = 28;
+                trigger_weapon_flash();
+                alert_monsters_by_sound();
+                damage_bfg_visible_targets();
+            } else {
+                ammo_message_timer = 45;
+            }
         } else if (!fire_prev && current_weapon == WEAPON_SHOTGUN && player_has_shotgun && player_shells > 0) {
             player_shells--;
             fire_timer = 16;
@@ -2572,21 +2691,29 @@ static void update_weapon(u8 pressed) {
     fire_prev = b_now;
 
     u8 frame = current_weapon == WEAPON_ROCKET && player_has_rocket_launcher ? 10
-        : (current_weapon == WEAPON_CHAINSAW && player_has_chainsaw ? 16
-        : (current_weapon == WEAPON_FIST ? 12
+        : (current_weapon == WEAPON_PLASMA && player_has_plasma ? 12
+        : (current_weapon == WEAPON_BFG && player_has_bfg ? 16
+        : (current_weapon == WEAPON_CHAINSAW && player_has_chainsaw ? 24
+        : (current_weapon == WEAPON_FIST ? 20
         : (current_weapon == WEAPON_CHAINGUN && player_has_chaingun ? 8
-        : (current_weapon == WEAPON_SHOTGUN && player_has_shotgun ? 4 : 0))));
+        : (current_weapon == WEAPON_SHOTGUN && player_has_shotgun ? 4 : 0))))));
     if (fire_timer) {
         if (current_weapon == WEAPON_CHAINSAW && player_has_chainsaw) {
-            frame = (u8)(16 + (fire_timer & 3));
+            frame = (u8)(24 + (fire_timer & 3));
         } else if (current_weapon == WEAPON_FIST) {
-            if (fire_timer > 8) frame = 13;
-            else if (fire_timer > 4) frame = 14;
-            else frame = 15;
+            if (fire_timer > 8) frame = 21;
+            else if (fire_timer > 4) frame = 22;
+            else frame = 23;
         } else if (current_weapon == WEAPON_CHAINGUN && player_has_chaingun) {
             frame = (u8)(8 + (chaingun_flash & 1));
         } else if (current_weapon == WEAPON_ROCKET && player_has_rocket_launcher) {
             frame = fire_timer > 10 ? 11 : 10;
+        } else if (current_weapon == WEAPON_PLASMA && player_has_plasma) {
+            frame = (u8)(12 + (chaingun_flash & 3));
+        } else if (current_weapon == WEAPON_BFG && player_has_bfg) {
+            if (fire_timer > 18) frame = 17;
+            else if (fire_timer > 8) frame = 18;
+            else frame = 19;
         } else {
             u8 base = current_weapon == WEAPON_SHOTGUN && player_has_shotgun ? 4 : 0;
             if (fire_timer > 10) frame = (u8)(base + 1);
@@ -2861,6 +2988,8 @@ static void restart_level(void) {
     player_has_shotgun = 0;
     player_has_chaingun = 0;
     player_has_rocket_launcher = 0;
+    player_has_plasma = 0;
+    player_has_bfg = 0;
     player_has_chainsaw = 0;
     player_has_backpack = 0;
     current_weapon = WEAPON_PISTOL;

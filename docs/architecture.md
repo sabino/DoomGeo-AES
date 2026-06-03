@@ -46,6 +46,10 @@ keeping its generated map and object files separate from the default E1M1 build.
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - Weapon/fire frames and sprite scale levels are generated offline so the 68000
   does not compose Doom patches during play.
+- Registered/commercial-only psprite lumps that are missing from shareware are
+  replaced with pistol placeholder frames at build time, so the same runtime
+  weapon table can be tested with shareware and then rebuilt with exact
+  registered/commercial WAD art.
 - The perspective plane cache is intentionally compact. Earlier multi-phase
   plane caches pushed monster tiles past the practical C-ROM tile index range,
   making enemies invisible even though their sprite slots were active.
