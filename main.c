@@ -608,7 +608,7 @@ static u8 thing_is_runtime_threat(u16 thing_type) {
 }
 
 static u8 thing_is_corpse(u16 thing_type) {
-    return (thing_type >= 9001 && thing_type <= 9005) || (thing_type >= 9010 && thing_type <= 9014);
+    return (thing_type >= 9001 && thing_type <= 9005) || (thing_type >= 9010 && thing_type <= 9024);
 }
 
 static u8 thing_is_shootable(u16 thing_type) {
@@ -758,19 +758,24 @@ static u16 monster_corpse_type(u16 thing_type) {
 static u16 monster_death_anim_type(u16 thing_type) {
     switch (thing_type) {
     case 3004:
-        return 9010; /* former human death transition */
+        return 9010; /* former human death sequence */
     case 9:
-        return 9011; /* shotgun guy death transition */
+        return 9011; /* shotgun guy death sequence */
     case 3001:
-        return 9012; /* imp death transition */
+        return 9012; /* imp death sequence */
     case 3002:
     case 58:
-        return 9013; /* demon/spectre death transition */
+        return 9013; /* demon/spectre death sequence */
     case 3003:
-        return 9014; /* baron death transition */
+        return 9014; /* baron death sequence */
     default:
         return 0;
     }
+}
+
+static u16 death_anim_next_stage_type(u16 thing_type) {
+    if (thing_type >= 9010 && thing_type <= 9019) return (u16)(thing_type + 5);
+    return 0;
 }
 
 static u16 monster_score_value(u16 thing_type) {
@@ -945,7 +950,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                         thing_type_override[i] = death_type;
                         death_anim_final_type[i] = final_type;
                         death_anim_drop_type[i] = final_drop;
-                        death_anim_timer[i] = 14;
+                        death_anim_timer[i] = 18;
                         death_drop_type[i] = 0;
                         death_drop_timer[i] = 0;
                         enemy_dead[i] = 0;
@@ -1229,6 +1234,13 @@ static void update_enemy_hit_flash(void) {
         }
         if (death_anim_timer[i]) {
             death_anim_timer[i]--;
+            if (death_anim_timer[i] == 12 || death_anim_timer[i] == 6) {
+                u16 next_type = death_anim_next_stage_type(thing_type_override[i]);
+                if (next_type) {
+                    thing_type_override[i] = next_type;
+                    hide_enemies();
+                }
+            }
             if (!death_anim_timer[i]) {
                 thing_type_override[i] = death_anim_final_type[i];
                 if (death_anim_drop_type[i]) {
