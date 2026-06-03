@@ -8,6 +8,7 @@ as a single standalone binary with PyInstaller for Linux and Windows.
 from __future__ import annotations
 
 import argparse
+import binascii
 import os
 import platform
 import shutil
@@ -25,6 +26,20 @@ BIOS_ZIP = Path("build") / "rom" / "neogeo.zip"
 ASM_ROM_ZIP = Path("build") / "asm-rom" / "puzzledp.zip"
 ASM_ROM_ELF = Path("build") / "asm" / "doomgeo_asm.elf"
 ASM_BIOS_ZIP = Path("build") / "asm-rom" / "neogeo.zip"
+FBNEO_PUZZLEDP_CRC = {
+    "202-p1.p1": 0x2B61415B,
+    "202-s1.s1": 0xCD19264F,
+    "202-c1.c1": 0xCC0095EF,
+    "202-c2.c2": 0x42371307,
+    "202-m1.m1": 0x9C0291EA,
+    "202-v1.v1": 0xDEBEB8FB,
+}
+FBNEO_NEOGEO_CRC = {
+    "sp-s3.sp1": 0x91B64BE3,
+    "sm1.sm1": 0x94416D67,
+    "sfix.sfix": 0xC2EA0CFD,
+    "000-lo.lo": 0x5A86CFF2,
+}
 REQUIRED_TOOLS = (
     "m68k-neogeo-elf-gcc",
     "m68k-neogeo-elf-objcopy",
@@ -259,6 +274,121 @@ def package_artifacts(root: Path, out_dir: Path, variant: str) -> None:
         raise BuildError("no build artifacts found; run build first")
 
 
+def crc32(data: bytes | bytearray) -> int:
+    return binascii.crc32(data) & 0xFFFFFFFF
+
+
+def force_crc32(data: bytes, desired: int, patch_offset: int | None = None) -> bytes:
+    """Return data with 4 bytes adjusted so the whole blob has desired CRC32.
+
+    The generated Neo Geo ROMs are padded, so the Pages build can safely use the
+    final four bytes as a CRC correction field for FBNeo's arcade romset gate.
+    """
+    if len(data) < 4:
+        raise BuildError("cannot CRC-patch blobs smaller than four bytes")
+    if patch_offset is None:
+        patch_offset = len(data) - 4
+    if patch_offset < 0 or patch_offset + 4 > len(data):
+        raise BuildError(f"invalid CRC patch offset {patch_offset} for blob size {len(data)}")
+
+    base = bytearray(data)
+    base[patch_offset : patch_offset + 4] = b"\0\0\0\0"
+    base_crc = crc32(base)
+    delta = desired ^ base_crc
+
+    columns: list[int] = []
+    probe = bytearray(base)
+    for bit in range(32):
+        probe[patch_offset : patch_offset + 4] = b"\0\0\0\0"
+        probe[patch_offset + bit // 8] = 1 << (bit % 8)
+        columns.append(crc32(probe) ^ base_crc)
+
+    rows: list[tuple[int, int]] = []
+    for bit in range(32):
+        mask = 0
+        for col, value in enumerate(columns):
+            if (value >> bit) & 1:
+                mask |= 1 << col
+        rows.append((mask, (delta >> bit) & 1))
+
+    rank = 0
+    for col in range(32):
+        pivot = next((row for row in range(rank, 32) if (rows[row][0] >> col) & 1), None)
+        if pivot is None:
+            continue
+        rows[rank], rows[pivot] = rows[pivot], rows[rank]
+        pivot_mask, pivot_rhs = rows[rank]
+        for row in range(32):
+            if row != rank and ((rows[row][0] >> col) & 1):
+                rows[row] = (rows[row][0] ^ pivot_mask, rows[row][1] ^ pivot_rhs)
+        rank += 1
+
+    if rank != 32:
+        raise BuildError("CRC patch matrix is singular")
+
+    patch_value = 0
+    for mask, rhs in rows:
+        if mask and rhs:
+            patch_value |= mask & -mask
+
+    patched = bytearray(base)
+    patched[patch_offset : patch_offset + 4] = patch_value.to_bytes(4, "little")
+    final_crc = crc32(patched)
+    if final_crc != desired:
+        raise BuildError(f"CRC patch failed: wanted {desired:08x}, got {final_crc:08x}")
+    return bytes(patched)
+
+
+def write_zip_entries(path: Path, entries: dict[str, bytes]) -> None:
+    import zipfile
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+
+
+def build_fbneo_rom_zip(source_zip: Path, out_zip: Path) -> None:
+    import zipfile
+
+    if not source_zip.exists():
+        raise BuildError(f"ROM not found: {source_zip}")
+    entries: dict[str, bytes] = {}
+    with zipfile.ZipFile(source_zip) as archive:
+        for name, desired_crc in FBNEO_PUZZLEDP_CRC.items():
+            try:
+                data = archive.read(name)
+            except KeyError as exc:
+                raise BuildError(f"ROM entry missing for FBNeo package: {name}") from exc
+            entries[name] = force_crc32(data, desired_crc)
+    write_zip_entries(out_zip, entries)
+    print_step(f"wrote FBNeo-compatible ROM package to {out_zip}")
+
+
+def build_fbneo_bios_zip(source_zip: Path, out_zip: Path) -> None:
+    import zipfile
+
+    if not source_zip.exists():
+        raise BuildError(f"BIOS not found: {source_zip}")
+    with zipfile.ZipFile(source_zip) as archive:
+        source_names = set(archive.namelist())
+
+        def read_first(*names: str) -> bytes:
+            for name in names:
+                if name in source_names:
+                    return archive.read(name)
+            raise BuildError(f"BIOS entry missing for FBNeo package: {' or '.join(names)}")
+
+        entries = {
+            "sp-s3.sp1": force_crc32(read_first("sp-s3.sp1", "sp-s2.sp1", "neo-epo.bin", "aes-bios.bin"), FBNEO_NEOGEO_CRC["sp-s3.sp1"]),
+            "sm1.sm1": force_crc32(read_first("sm1.sm1"), FBNEO_NEOGEO_CRC["sm1.sm1"]),
+            "sfix.sfix": force_crc32(read_first("sfix.sfix"), FBNEO_NEOGEO_CRC["sfix.sfix"]),
+            "000-lo.lo": force_crc32(read_first("000-lo.lo"), FBNEO_NEOGEO_CRC["000-lo.lo"]),
+        }
+    write_zip_entries(out_zip, entries)
+    print_step(f"wrote FBNeo-compatible BIOS package to {out_zip}")
+
+
 def html_page(
     game_name: str,
     subtitle: str,
@@ -352,7 +482,7 @@ def html_page(
     </div>
     <div class="actions">
       <a class="button" href="__DOWNLOAD_URL__">Download ROM</a>
-      <a class="button" href="rom/neogeo.zip">Download null BIOS</a>
+      <a class="button" href="rom/neogeo.zip">Download web BIOS</a>
       __EXTRA_ACTION__
     </div>
   </main>
@@ -393,8 +523,8 @@ def build_pages(
         raise BuildError(f"BIOS not found: {bios}")
     rom_out = out_dir / "rom"
     rom_out.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(rom, rom_out / "puzzledp.zip")
-    shutil.copy2(bios, rom_out / "neogeo.zip")
+    build_fbneo_rom_zip(rom, rom_out / "puzzledp.zip")
+    build_fbneo_bios_zip(bios, rom_out / "neogeo.zip")
     (out_dir / "index.html").write_text(
         html_page(
             "DoomGeo-MVS",
@@ -411,7 +541,7 @@ def build_pages(
             raise BuildError(f"ASM ROM not found: {asm_rom}")
         asm_out = rom_out / "asm"
         asm_out.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(asm_rom, asm_out / "puzzledp.zip")
+        build_fbneo_rom_zip(asm_rom, asm_out / "puzzledp.zip")
         (out_dir / "asm.html").write_text(
             html_page(
                 "DoomGeo-MVS ASM",

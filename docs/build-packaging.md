@@ -14,6 +14,13 @@ EmulatorJS's FBNeo WebAssembly/asm.js frontend, so the current ROM can be played
 directly from the repository's Pages site. The same Pages bundle can expose the
 standalone 68000 assembly ROM at `asm.html`.
 
+FBNeo is an arcade core and validates known romsets by filename, size, and CRC.
+For the Pages bundle only, `doomgeo-build pages` writes FBNeo-compatible launch
+zips for the `puzzledp` driver by adjusting unused padding bytes in the generated
+ROM chips and null BIOS aliases. The raw build artifacts under `build/rom/` and
+the CI artifact zips are not rewritten this way; this compatibility package is
+only for the browser player.
+
 ## Local Linux Build
 
 The existing Makefile still expects ngdevkit under `.tools/ngdevkit-local/usr`

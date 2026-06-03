@@ -28,6 +28,9 @@ the other only accompanies and tracks the plan.
   `doomgeo-plan` artifacts for Linux, plus `.exe` variants for Windows.
 - The Pages bundle is expected to publish `index.html`, `asm.html`,
   `rom/puzzledp.zip`, `rom/asm/puzzledp.zip`, and `rom/neogeo.zip`.
+- The Pages ROM zips are expected to be FBNeo-compatible launch packages with
+  the `puzzledp` driver filenames, sizes, and CRCs while preserving the
+  generated homebrew data outside the final padding correction bytes.
 - Repo-local installs are removable with `doomgeo-build uninstall`; `--all`
   also removes cached WAD/package downloads under `.tools`.
 - The installer decision is MSYS2 UCRT64 for native Windows builds, with WSL

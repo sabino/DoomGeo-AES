@@ -209,6 +209,40 @@ jobs:
       - name: Build Pages bundle
         run: python3 tools/doomgeo_build.py pages --rom dist/rom/puzzledp.zip --bios dist/rom/neogeo.zip --asm-rom dist/asm-rom/puzzledp.zip --out dist/pages
 
+      - name: Verify FBNeo web package CRCs
+        run: |
+          python3 - <<'PY'
+          import binascii
+          import zipfile
+
+          expected_rom = {
+              "202-p1.p1": 0x2B61415B,
+              "202-s1.s1": 0xCD19264F,
+              "202-c1.c1": 0xCC0095EF,
+              "202-c2.c2": 0x42371307,
+              "202-m1.m1": 0x9C0291EA,
+              "202-v1.v1": 0xDEBEB8FB,
+          }
+          expected_bios = {
+              "sp-s3.sp1": 0x91B64BE3,
+              "sm1.sm1": 0x94416D67,
+              "sfix.sfix": 0xC2EA0CFD,
+              "000-lo.lo": 0x5A86CFF2,
+          }
+
+          def check(path, expected):
+              with zipfile.ZipFile(path) as archive:
+                  for name, crc in expected.items():
+                      data = archive.read(name)
+                      actual = binascii.crc32(data) & 0xFFFFFFFF
+                      if actual != crc:
+                          raise SystemExit(f"{path}:{name} CRC {actual:08x} != {crc:08x}")
+
+          check("dist/pages/rom/puzzledp.zip", expected_rom)
+          check("dist/pages/rom/asm/puzzledp.zip", expected_rom)
+          check("dist/pages/rom/neogeo.zip", expected_bios)
+          PY
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

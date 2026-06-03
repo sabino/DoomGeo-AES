@@ -286,7 +286,9 @@ Windows/MSYS2, and publishes a GitHub Pages bundle that loads the generated
 cartridge through the EmulatorJS FBNeo WebAssembly/asm.js frontend. The Pages
 site also publishes a separate 68000 assembly cartridge at `asm.html`; that ROM
 is built from `asm/doomgeo_asm.S` with dedicated assets from
-`tools/gen_asm_gfx.py`.
+`tools/gen_asm_gfx.py`. Because FBNeo validates arcade romsets by CRC, the Pages
+bundle is packaged as an FBNeo-compatible `puzzledp` launch zip while the raw
+development ROM artifacts remain the generated homebrew data.
 
 `tools/gen_gfx.py` emits the C/S/M/V ROMs directly in the Neo Geo's planar
 format, so the only ngdevkit dependency is the m68k toolchain. See the comments
