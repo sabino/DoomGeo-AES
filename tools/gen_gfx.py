@@ -93,7 +93,14 @@ WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
 WEAPON_STRIPS = 7
 WEAPON_ROWS = 8
 WEAPON_TILES = WEAPON_STRIPS * WEAPON_ROWS
-WEAPON_FRAMES = ("PISGA0", "PISGB0+PISFA0", "PISGC0", "PISGD0", "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0", "CHGGA0", "CHGGB0", "MISGA0", "MISGB0")
+WEAPON_FRAMES = (
+    "PISGA0", "PISGB0+PISFA0", "PISGC0", "PISGD0",
+    "SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0",
+    "CHGGA0", "CHGGB0",
+    "MISGA0", "MISGB0",
+    "PUNGA0", "PUNGB0", "PUNGC0", "PUNGD0",
+    "SAWGA0", "SAWGB0", "SAWGC0", "SAWGD0",
+)
 HUD_KEYCARD_FRAMES = ("BKEYA0", "RKEYA0", "YKEYA0")
 HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 HUD_KEYCARD_TILES = len(HUD_KEYCARD_FRAMES)
@@ -835,7 +842,8 @@ def weapon_tiles(iwad, zip_member, patch_names):
                 tile = [[0] * 16 for _ in range(16)]
                 for y in range(16):
                     for x in range(16):
-                        tile[y][x] = quantize_color(canvas[row * 16 + y][strip * 16 + x], playpal, palette)
+                        color = canvas[row * 16 + y][strip * 16 + x]
+                        tile[y][x] = 0 if color < 0 else quantize_color(color, playpal, palette)
                 tiles.append(tile)
 
     return tiles, "+".join(frame_name for frame_name, _frame_patches in frames), palette, max_w, max_h
@@ -1116,7 +1124,7 @@ def main():
     ap.add_argument("--face-tune-grid", action="store_true", help="Bake face probes and STFST00 orientation variants into the face frame slots")
     ap.add_argument("--out-dir", default=None, help="Directory for generated c1/c2/s1/m1/v1 ROM blobs")
     ap.add_argument("--sprite-frame", default="TROOA1", help="Doom sprite patch frame to pre-scale into C-ROM strips")
-    ap.add_argument("--monster-sprites", default="3004:POSSA1,3004:POSSB1,9:SPOSA1,9:SPOSB1,3001:TROOA1,3001:TROOB1,3002:SARGA1,3002:SARGB1,58:SARGA1,58:SARGB1,3003:BOSSA1,3003:BOSSB1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
+    ap.add_argument("--monster-sprites", default="3004:POSSA1,3004:POSSB1,9:SPOSA1,9:SPOSB1,3001:TROOA1,3001:TROOB1,3002:SARGA1,3002:SARGB1,58:SARGA1,58:SARGB1,3003:BOSSA1,3003:BOSSB1,5:BKEYA0,6:YKEYA0,13:RKEYA0,38:RSKUA0,39:YSKUA0,40:BSKUA0,8:BPAKA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2005:CSAWA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2035:BAR1A0,2046:BROKA0,9000:BEXPC0,2048:AMMOA0,9001:POSSL0,9002:SPOSL0,9003:TROOR0,9004:SARGN0,9005:BOSSO0,9006:BAL1A0,9007:BAL7A1A5", help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
 

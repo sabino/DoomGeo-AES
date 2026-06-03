@@ -46,8 +46,11 @@ readable.
 
 ## Weapons And Combat
 
-- Implemented weapons: pistol, shotgun, chaingun, and rocket launcher.
+- Implemented weapons: fist, pistol, shotgun, chaingun, rocket launcher, and
+  chainsaw.
 - Pistol/chaingun use compact hitscan-style targeting.
+- Fist/chainsaw use close-range rendered-slot melee checks, so they only hit
+  visible nearby targets.
 - Shotgun uses spread damage and can hit multiple visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
@@ -58,6 +61,8 @@ readable.
 
 - Runtime things include common E1M1 pickups, keys, ammo, armor, health,
   backpack, weapons, barrels, monsters, projectiles, corpses, and explosions.
+- The chainsaw pickup uses the Doom `CSAWA0` world sprite and switches to the
+  chainsaw weapon when collected.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
 - Former humans, shotgun guys, imps, demons/spectres, Barons, and barrels have

@@ -15,8 +15,9 @@ after the current documentation pass.
 
 ## Gameplay And Assets
 
-- Add missing weapons: fist, chainsaw, plasma rifle, and BFG.
-- Expand weapon selection and ammo rules to cover the full Doom weapon set.
+- Add missing registered/commercial-WAD weapons: plasma rifle and BFG.
+- Expand weapon selection and ammo rules once a non-shareware WAD asset path is
+  available for plasma/BFG sprites and pickups.
 - Complete enemy sprite coverage, rotations, animation states, pain/death
   frames, and more faithful thing placement.
 - Continue tuning line-of-sight, wall-depth fallback, and encounter placement

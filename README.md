@@ -18,7 +18,7 @@ drawing pixels.
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
 | Rendering | 40 sprite-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and five visible world-thing slots kept under the Neo Geo scanline limit. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
-| Weapons | Pistol, shotgun, chaingun, and rocket launcher are playable. Fist, chainsaw, plasma rifle, and BFG are still missing. |
+| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, and chainsaw are playable. Plasma rifle and BFG need a registered/commercial WAD asset path or fallback art. |
 | Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters, barrels, corpses, drops, projectiles, and compact AI are present. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. It needs an instant/faster redraw pass. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
