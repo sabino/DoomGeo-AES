@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DoomGeo-MVS build helper.
+"""DoomGeo-AES build helper.
 
 This script is intentionally dependency-light so GitHub Actions can package it
 as a single standalone binary with PyInstaller for Linux and Windows.
@@ -21,10 +21,14 @@ from typing import TypeAlias
 
 REPO_MARKERS = ("Makefile", "config.mk", "rom.mk")
 DEFAULT_LOCAL_PREFIX = Path(".tools") / "ngdevkit-local" / "usr"
-ROM_ZIP = Path("build") / "rom" / "puzzledp.zip"
+PROJECT_NAME = "DoomGeo-AES"
+PACKAGE_ROM_ZIP = "doomgeo-aes.zip"
+PACKAGE_ASM_ROM_ZIP = "doomgeo-aes-asm.zip"
+FBNEO_COMPAT_ROM_ZIP = "puzzledp.zip"
+ROM_ZIP = Path("build") / "rom" / FBNEO_COMPAT_ROM_ZIP
 ROM_ELF = Path("build") / "rom.elf"
 BIOS_ZIP = Path("build") / "rom" / "neogeo.zip"
-ASM_ROM_ZIP = Path("build") / "asm-rom" / "puzzledp.zip"
+ASM_ROM_ZIP = Path("build") / "asm-rom" / FBNEO_COMPAT_ROM_ZIP
 ASM_ROM_ELF = Path("build") / "asm" / "doomgeo_asm.elf"
 ASM_BIOS_ZIP = Path("build") / "asm-rom" / "neogeo.zip"
 FBNEO_PUZZLEDP_CRC = {
@@ -263,13 +267,25 @@ def build(root: Path, prefix_arg: str | None, target: str, run_emulator: bool) -
 
 def package_artifacts(root: Path, out_dir: Path, variant: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    artifacts = (ASM_ROM_ZIP, ASM_ROM_ELF, ASM_BIOS_ZIP) if variant == "asm" else (ROM_ZIP, ROM_ELF, BIOS_ZIP)
+    if variant == "asm":
+        artifacts = (
+            (ASM_ROM_ZIP, PACKAGE_ASM_ROM_ZIP),
+            (ASM_ROM_ELF, ASM_ROM_ELF.name),
+            (ASM_BIOS_ZIP, ASM_BIOS_ZIP.name),
+        )
+    else:
+        artifacts = (
+            (ROM_ZIP, PACKAGE_ROM_ZIP),
+            (ROM_ELF, ROM_ELF.name),
+            (BIOS_ZIP, BIOS_ZIP.name),
+        )
     copied = 0
-    for artifact in artifacts:
+    for artifact, packaged_name in artifacts:
         source = root / artifact
         if source.exists():
-            shutil.copy2(source, out_dir / source.name)
-            print_step(f"copied {artifact} -> {out_dir / source.name}")
+            destination = out_dir / packaged_name
+            shutil.copy2(source, destination)
+            print_step(f"copied {artifact} -> {destination}")
             copied += 1
     if copied == 0:
         raise BuildError("no build artifacts found; run build first")
@@ -538,14 +554,16 @@ def build_pages(
     version = web_asset_version(version_inputs)
     rom_out = out_dir / "rom" / f"web-{version}"
     rom_out.mkdir(parents=True, exist_ok=True)
-    main_rom_url = f"rom/web-{version}/puzzledp.zip"
+    main_rom_url = f"rom/web-{version}/{PACKAGE_ROM_ZIP}"
     bios_url = f"rom/web-{version}/neogeo.zip"
-    build_fbneo_rom_zip(rom, rom_out / "puzzledp.zip")
+    build_fbneo_rom_zip(rom, rom_out / PACKAGE_ROM_ZIP)
     build_fbneo_bios_zip(bios, rom_out / "neogeo.zip")
+    # FBNeo still matches the internal Neo Geo chip filenames and CRCs against
+    # the Puzzle De Pon driver. The public zip name can be project-specific.
     (out_dir / "index.html").write_text(
         html_page(
-            "DoomGeo-MVS",
-            "Neo Geo Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.",
+            PROJECT_NAME,
+            "Neo Geo AES Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.",
             main_rom_url,
             main_rom_url,
             bios_url,
@@ -559,11 +577,11 @@ def build_pages(
             raise BuildError(f"ASM ROM not found: {asm_rom}")
         asm_out = out_dir / "rom" / "asm" / f"web-{version}"
         asm_out.mkdir(parents=True, exist_ok=True)
-        asm_rom_url = f"rom/asm/web-{version}/puzzledp.zip"
-        build_fbneo_rom_zip(asm_rom, asm_out / "puzzledp.zip")
+        asm_rom_url = f"rom/asm/web-{version}/{PACKAGE_ASM_ROM_ZIP}"
+        build_fbneo_rom_zip(asm_rom, asm_out / PACKAGE_ASM_ROM_ZIP)
         (out_dir / "asm.html").write_text(
             html_page(
-                "DoomGeo-MVS ASM",
+                f"{PROJECT_NAME} ASM",
                 "A separate 68000 assembly cartridge build with a controller-driven Neo Geo sprite scene.",
                 asm_rom_url,
                 asm_rom_url,
@@ -612,7 +630,7 @@ def doctor(root: Path, prefix_arg: str | None) -> int:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build and manage DoomGeo-MVS locally.")
+    parser = argparse.ArgumentParser(description=f"Build and manage {PROJECT_NAME} locally.")
     parser.add_argument("--repo", type=Path, default=None, help="repository root override")
     sub = parser.add_subparsers(dest="command", required=True)
 

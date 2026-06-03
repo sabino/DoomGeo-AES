@@ -51,7 +51,7 @@ jobs:
       - name: Upload ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-mvs-rom
+          name: doomgeo-aes-rom
           path: dist/rom/*
           if-no-files-found: error
 
@@ -79,7 +79,7 @@ jobs:
       - name: Upload ASM ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-mvs-asm-rom
+          name: doomgeo-aes-asm-rom
           path: dist/asm-rom/*
           if-no-files-found: error
 
@@ -90,11 +90,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            artifact: doomgeo-mvs-linux-helpers
+            artifact: doomgeo-aes-linux-helpers
             build_name: doomgeo-build
             plan_name: doomgeo-plan
           - os: windows-2022
-            artifact: doomgeo-mvs-windows-helpers
+            artifact: doomgeo-aes-windows-helpers
             build_name: doomgeo-build.exe
             plan_name: doomgeo-plan.exe
     runs-on: ${{ matrix.os }}
@@ -176,7 +176,7 @@ jobs:
       - name: Upload Windows-built ROM
         uses: actions/upload-artifact@v4
         with:
-          name: doomgeo-mvs-windows-rom
+          name: doomgeo-aes-windows-rom
           path: dist/windows-rom/*
           if-no-files-found: error
 
@@ -197,17 +197,17 @@ jobs:
       - name: Download ROM artifact
         uses: actions/download-artifact@v4
         with:
-          name: doomgeo-mvs-rom
+          name: doomgeo-aes-rom
           path: dist/rom
 
       - name: Download ASM ROM artifact
         uses: actions/download-artifact@v4
         with:
-          name: doomgeo-mvs-asm-rom
+          name: doomgeo-aes-asm-rom
           path: dist/asm-rom
 
       - name: Build Pages bundle
-        run: python3 tools/doomgeo_build.py pages --rom dist/rom/puzzledp.zip --bios dist/rom/neogeo.zip --asm-rom dist/asm-rom/puzzledp.zip --out dist/pages
+        run: python3 tools/doomgeo_build.py pages --rom dist/rom/doomgeo-aes.zip --bios dist/rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-aes-asm.zip --out dist/pages
 
       - name: Verify FBNeo web package CRCs
         run: |
@@ -239,9 +239,9 @@ jobs:
                       if actual != crc:
                           raise SystemExit(f"{path}:{name} CRC {actual:08x} != {crc:08x}")
 
-          main_rom = glob.glob("dist/pages/rom/web-*/puzzledp.zip")
+          main_rom = glob.glob("dist/pages/rom/web-*/doomgeo-aes.zip")
           main_bios = glob.glob("dist/pages/rom/web-*/neogeo.zip")
-          asm_rom = glob.glob("dist/pages/rom/asm/web-*/puzzledp.zip")
+          asm_rom = glob.glob("dist/pages/rom/asm/web-*/doomgeo-aes-asm.zip")
           if len(main_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1:
               raise SystemExit(f"unexpected web package layout: {main_rom=} {main_bios=} {asm_rom=}")
           check(main_rom[0], expected_rom)

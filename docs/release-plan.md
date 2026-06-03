@@ -1,4 +1,4 @@
-# DoomGeo-MVS Build and Release Plan
+# DoomGeo-AES Build and Release Plan
 
 This file is the committed plan tracked by `doomgeo-plan`. It is intentionally
 separate from the build helper so one standalone binary can build/package while
@@ -19,19 +19,20 @@ the other only accompanies and tracks the plan.
 
 ## Evidence
 
-- Linux ROM builds are expected to produce `build/rom/puzzledp.zip`.
+- Linux ROM builds are expected to produce `build/rom/puzzledp.zip` internally,
+  then package it as `dist/rom/doomgeo-aes.zip`.
 - ASM ROM builds are expected to produce `build/asm-rom/puzzledp.zip` from
-  `asm/doomgeo_asm.S`.
-- Windows/MSYS2 ROM builds are expected to produce the same `puzzledp.zip`
-  through the UCRT64 ngdevkit packages.
+  `asm/doomgeo_asm.S`, then package it as `dist/asm-rom/doomgeo-aes-asm.zip`.
+- Windows/MSYS2 ROM builds are expected to produce the same packaged
+  `doomgeo-aes.zip` through the UCRT64 ngdevkit packages.
 - Standalone helper builds are expected to produce `doomgeo-build` and
   `doomgeo-plan` artifacts for Linux, plus `.exe` variants for Windows.
 - The Pages bundle is expected to publish `index.html`, `asm.html`,
-  `rom/web-<hash>/puzzledp.zip`, `rom/web-<hash>/neogeo.zip`, and
-  `rom/asm/web-<hash>/puzzledp.zip`.
+  `rom/web-<hash>/doomgeo-aes.zip`, `rom/web-<hash>/neogeo.zip`, and
+  `rom/asm/web-<hash>/doomgeo-aes-asm.zip`.
 - The Pages ROM zips are expected to be FBNeo-compatible launch packages with
-  the `puzzledp` driver filenames, sizes, and CRCs while preserving the
-  generated homebrew data outside the final padding correction bytes.
+  `puzzledp` driver chip filenames, sizes, and CRCs internally while preserving
+  the generated homebrew data outside the final padding correction bytes.
 - Repo-local installs are removable with `doomgeo-build uninstall`; `--all`
   also removes cached WAD/package downloads under `.tools`.
 - The installer decision is MSYS2 UCRT64 for native Windows builds, with WSL

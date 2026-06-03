@@ -16,9 +16,11 @@ standalone 68000 assembly ROM at `asm.html`.
 
 FBNeo is an arcade core and validates known romsets by filename, size, and CRC.
 For the Pages bundle only, `doomgeo-build pages` writes FBNeo-compatible launch
-zips for the `puzzledp` driver by adjusting unused padding bytes in the generated
-ROM chips and null BIOS aliases. The raw build artifacts under `build/rom/` and
-the CI artifact zips are not rewritten this way; this compatibility package is
+zips against the `puzzledp` driver by adjusting unused padding bytes in the
+generated ROM chips and null BIOS aliases. The public Pages/download zip names
+are still `doomgeo-aes.zip` and `doomgeo-aes-asm.zip`; `puzzledp` remains only
+the private FBNeo driver/chip compatibility identity. The raw build artifacts
+under `build/rom/` are not rewritten this way; this compatibility package is
 only for the browser player.
 
 ## Local Linux Build
@@ -103,9 +105,9 @@ The Pages job consumes the ROM artifact and writes:
 ```text
 dist/pages/index.html
 dist/pages/asm.html
-dist/pages/rom/web-<hash>/puzzledp.zip
+dist/pages/rom/web-<hash>/doomgeo-aes.zip
 dist/pages/rom/web-<hash>/neogeo.zip
-dist/pages/rom/asm/web-<hash>/puzzledp.zip
+dist/pages/rom/asm/web-<hash>/doomgeo-aes-asm.zip
 ```
 
 The web players use the hosted EmulatorJS loader, set `EJS_core = "fbneo"`, and
