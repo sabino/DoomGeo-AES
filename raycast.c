@@ -63,6 +63,8 @@ static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 static u8  kindbuf[NUM_COLS];    /* 0 = wall, 1..N = alt wall, N+1 = door   */
 static u8  curkind[NUM_COLS];
+static u8  closebuf[NUM_COLS];   /* point-blank walls use stable coarse art */
+static u8  curclose[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 wall_alt_tiles[TILE_WALL_ALT_COUNT][TILE_WALL_ATLAS_COLS][WALL_WIN];
@@ -111,6 +113,7 @@ void rc_init(void) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
         curkind[c] = 0xFF;
+        curclose[c] = 0xFF;
         curscb2[c] = 0xFFFF;
         curscb3[c] = 0xFFFF;
     }
@@ -271,6 +274,7 @@ void rc_render(void) {
         int h = projected_height_from_inv(inv_perp);     /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
+        closebuf[x] = (u8)(h >= GAME_H - 4 && kindbuf[x] <= TILE_WALL_ALT_COUNT);
 
         int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */
@@ -333,7 +337,7 @@ void rc_blit(void) {
 
     /* directional shading */
     for (int c = 0; c < NUM_COLS; c++) {
-        if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c]) {
+        if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]) {
             u16 spr = WALL_BASE + c;
             u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
             if (palbuf[c] != curpal[c]) {
@@ -341,17 +345,18 @@ void rc_blit(void) {
                 vram_addr(VRAM_SCB1 + spr * 64);
                 vram_mod(1);
                 for (int t = 0; t < WALL_WIN; t++) {
-                    vram_w(tiles[t]);
+                    vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
                     vram_w(attr);
                 }
                 curpal[c] = palbuf[c];
             } else {
                 vram_addr(VRAM_SCB1 + spr * 64);
                 vram_mod(2);
-                for (int t = 0; t < WALL_WIN; t++) vram_w(tiles[t]);
+                for (int t = 0; t < WALL_WIN; t++) vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
             }
             curtex[c] = texbuf[c];
             curkind[c] = kindbuf[c];
+            curclose[c] = closebuf[c];
             continue;
         }
         if (palbuf[c] == curpal[c]) continue;

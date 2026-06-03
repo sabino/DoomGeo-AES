@@ -102,7 +102,7 @@ static void set_muzzle_palettes(void) {
     /* Intentionally no wall/depth palette rewrite here.  Shot lighting uses a
      * Neo Geo-friendly backdrop/weapon pulse so it can start in the same vblank
      * as the trigger without touching thousands of palette RAM entries. */
-    REG_BACKDROP = RGB(10, 7, 2);
+    REG_BACKDROP = RGB(1, 1, 0);
 }
 
 static void set_bonus_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
@@ -208,7 +208,7 @@ static void restore_play_palettes(void) {
 }
 
 static void set_hurt_palettes(void) {
-    REG_BACKDROP = RGB(10, 0, 0);
+    REG_BACKDROP = RGB(1, 0, 0);
 }
 
 static void update_hurt_flash(void) {
@@ -1169,6 +1169,8 @@ static void update_impact_effect(void) {
 
 static void update_projectile(void) {
     int px, py;
+    int sx, h, dist_q8;
+    u8 visible;
     if (!projectile_active) return;
     if (!game_active()) {
         projectile_active = 0;
@@ -1185,9 +1187,10 @@ static void update_projectile(void) {
         projectile_active = 0;
         return;
     }
+    visible = project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8);
     rc_player_q8(&px, &py);
     if (iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
-        player_take_damage(projectile_damage);
+        if (visible) player_take_damage(projectile_damage);
         projectile_active = 0;
         return;
     }
