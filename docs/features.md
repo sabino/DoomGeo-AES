@@ -132,6 +132,9 @@ readable.
 - Secret cells can be discovered once and increment the secret count.
 - The minimap uses the Neo Geo fix layer and overlays walls, player, threats,
   pickups, closed doors, and exits.
+- Opening the minimap redraws the 38x23 fix-layer view incrementally in small
+  frame budgets while repainting the player marker, so the map appears without
+  the old one-frame stall.
 
 ## Build And Packaging
 

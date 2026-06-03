@@ -20,7 +20,7 @@ drawing pixels.
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use placeholder psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the real art. |
 | Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. |
-| Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. It needs an instant/faster redraw pass. |
+| Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening the map fills incrementally instead of blocking on a full fix-layer redraw. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
 | Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
 

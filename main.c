@@ -246,6 +246,8 @@ static void clear_fix(void) {
 
 static int prev_px = -1, prev_py = -1;
 static u8  map_on = 0;              /* minimap visible?                       */
+static u8  minimap_redraw_active = 0;
+static u16 minimap_redraw_index = 0;
 static u8  weapon_frame = 0xFF;
 static u8  hud_face_frame = 0xFF;
 static u8  weapon_bob_phase = 0;
@@ -2472,7 +2474,7 @@ static void force_fix_hud_redraw(void) {
 
 enum {
     MINIMAP_W = 38,
-    MINIMAP_H = 27
+    MINIMAP_H = 23
 };
 
 static int minimap_view_x(int map_x) {
@@ -2582,10 +2584,30 @@ static void draw_minimap(void) {
     for (int my = 0; my < MINIMAP_H; my++)
         for (int mx = 0; mx < MINIMAP_W; mx++)
             draw_minimap_cell(mx, my);
+    minimap_redraw_active = 0;
+}
+
+static void start_minimap_redraw(void) {
+    minimap_redraw_index = 0;
+    minimap_redraw_active = 1;
+    prev_px = -1;
+}
+
+static void update_minimap_redraw(void) {
+    enum { MINIMAP_CELLS_PER_FRAME = 64 };
+    u8 budget = MINIMAP_CELLS_PER_FRAME;
+    if (!map_on || !minimap_redraw_active) return;
+    while (budget && minimap_redraw_index < (u16)(MINIMAP_W * MINIMAP_H)) {
+        u16 index = minimap_redraw_index++;
+        draw_minimap_cell(index % MINIMAP_W, index / MINIMAP_W);
+        budget--;
+    }
+    if (minimap_redraw_index >= (u16)(MINIMAP_W * MINIMAP_H)) minimap_redraw_active = 0;
 }
 
 /* blank just the minimap's fix region */
 static void clear_minimap(void) {
+    minimap_redraw_active = 0;
     for (int my = 0; my < MINIMAP_H; my++)
         for (int mx = 0; mx < MINIMAP_W; mx++)
             map_cell(mx, my, 0, FIX_BLANK);
@@ -2598,7 +2620,7 @@ static void update_marker(void) {
     rc_player_cell(&px, &py);
     px = minimap_view_x(px);
     py = minimap_view_y(py);
-    if (px == prev_px && py == prev_py) return;
+    if (px == prev_px && py == prev_py && !minimap_redraw_active) return;
     if (prev_px >= 0) {                 /* repaint old cell as its map content */
         draw_minimap_cell(prev_px, prev_py);
     }
@@ -3369,7 +3391,7 @@ int main(void) {
             if (c_now && !map_prev) {
                 if (pressed & A) {
                     map_on = !map_on;
-                    if (map_on) { draw_minimap(); prev_px = -1; }  /* -1 forces marker repaint */
+                    if (map_on) start_minimap_redraw();
                     else          clear_minimap();
                     force_fix_hud_redraw();
                 } else {
@@ -3379,6 +3401,7 @@ int main(void) {
             map_prev = c_now;
         }
 
+        update_minimap_redraw();
         update_marker();                /* 2 fix writes when the cell changes */
     }
     return 0;
