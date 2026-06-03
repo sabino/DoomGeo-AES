@@ -52,10 +52,10 @@ status face.
 The pistol animates through the intended Doom firing patches when B is pressed;
 walking and strafing nudge the strips with a small hardware-position bob so
 movement feels less static without adding any sprite slots. Real shots also
-pulse the weapon palette for a few frames,
-briefly brighten the wall/floor/ceiling depth palettes, and successful pickups
-add a short warm bonus flash, giving muzzle and item feedback through cheap
-palette updates while the project still uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
+pulse the weapon palette and backdrop for a few frames instead of rewriting the
+full wall/floor/ceiling depth palette set on the firing frame, and successful
+pickups add a short warm bonus flash, giving muzzle and item feedback through
+cheap palette updates while the project still uses the null sound driver. The converter emits a compact grid-space runtime list from WAD `THINGS`;
 the renderer projects up to three visible monster candidates with the same camera
 math as the wall renderer while staying within the Neo Geo's
 96-sprites-per-scanline ceiling in the worst case. Each visible thing now gets a
@@ -105,13 +105,21 @@ while using the nearest safe lateral grid center, which keeps the opening view
 closer to the WAD without putting the player against coarse converted walls.
 
 The wall and sprite projection heights use the raycaster's reciprocal lookup
-table instead of doing a 64-bit divide for each projected column.
+table for the common near and mid range, with an exact reciprocal fallback for
+long corridors so far geometry keeps shrinking instead of saturating to one
+distance band.
 
 Runtime WAD things now include common Doom pickups as well as monsters. Pickups
 share the three projected world-sprite slots to preserve the Neo Geo scanline
 budget, disappear when touched, and update live fix-layer health, ammo, and
 armor counters over the Doom status bar using large Doom `STTNUM` digit art
-quantized into the `STBAR` palette instead of debug-green minimap colors.
+quantized into the `STBAR` palette instead of debug-green minimap colors. The
+large red counters are intentionally placed inside the bottom `STBAR` rows, over
+the original Doom labels, so they behave as part of the status bar rather than
+floating above it on the playfield. The weapon sprite chain is also allocated
+before the world-object slots, keeping the held gun inside the Neo Geo's first
+96 evaluated sprites on busy gameplay scanlines; the HUD sprites live on the
+non-gameplay rows at the bottom of the screen.
 The status bar also overlays compact `1`-`4` weapon indicators in the Doom
 `ARMS` area: unowned slots stay dim, owned slots use the HUD palette, and the
 active weapon is highlighted so weapon cycling is readable during play.

@@ -15,7 +15,7 @@ static inline fix fdiv(fix a, fix b) { return (fix)(((int64_t)a << FBITS) / b); 
 static inline fix fabsx(fix a)       { return a < 0 ? -a : a; }
  
 #define RECIP_SHIFT    9
-#define RECIP_LUT_SIZE 256
+#define RECIP_LUT_SIZE 2048
 #define RECIP_MIN      (FONE >> 8)
 
 static fix recip_lut[RECIP_LUT_SIZE];
@@ -33,8 +33,14 @@ static inline fix recip(fix b) {
     u32 idx;
     if (ab < (u32)RECIP_MIN) return recip_lut[0];
     idx = ab >> RECIP_SHIFT;
-    if (idx >= RECIP_LUT_SIZE) idx = RECIP_LUT_SIZE - 1;
-    return recip_lut[idx];
+    if (idx < RECIP_LUT_SIZE) return recip_lut[idx];
+
+    /* The old 256-entry LUT saturated every distance past ~2 map cells to
+     * one reciprocal, so far walls/sprites stopped shrinking and then popped
+     * out instead of preserving the perspective falloff.  Keep the Neo Geo
+     * fast table for the common near/mid range, but fall back to one exact
+     * reciprocal for true long corridors. */
+    return (fix)(0x100000000ULL / ab);
 }
 
 #define FBIG (1 << 28)            
@@ -65,7 +71,8 @@ static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 
 static inline int projected_height_from_inv(fix inv_dist) {
-    return (int)(((s32)WALLH * inv_dist) >> FBITS);
+    int h = (int)(((s32)WALLH * inv_dist) >> FBITS);
+    return h < 1 ? 1 : h;
 }
 
 static inline int projected_height(fix dist) {

@@ -98,18 +98,10 @@ static void set_muzzle_depth_palette_range(u16 base, const u8 rgb[][3], u16 colo
 }
 
 static void set_muzzle_palettes(void) {
-    for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(160 + row * 24);
-        u16 floor_scale = (u16)(225 + row * 42);
-        set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
-        set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
-    }
-    set_muzzle_depth_palette_range(PAL_DEPTH_BASE, g_wall_palette_rgb, WALL_PALETTE_COLORS);
-    for (u16 alt = 0; alt < WALL_ALT_TEXTURE_COUNT; alt++) {
-        u16 base = (u16)(PAL_WALL_ALT_DEPTH_BASE + alt * PAL_WALL_ALT_DEPTH_STRIDE);
-        set_muzzle_depth_palette_range(base, g_wall_alt_palette_rgb[alt], WALL_ALT_PALETTE_COLORS);
-    }
-    set_muzzle_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
+    /* Intentionally no wall/depth palette rewrite here.  Shot lighting uses a
+     * Neo Geo-friendly backdrop/weapon pulse so it can start in the same vblank
+     * as the trigger without touching thousands of palette RAM entries. */
+    REG_BACKDROP = RGB(10, 7, 2);
 }
 
 static void set_bonus_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
@@ -256,7 +248,8 @@ static void update_hurt_flash(void) {
         }
         muzzle_flash--;
     } else if (palette_effect) {
-        restore_play_palettes();
+        if (palette_effect == 2) REG_BACKDROP = RGB(0, 0, 0);
+        else restore_play_palettes();
         palette_effect = 0;
     }
 }
@@ -366,8 +359,12 @@ typedef struct EnemyDraw {
 } EnemyDraw;
 
 static void trigger_weapon_flash(void) {
-    weapon_flash_timer = 5;
-    muzzle_flash = 8;
+    /* Keep the shot response on the tiny Neo Geo palette path: weapon palette
+     * plus backdrop pulse only.  The old muzzle pass recolored every floor,
+     * ceiling, wall, door and alt-wall depth palette on the first shot frame,
+     * which made firing hitch exactly when the effect needed to be instant. */
+    weapon_flash_timer = 3;
+    muzzle_flash = 3;
 }
 
 static void update_weapon_flash(void) {
@@ -1690,6 +1687,11 @@ static void map_cell(int mx, int my, u16 pal, u16 tile) {
     fix_poke((u16)(MAP_FIX_COL + mx), (u16)(MAP_FIX_ROW + my), pal, tile);
 }
 
+enum {
+    HUD_FIX_TOP_ROW = (GAME_H / 8) + 1,
+    HUD_FIX_BOTTOM_ROW = HUD_FIX_TOP_ROW + 1
+};
+
 static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     if (value > 999) value = 999;
     u8 digits[3] = {
@@ -1707,10 +1709,36 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     }
 }
 
-static void draw_small_number2(u16 col, u16 row, u16 value, u16 pal) {
+static void draw_number2(u16 col, u16 row, u16 value, u16 pal) {
     if (value > 99) value = 99;
-    fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + (value / 10)));
-    fix_poke((u16)(col + 1), row, pal, (u16)(FIX_DIGIT_BASE + (value % 10)));
+    u8 digits[2] = {
+        (u8)(value / 10),
+        (u8)(value % 10),
+    };
+    for (u16 i = 0; i < 2; i++) {
+        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
+        u16 x = (u16)(col + i * 2);
+        fix_poke(x, row, pal, tile);
+        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
+        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
+        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
+    }
+}
+
+enum {
+    HUD_NUM_ROW = 25,
+    HUD_AMMO_COL = 2,
+    HUD_HEALTH_COL = 9,
+    HUD_FRAG_COL = 17,
+    HUD_ARMOR_COL = 24
+};
+
+static void clear_fix_area(u16 col, u16 row, u16 cols, u16 rows) {
+    for (u16 y = 0; y < rows; y++) {
+        for (u16 x = 0; x < cols; x++) {
+            fix_poke((u16)(col + x), (u16)(row + y), 0, FIX_BLANK);
+        }
+    }
 }
 
 static u8 face_frame_for_health(void);
@@ -1736,7 +1764,7 @@ static void draw_weapon_status(void) {
     for (u8 weapon = 0; weapon < 4; weapon++) {
         u16 pal = (bits & (1 << weapon)) ? PAL_HUD : PAL_MAP_WALL;
         if (weapon == current_weapon) pal = PAL_MAP_PLAYER;
-        fix_poke((u16)(12 + weapon), 26, pal, (u16)(FIX_DIGIT_BASE + weapon + 1));
+        fix_poke((u16)(12 + weapon), HUD_FIX_BOTTOM_ROW, pal, (u16)(FIX_DIGIT_BASE + weapon + 1));
     }
     shown_weapon_status = weapon_status_bits();
 }
@@ -1747,30 +1775,31 @@ static void update_status_numbers(u8 pressed) {
     u16 armor = player_armor;
     u16 frags = player_kills;
     if (health != shown_health) {
-        draw_number3(10, 25, health, PAL_HUD);
+        draw_number3(HUD_HEALTH_COL, HUD_NUM_ROW, health, PAL_HUD);
         shown_health = health;
     }
     update_hud_face(pressed);
     if (ammo != shown_ammo) {
-        draw_number3(3, 25, ammo, PAL_HUD);
+        draw_number3(HUD_AMMO_COL, HUD_NUM_ROW, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
     if (frags != shown_frags) {
-        draw_small_number2(16, 25, frags, PAL_HUD);
+        clear_fix_area(HUD_FRAG_COL, (u16)(HUD_NUM_ROW + 2), 4, 1);
+        draw_number2(HUD_FRAG_COL, HUD_NUM_ROW, frags, PAL_HUD);
         shown_frags = frags;
     }
     if (armor_flash_timer) {
-        draw_number3(24, 25, armor, PAL_MAP_PLAYER);
+        draw_number3(HUD_ARMOR_COL, HUD_NUM_ROW, armor, PAL_MAP_PLAYER);
         shown_armor = 0xFFFF;
         armor_flash_timer--;
     } else if (armor != shown_armor) {
-        draw_number3(24, 25, armor, PAL_HUD);
+        draw_number3(HUD_ARMOR_COL, HUD_NUM_ROW, armor, PAL_HUD);
         shown_armor = armor;
     }
     if (player_keys != shown_keys) {
-        fix_poke(36, 26, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
-        fix_poke(37, 26, (player_keys & 2) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 1));
-        fix_poke(38, 26, (player_keys & 4) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 2));
+        fix_poke(36, HUD_FIX_BOTTOM_ROW, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
+        fix_poke(37, HUD_FIX_BOTTOM_ROW, (player_keys & 2) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 1));
+        fix_poke(38, HUD_FIX_BOTTOM_ROW, (player_keys & 4) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 2));
         shown_keys = player_keys;
     }
     if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
@@ -2017,7 +2046,7 @@ static void init_hud(void) {
             scb1_tile(spr, row, tile, PAL_HUD);
         }
         scb2(spr, 0x0F, 0xFF);
-        scb3(spr, GAME_H, 0, HUD_WIN);
+        scb3(spr, GAME_H + HUD_Y_OFFSET, 0, HUD_WIN);
         scb4(spr, i * 16);
     }
     hud_face_frame = 0xFF;
@@ -2230,15 +2259,16 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
             top = (GAME_H - meta->height) / 2;
         } else {
             if (h < 80 && bottom > GAME_H - WEAPON_WIN * 16 + 6) bottom = GAME_H - WEAPON_WIN * 16 + 6;
-            top = bottom - meta->height;
+            top = bottom - meta->height + ENEMY_GROUND_LIFT;
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
             u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
-            if (j < meta->strips) {
+            int strip_x = enemies[slot].screen_x + j * 16;
+            if (j < meta->strips && strip_x > -16 && strip_x < SCRW) {
                 scb2(spr, 0x0F, 0xFF);
                 scb3(spr, top, 0, meta->rows);
-                scb4(spr, (u16)(enemies[slot].screen_x + j * 16));
+                scb4(spr, (u16)strip_x);
             } else {
                 scb2(spr, 0x0F, 0x00);
                 scb3(spr, SCRH + 32, 0, 1);
