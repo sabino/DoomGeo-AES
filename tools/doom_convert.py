@@ -805,12 +805,14 @@ def emit_header(
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
-        f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n\n")
+        f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n")
+        f.write("#define MAP_RUNTIME_OPEN_BYTES MAP_SECRET_BYTES\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; } NgRuntimeExit;\n\n")
         f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
         if doors:
             f.write("extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT];\n\n")
+        f.write("extern unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES];\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for y, row in enumerate(grid):
             f.write("    {")
@@ -855,6 +857,7 @@ def emit_header(
         f.write("};\n\n")
         f.write("static inline int map_at(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;\n")
+        f.write("    if (g_runtime_cell_open[((y * MAP_W) + x) >> 3] & (1 << (((y * MAP_W) + x) & 7))) return 0;\n")
         f.write("    unsigned char cell = g_map[y][x];\n")
         f.write("    if (!cell) return 0;\n")
         if doors:

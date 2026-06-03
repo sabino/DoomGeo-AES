@@ -8,6 +8,7 @@
 #include "map.h"
 
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
+unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
 static u8 bonus_flash = 0;
@@ -400,6 +401,8 @@ static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 static void hide_enemy_slot(u16 slot);
 static void hide_enemies(void);
 static void map_cell(int mx, int my, u16 pal, u16 tile);
+static u8 map_bit_get(const u8 *bits, u16 index);
+static void map_bit_set(u8 *bits, u16 index);
 
 static void draw_minimap_cell(int mx, int my);
 static void redraw_minimap_thing_cell(int thing_index);
@@ -1616,6 +1619,87 @@ static int closed_door_at_cell(int cell_x, int cell_y) {
     return door_index;
 }
 
+static int trace_closed_door_in_view(int px, int py, int dir_x, int dir_y) {
+    enum { USE_RANGE_Q8 = 896, HUGE_DIST_Q8 = 0x3FFFFFFF };
+    int map_x = px >> 8;
+    int map_y = py >> 8;
+    int step_x = dir_x < 0 ? -1 : 1;
+    int step_y = dir_y < 0 ? -1 : 1;
+    int abs_dir_x = iabs16(dir_x);
+    int abs_dir_y = iabs16(dir_y);
+    int delta_x = abs_dir_x ? (65536 / abs_dir_x) : HUGE_DIST_Q8;
+    int delta_y = abs_dir_y ? (65536 / abs_dir_y) : HUGE_DIST_Q8;
+    int side_x;
+    int side_y;
+
+    if (abs_dir_x) {
+        int next_x = dir_x < 0 ? (map_x << 8) : ((map_x + 1) << 8);
+        side_x = ((iabs16(next_x - px)) << 8) / abs_dir_x;
+    } else {
+        side_x = HUGE_DIST_Q8;
+    }
+
+    if (abs_dir_y) {
+        int next_y = dir_y < 0 ? (map_y << 8) : ((map_y + 1) << 8);
+        side_y = ((iabs16(next_y - py)) << 8) / abs_dir_y;
+    } else {
+        side_y = HUGE_DIST_Q8;
+    }
+
+    for (;;) {
+        int hit_dist;
+        if (side_x < side_y) {
+            hit_dist = side_x;
+            side_x += delta_x;
+            map_x += step_x;
+        } else {
+            hit_dist = side_y;
+            side_y += delta_y;
+            map_y += step_y;
+        }
+
+        if (hit_dist > USE_RANGE_Q8) return -1;
+
+        {
+            int door_index = closed_door_at_cell(map_x, map_y);
+            if (door_index >= 0) return door_index;
+        }
+
+        if (map_at(map_x, map_y)) return -1;
+    }
+}
+
+static void mark_runtime_cell_open(int x, int y) {
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return;
+    map_bit_set(g_runtime_cell_open, (u16)(y * MAP_W + x));
+    if (map_on) draw_minimap_cell(x, y);
+}
+
+static u8 map_cell_runtime_open(int x, int y) {
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;
+    return map_bit_get(g_runtime_cell_open, (u16)(y * MAP_W + x));
+}
+
+static void carve_door_bridge_from_cell(int x, int y) {
+    static const signed char dirs[4][2] = {
+        { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }
+    };
+    mark_runtime_cell_open(x, y);
+    for (u8 d = 0; d < 4; d++) {
+        for (u8 step = 1; step <= 4; step++) {
+            int nx = x + dirs[d][0] * step;
+            int ny = y + dirs[d][1] * step;
+            if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) break;
+            if (g_map[ny][nx] == 0 || map_cell_runtime_open(nx, ny)) {
+                for (u8 carve = 1; carve < step; carve++) {
+                    mark_runtime_cell_open(x + dirs[d][0] * carve, y + dirs[d][1] * carve);
+                }
+                break;
+            }
+        }
+    }
+}
+
 static void open_door_index(u16 door_index) {
     const NgRuntimeDoor *door = &g_runtime_doors[door_index];
     u8 required_key = key_bit_for_door(door->special);
@@ -1653,6 +1737,7 @@ static void open_door_index(u16 door_index) {
         if (!in_group[i]) continue;
         if (!g_runtime_door_open[i]) opened = 1;
         g_runtime_door_open[i] = 1;
+        carve_door_bridge_from_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
         if (map_on) draw_minimap_cell(g_runtime_doors[i].x, g_runtime_doors[i].y);
     }
     if (opened) {
@@ -1668,10 +1753,8 @@ static void open_nearby_door(void) {
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
 
-    for (int step = 96; step <= 896; step += 64) {
-        int trace_x = px + ((dir_x * step) >> 8);
-        int trace_y = py + ((dir_y * step) >> 8);
-        int door_index = closed_door_at_cell(trace_x >> 8, trace_y >> 8);
+    {
+        int door_index = trace_closed_door_in_view(px, py, dir_x, dir_y);
         if (door_index >= 0) {
             open_door_index((u16)door_index);
             return;
@@ -2511,6 +2594,7 @@ static void restart_level(void) {
     face_idle_variant = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
+    for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         enemy_dead[i] = 0;
