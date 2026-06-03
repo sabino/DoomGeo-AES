@@ -346,6 +346,7 @@ static u16 player_secrets = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
+static u16 shown_frags = 0xFFFF;
 static u8 shown_keys = 0xFF;
 static u8 shown_weapon_status = 0xFF;
 
@@ -1706,6 +1707,12 @@ static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
     }
 }
 
+static void draw_small_number2(u16 col, u16 row, u16 value, u16 pal) {
+    if (value > 99) value = 99;
+    fix_poke(col, row, pal, (u16)(FIX_DIGIT_BASE + (value / 10)));
+    fix_poke((u16)(col + 1), row, pal, (u16)(FIX_DIGIT_BASE + (value % 10)));
+}
+
 static u8 face_frame_for_health(void);
 static void set_hud_face_frame(u8 frame);
 static void update_hud_face(u8 pressed);
@@ -1738,21 +1745,26 @@ static void update_status_numbers(u8 pressed) {
     u16 health = player_health;
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
+    u16 frags = player_kills;
     if (health != shown_health) {
-        draw_number3(11, 24, health, PAL_HUD);
+        draw_number3(10, 25, health, PAL_HUD);
         shown_health = health;
     }
     update_hud_face(pressed);
     if (ammo != shown_ammo) {
-        draw_number3(5, 24, ammo, PAL_HUD);
+        draw_number3(3, 25, ammo, PAL_HUD);
         shown_ammo = ammo;
     }
+    if (frags != shown_frags) {
+        draw_small_number2(16, 25, frags, PAL_HUD);
+        shown_frags = frags;
+    }
     if (armor_flash_timer) {
-        draw_number3(27, 24, armor, PAL_MAP_PLAYER);
+        draw_number3(24, 25, armor, PAL_MAP_PLAYER);
         shown_armor = 0xFFFF;
         armor_flash_timer--;
     } else if (armor != shown_armor) {
-        draw_number3(27, 24, armor, PAL_HUD);
+        draw_number3(24, 25, armor, PAL_HUD);
         shown_armor = armor;
     }
     if (player_keys != shown_keys) {
@@ -1772,6 +1784,7 @@ static void force_fix_hud_redraw(void) {
     shown_health = 0xFFFF;
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
+    shown_frags = 0xFFFF;
     shown_keys = 0xFF;
     shown_weapon_status = 0xFF;
     hud_face_frame = 0xFF;
