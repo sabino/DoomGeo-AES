@@ -42,6 +42,9 @@ The ROM does not load a WAD at runtime.
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - Weapon/fire frames and sprite scale levels are generated offline so the 68000
   does not compose Doom patches during play.
+- The perspective plane cache is intentionally compact. Earlier multi-phase
+  plane caches pushed monster tiles past the practical C-ROM tile index range,
+  making enemies invisible even though their sprite slots were active.
 
 ## Why Not Exact Doom Yet
 

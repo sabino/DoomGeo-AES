@@ -321,6 +321,7 @@ static u8  enemy_hp[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
+static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
 static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
 static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
@@ -414,8 +415,7 @@ static int iabs16(int value) {
 }
 
 #define WORLD_Q8(value) ((value) * MAP_RENDER_SCALE)
-#define MONSTER_RADIUS_Q8 48
-#define MONSTER_SEPARATION_Q8 96
+#define MONSTER_SEPARATION_Q8 32
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
@@ -845,7 +845,7 @@ static void damage_visible_enemy(int thing_index, u8 damage) {
 
 static u8 weapon_target_project(int thing, int *sx, int *h, int *dist_q8) {
     int col;
-    if (!rc_project_point(thing_x_q8[thing], thing_y_q8[thing], sx, h, dist_q8)) return 0;
+    if (!rc_project_point_raw(thing_x_q8[thing], thing_y_q8[thing], sx, h, dist_q8)) return 0;
     if (*sx < 0 || *sx >= SCRW) return 0;
     col = *sx / COLW;
     if (col < 0 || col >= NUM_COLS) return 0;
@@ -1211,10 +1211,6 @@ static u8 can_monster_step(int self, short x_q8, short y_q8) {
     int cx = x_q8 >> 8;
     int cy = y_q8 >> 8;
     if (map_at(cx, cy)) return 0;
-    if (map_at((x_q8 - MONSTER_RADIUS_Q8) >> 8, cy)) return 0;
-    if (map_at((x_q8 + MONSTER_RADIUS_Q8) >> 8, cy)) return 0;
-    if (map_at(cx, (y_q8 - MONSTER_RADIUS_Q8) >> 8)) return 0;
-    if (map_at(cx, (y_q8 + MONSTER_RADIUS_Q8) >> 8)) return 0;
     if (monster_step_occupied(self, x_q8, y_q8)) return 0;
     return 1;
 }
@@ -1324,11 +1320,58 @@ static u8 move_monster_along_path(int i) {
     return 1;
 }
 
+static u8 visible_monster_slots(void) {
+    u8 count = 0;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        if (thing >= 0 && thing_is_monster(runtime_thing_type(thing)) && enemies[slot].screen_w > 0 && enemies[slot].screen_h > 0) count++;
+    }
+    return count;
+}
+
+static u8 reveal_hidden_monster_near_player(int i, int px, int py) {
+    int dir_x, dir_y, plane_x, plane_y;
+    int best_x = 0;
+    int best_y = 0;
+    int best_score = 0x3FFFFFFF;
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    for (signed char cy = -5; cy <= 5; cy++) {
+        for (signed char cx = -5; cx <= 5; cx++) {
+            int x = px + ((int)cx << 8);
+            int y = py + ((int)cy << 8);
+            int vx = x - px;
+            int vy = y - py;
+            int front = ((vx * dir_x) + (vy * dir_y)) >> 8;
+            int side = ((vx * plane_x) + (vy * plane_y)) >> 8;
+            int abs_side = iabs16(side);
+            int score;
+            if (front < 384 || front > 1280) continue;
+            if (abs_side > 960) continue;
+            if (map_at(x >> 8, y >> 8)) continue;
+            if (!line_of_sight_q8((short)x, (short)y, (short)px, (short)py)) continue;
+            score = abs_side + iabs16(front - 640);
+            if (score < best_score) {
+                best_score = score;
+                best_x = x;
+                best_y = y;
+            }
+        }
+    }
+    if (best_score == 0x3FFFFFFF) return 0;
+    thing_x_q8[i] = (short)best_x;
+    thing_y_q8[i] = (short)best_y;
+    enemy_hidden_timer[i] = 0;
+    enemy_attack_cooldown[i] = 24;
+    return 1;
+}
+
 static void update_monster_ai(void) {
     int px, py;
+    u8 visible_monsters;
     if (++monster_ai_tick & 3) return;
     rc_player_q8(&px, &py);
     refresh_monster_path();
+    visible_monsters = visible_monster_slots();
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, adx, ady;
         if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
@@ -1338,13 +1381,20 @@ static void update_monster_ai(void) {
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
-        if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)) continue;
+        if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
+            && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
             enemy_awake[i] = 1;
             enemy_attack_cooldown[i] = 28;
         }
 
         if (!move_monster_along_path(i)) move_monster_toward(i, dx, dy, adx, ady);
+        if (visible_monsters != 0) {
+            enemy_hidden_timer[i] = 0;
+        } else if (adx + ady < WORLD_Q8(1024) && visible_monsters == 0) {
+            if (enemy_hidden_timer[i] < 255) enemy_hidden_timer[i]++;
+            if (enemy_hidden_timer[i] > 18 && reveal_hidden_monster_near_player(i, px, py)) visible_monsters = 1;
+        }
     }
 }
 
@@ -1996,20 +2046,19 @@ static void load_hud_key_palette(u16 key) {
 
 static void render_hud_keys(void) {
     static const u8 key_bits[HUD_KEY_COUNT] = {1, 2, 4};
-    static const u8 key_y[HUD_KEY_COUNT] = {194, 204, 214};
+    static const u8 key_row[HUD_KEY_COUNT] = {24, 25, 26};
+    static const u8 key_col = 29;
 
     for (u16 key = 0; key < HUD_KEY_COUNT; key++) {
         u16 spr = (u16)(HUD_KEY_BASE + key);
-        if (!(player_keys & key_bits[key])) {
-            scb2(spr, 0x0F, 0x00);
-            scb3(spr, SCRH + 32, 0, 1);
+        scb2(spr, 0x0F, 0x00);
+        scb3(spr, SCRH + 32, 0, 1);
+        fix_poke(key_col, key_row[key], 0, FIX_BLANK);
+        if (player_keys & key_bits[key]) {
+            load_hud_key_palette(key);
+            fix_poke(key_col, key_row[key], (u16)(PAL_HUD_KEY_BASE + key), (u16)(FIX_KEY_BASE + key));
             continue;
         }
-        load_hud_key_palette(key);
-        scb1_tile(spr, 0, (u16)(TILE_HUD_KEYCARD_BASE + key), (u16)(PAL_HUD_KEY_BASE + key));
-        scb2(spr, 0x08, 0x7F);
-        scb3(spr, key_y[key], 0, 1);
-        scb4(spr, 240);
     }
     shown_keys = player_keys;
 }
@@ -2625,7 +2674,10 @@ static int select_visible_things(int found, u8 pass) {
         if (pass == 3 && !thing_is_corpse(thing_type)) continue;
         if (pass == 4 && (!thing_is_pickup(thing_type) || pickup_is_collectible(thing_type))) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
-        if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+        if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
+            if (!player_line_of_sight_to(thing_x_q8[i], thing_y_q8[i])) continue;
+            if (!rc_project_point_raw(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+        }
         if (sx < -48 || sx > SCRW + 48) continue;
 
         score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
@@ -2761,6 +2813,7 @@ static void restart_level(void) {
         enemy_hit_flash[i] = 0;
         enemy_awake[i] = 0;
         enemy_attack_cooldown[i] = 0;
+        enemy_hidden_timer[i] = 0;
         explosion_timer[i] = 0;
         death_drop_timer[i] = 0;
         thing_type_override[i] = 0;

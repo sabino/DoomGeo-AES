@@ -18,15 +18,16 @@ readable.
 
 ## Rendering
 
-- 64 wall-column sprites cover the 320-pixel screen in 5-pixel strips.
+- 40 wall-column sprites cover the 320-pixel screen in 8-pixel strips.
 - Each frame casts fixed-point rays, computes projected wall height, and writes
   Neo Geo sprite shrink/position data.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
   tile strips. The current preferred wall texture is `STARTAN3`, with alternate
   atlases for common E1M1 walls and `BIGDOOR2` doors.
-- Floor and ceiling use pre-baked perspective tile caches selected by player
-  direction and movement phase. This is a compromise, not true Doom span
-  rendering.
+- Floor and ceiling use compact pre-baked perspective tile caches selected by
+  player direction. This is a compromise, not true Doom span rendering; the
+  cache is deliberately kept small so monster and pickup sprite tiles stay
+  inside the visible Neo Geo C-ROM tile range.
 - Depth palettes and directional shading give walls/planes distance cues without
   runtime pixel drawing.
 
@@ -37,8 +38,8 @@ readable.
   health, turn direction, pain, evil grin, and death state.
 - Large red Doom-style `STTNUM` digits are rendered on the fix layer for ammo,
   health, frags/kills, and armor.
-- Current known flaw: the large number positions do not yet line up cleanly with
-  the AMMO, HEALTH, FRAG, and ARMOR fields.
+- The large status numbers are positioned over the AMMO, HEALTH, FRAG, and
+  ARMOR fields with the Doom red-number palette.
 - Weapon indicators, key indicators, and short messages (`KEY`, `AMMO`, `MED`,
   `ARM`, `DOR`, `SEC`, `EXIT`, `DEAD`) use fix-layer glyphs.
 - The crosshair marker has been cleared from the current runtime path.
@@ -69,6 +70,9 @@ readable.
   rendered world-sprite slots, so hidden/off-screen things do not attack through
   the Neo Geo sprite fallback path. Imps/Barons can launch visible fireball
   sprites.
+- Thing projection falls back to a raw projection path after a successful map
+  line-of-sight check, which avoids false sprite culling from the coarse
+  40-column wall depth buffer.
 - Barrels explode and can apply radius damage.
 - Killed monsters leave corpse frames or drops where implemented.
 
