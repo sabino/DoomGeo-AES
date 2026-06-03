@@ -215,16 +215,8 @@ static void restore_play_palettes(void) {
 
 static void set_hurt_palettes(void) {
     for (int i = 1; i < 16; i++) {
-        pal_set(PAL_CEILING, (u16)i, RGB(31, 2, 2));
-        pal_set(PAL_FLOOR, (u16)i, RGB(28, 2, 1));
         pal_set(PAL_HUD, (u16)i, RGB(31, 4, 4));
         pal_set(PAL_WEAPON, (u16)i, RGB(31, 5, 4));
-    }
-    for (u16 row = 0; row < BG_SPLIT; row++) {
-        for (int i = 1; i < 16; i++) {
-            pal_set((u16)(PAL_CEILING_GRAD_BASE + row), (u16)i, RGB(31, 2, 2));
-            pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)i, RGB(28, 2, 1));
-        }
     }
 }
 
