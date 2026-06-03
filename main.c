@@ -445,6 +445,31 @@ static u8 player_line_of_sight_to(short x_q8, short y_q8) {
     return line_of_sight_q8((short)px, (short)py, x_q8, y_q8);
 }
 
+static u8 project_point_q8(short world_x_q8, short world_y_q8, int *screen_x, int *height, int *dist_q8) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    long sprite_x;
+    long sprite_y;
+    long det;
+    long transform_x;
+    long transform_y;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    sprite_x = (long)world_x_q8 - px;
+    sprite_y = (long)world_y_q8 - py;
+    det = (long)plane_x * dir_y - (long)dir_x * plane_y;
+    if (det > -1 && det < 1) return 0;
+    transform_x = (((long)dir_y * sprite_x - (long)dir_x * sprite_y) << 8) / det;
+    transform_y = ((-(long)plane_y * sprite_x + (long)plane_x * sprite_y) << 8) / det;
+    if (transform_y < 32) return 0;
+    *screen_x = (SCRW / 2) + (int)(((long)(SCRW / 2) * transform_x) / transform_y);
+    *height = (int)(((long)GAME_H * MAP_RENDER_SCALE * 256) / transform_y);
+    if (*height < 1) return 0;
+    if (*height > GAME_H) *height = GAME_H;
+    *dist_q8 = (int)transform_y;
+    return 1;
+}
+
 static u8 game_active(void) {
     return player_health != 0 && !level_complete;
 }
@@ -845,7 +870,7 @@ static void damage_visible_enemy(int thing_index, u8 damage) {
 
 static u8 weapon_target_project(int thing, int *sx, int *h, int *dist_q8) {
     int col;
-    if (!rc_project_point_raw(thing_x_q8[thing], thing_y_q8[thing], sx, h, dist_q8)) return 0;
+    if (!project_point_q8(thing_x_q8[thing], thing_y_q8[thing], sx, h, dist_q8)) return 0;
     if (*sx < 0 || *sx >= SCRW) return 0;
     col = *sx / COLW;
     if (col < 0 || col >= NUM_COLS) return 0;
@@ -1391,7 +1416,7 @@ static void update_monster_ai(void) {
         if (!move_monster_along_path(i)) move_monster_toward(i, dx, dy, adx, ady);
         if (visible_monsters != 0) {
             enemy_hidden_timer[i] = 0;
-        } else if (adx + ady < WORLD_Q8(1024) && visible_monsters == 0) {
+        } else if (adx + ady < WORLD_Q8(4608) && visible_monsters == 0) {
             if (enemy_hidden_timer[i] < 255) enemy_hidden_timer[i]++;
             if (enemy_hidden_timer[i] > 18 && reveal_hidden_monster_near_player(i, px, py)) visible_monsters = 1;
         }
@@ -2676,7 +2701,7 @@ static int select_visible_things(int found, u8 pass) {
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
             if (!player_line_of_sight_to(thing_x_q8[i], thing_y_q8[i])) continue;
-            if (!rc_project_point_raw(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+            if (!project_point_q8(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
 
@@ -2703,7 +2728,7 @@ static int select_visible_things(int found, u8 pass) {
 static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
-    if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
+    if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
     render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0);
     return found + 1;
 }
@@ -2711,7 +2736,7 @@ static int render_visible_projectile(int found) {
 static void render_visible_impact(u16 slot) {
     int sx, h, dist_q8;
     if (!impact_active) return;
-    if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return;
+    if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return;
     render_type_slot(slot, -1, 9000, sx, h, dist_q8, 0);
 }
 

@@ -59,9 +59,10 @@ current runtime accepts several compromises:
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
   The current runtime uses 40 wall columns so five 4-strip world things can fit
   alongside the backdrop and weapon under the 96-sprites-per-scanline limit.
-- Thing projection samples neighboring wall columns before culling, and slots
-  that do not draw any strips are treated as non-visible so hidden/off-screen
-  monsters cannot drive melee or ranged damage.
+- Thing projection first samples neighboring wall columns before culling, then
+  falls back to a q8 player/view-vector projection when map line-of-sight says
+  the thing should be visible. Slots that do not draw any strips are treated as
+  non-visible so hidden/off-screen monsters cannot drive melee or ranged damage.
 - Monster chase uses a periodically refreshed grid distance field from the
   player, which is cheaper and more reliable on the converted map than asking
   each monster to solve local wall avoidance independently.

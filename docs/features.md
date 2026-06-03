@@ -70,9 +70,9 @@ readable.
   rendered world-sprite slots, so hidden/off-screen things do not attack through
   the Neo Geo sprite fallback path. Imps/Barons can launch visible fireball
   sprites.
-- Thing projection falls back to a raw projection path after a successful map
-  line-of-sight check, which avoids false sprite culling from the coarse
-  40-column wall depth buffer.
+- Thing projection falls back to a q8 player/view-vector projection after a
+  successful map line-of-sight check, which avoids false sprite culling from the
+  coarse 40-column wall depth buffer.
 - Barrels explode and can apply radius damage.
 - Killed monsters leave corpse frames or drops where implemented.
 

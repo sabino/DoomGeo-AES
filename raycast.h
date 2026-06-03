@@ -13,6 +13,5 @@ void rc_player_cell(int *cx, int *cy);
 void rc_player_q8(int *x_q8, int *y_q8);
 void rc_view_q8(int *dir_x, int *dir_y, int *plane_x, int *plane_y);
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8);
-int rc_project_point_raw(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8);
 
 #endif /* RAYCAST_H */

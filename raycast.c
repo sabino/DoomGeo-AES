@@ -184,7 +184,7 @@ void rc_view_q8(int *view_dir_x, int *view_dir_y, int *view_plane_x, int *view_p
     *view_plane_y = planeY >> (FBITS - 8);
 }
 
-static int rc_project_point_mode(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8, u8 check_depth) {
+int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
     fix spriteX = ((fix)world_x_q8 << (FBITS - 8)) - posX;
     fix spriteY = ((fix)world_y_q8 << (FBITS - 8)) - posY;
     if (!invDet) return 0;
@@ -200,7 +200,7 @@ static int rc_project_point_mode(int world_x_q8, int world_y_q8, int *screen_x, 
     if (h < 1) return 0;
     if (h > GAME_H) h = GAME_H;
 
-    if (check_depth && sx >= 0 && sx < SCRW) {
+    if (sx >= 0 && sx < SCRW) {
         int col = sx / COLW;
         if (col >= 0 && col < NUM_COLS) {
             u8 visible = 0;
@@ -220,14 +220,6 @@ static int rc_project_point_mode(int world_x_q8, int world_y_q8, int *screen_x, 
     *height = h;
     *dist_q8 = (int)(transformY >> (FBITS - 8));
     return 1;
-}
-
-int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
-    return rc_project_point_mode(world_x_q8, world_y_q8, screen_x, height, dist_q8, 1);
-}
-
-int rc_project_point_raw(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8) {
-    return rc_project_point_mode(world_x_q8, world_y_q8, screen_x, height, dist_q8, 0);
 }
 
 void rc_render(void) {
