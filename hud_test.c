@@ -41,10 +41,10 @@ static u8 repeat_tick = 0;
 
 static const HudOffset default_offsets[HUD_ITEM_COUNT] = {
     { 0, 0 }, /* BAR: render variant only */
-    { 0, 0 }, /* AMMO: sprite pixel offset */
-    { 0, 0 }, /* HEALTH: sprite pixel offset */
-    { 0, 0 }, /* FRAG: sprite pixel offset */
-    { 0, 0 }, /* ARMOR: sprite pixel offset */
+    { 17, 11 }, /* AMMO: sprite pixel offset */
+    { 21, 11 }, /* HEALTH: sprite pixel offset */
+    { 27, 11 }, /* FRAG: sprite pixel offset */
+    { 8, 11 },  /* ARMOR: sprite pixel offset */
     { 0, 0 }, /* KEYS: sprite pixel offset */
 };
 

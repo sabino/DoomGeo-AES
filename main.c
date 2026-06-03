@@ -153,6 +153,10 @@ static void restore_weapon_palette(void) {
     }
 }
 
+static void restore_counter_palette(void) {
+    for (int i = 1; i < 16; i++) pal_set(PAL_AMMO_COUNTER, (u16)i, RGB(31, 25, 2));
+}
+
 static void set_weapon_flash_palette(void) {
     for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
         u8 r = g_weapon_palette_rgb[i][0];
@@ -192,6 +196,7 @@ static void init_palettes(void) {
         u8 b = g_hud_palette_rgb[i][2];
         pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
     }
+    restore_counter_palette();
     restore_weapon_palette();
     REG_BACKDROP = RGB(0, 0, 0);
 }
@@ -201,6 +206,7 @@ static void restore_play_palettes(void) {
     for (int i = 0; i < HUD_PALETTE_COLORS; i++) {
         pal_set(PAL_HUD, (u16)(i + 1), RGB(g_hud_palette_rgb[i][0], g_hud_palette_rgb[i][1], g_hud_palette_rgb[i][2]));
     }
+    restore_counter_palette();
     restore_weapon_palette();
     restore_wall_depth_palettes();
 }
@@ -329,9 +335,11 @@ static u8 player_armor_class = 0;
 static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
 static volatile u16 player_rockets = 0;
+static volatile u16 player_cells = 0;
 static u16 player_max_bullets = 200;
 static u16 player_max_shells = 50;
 static u16 player_max_rockets = 50;
+static u16 player_max_cells = 300;
 static u16 player_score = 0;
 static u16 player_kills = 0;
 static u16 player_items = 0;
@@ -346,7 +354,8 @@ static u8 shown_weapon_status = 0xFF;
 enum {
     PLAYER_MAX_BULLETS = 200,
     PLAYER_MAX_SHELLS = 50,
-    PLAYER_MAX_ROCKETS = 50
+    PLAYER_MAX_ROCKETS = 50,
+    PLAYER_MAX_CELLS = 300
 };
 
 typedef struct EnemyDraw {
@@ -1256,16 +1265,18 @@ static u8 apply_pickup(u16 thing_type) {
 
     switch (thing_type) {
     case 8:    /* backpack */
-        if (player_has_backpack && player_ammo >= player_max_bullets && player_shells >= player_max_shells && player_rockets >= player_max_rockets) return 0;
+        if (player_has_backpack && player_ammo >= player_max_bullets && player_shells >= player_max_shells && player_rockets >= player_max_rockets && player_cells >= player_max_cells) return 0;
         if (!player_has_backpack) {
             player_has_backpack = 1;
             player_max_bullets = 400;
             player_max_shells = 100;
             player_max_rockets = 100;
+            player_max_cells = 600;
         }
         add_capped_u16(&player_ammo, 10, player_max_bullets);
         add_capped_u16(&player_shells, 4, player_max_shells);
         add_capped_u16(&player_rockets, 1, player_max_rockets);
+        add_capped_u16(&player_cells, 20, player_max_cells);
         shown_ammo = 0xFFFF;
         pickup_message_type = 3;
         break;
@@ -1692,45 +1703,12 @@ enum {
     HUD_FIX_BOTTOM_ROW = HUD_FIX_TOP_ROW + 1
 };
 
-static void draw_number3(u16 col, u16 row, u16 value, u16 pal) {
-    if (value > 999) value = 999;
-    u8 digits[3] = {
-        (u8)(value / 100),
-        (u8)((value / 10) % 10),
-        (u8)(value % 10),
-    };
-    for (u16 i = 0; i < 3; i++) {
-        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
-        u16 x = (u16)(col + i * 2);
-        fix_poke(x, row, pal, tile);
-        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
-        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
-        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
-    }
-}
-
-static void draw_number2(u16 col, u16 row, u16 value, u16 pal) {
-    if (value > 99) value = 99;
-    u8 digits[2] = {
-        (u8)(value / 10),
-        (u8)(value % 10),
-    };
-    for (u16 i = 0; i < 2; i++) {
-        u16 tile = (u16)(FIX_BIG_DIGIT_BASE + digits[i] * 4);
-        u16 x = (u16)(col + i * 2);
-        fix_poke(x, row, pal, tile);
-        fix_poke((u16)(x + 1), row, pal, (u16)(tile + 1));
-        fix_poke(x, (u16)(row + 1), pal, (u16)(tile + 2));
-        fix_poke((u16)(x + 1), (u16)(row + 1), pal, (u16)(tile + 3));
-    }
-}
-
 enum {
-    HUD_NUM_ROW = 25,
-    HUD_AMMO_COL = 2,
-    HUD_HEALTH_COL = 9,
-    HUD_FRAG_COL = 17,
-    HUD_ARMOR_COL = 24
+    HUD_VALUE_Y = GAME_H - 7 + 11,
+    HUD_AMMO_X = 16 + 17,
+    HUD_HEALTH_X = 72 + 21,
+    HUD_FRAG_X = 136 + 27,
+    HUD_ARMOR_X = 192 + 8
 };
 
 static void clear_fix_area(u16 col, u16 row, u16 cols, u16 rows) {
@@ -1739,6 +1717,65 @@ static void clear_fix_area(u16 col, u16 row, u16 cols, u16 rows) {
             fix_poke((u16)(col + x), (u16)(row + y), 0, FIX_BLANK);
         }
     }
+}
+
+static void render_hud_value(u16 base_spr, int base_x, u16 value, u8 digits_count, u16 pal) {
+    u8 digits[3] = { 0, 0, 0 };
+    if (digits_count == 2) {
+        if (value > 99) value = 99;
+        digits[0] = (u8)(value / 10);
+        digits[1] = (u8)(value % 10);
+    } else {
+        if (value > 999) value = 999;
+        digits[0] = (u8)(value / 100);
+        digits[1] = (u8)((value / 10) % 10);
+        digits[2] = (u8)(value % 10);
+    }
+    for (u8 i = 0; i < 3; i++) {
+        u16 spr = (u16)(base_spr + i);
+        if (i >= digits_count) {
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            continue;
+        }
+        scb1_tile(spr, 0, (u16)(TILE_HUD_DIGIT_BASE + digits[i]), pal);
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, HUD_VALUE_Y, 0, 1);
+        scb4(spr, (u16)(base_x + i * 16));
+    }
+}
+
+static void render_counter_value(u16 base_spr, int x, int y, u16 value) {
+    u16 capped = value > 999 ? 999 : value;
+    u8 digits[3] = {
+        (u8)((capped / 100) % 10),
+        (u8)((capped / 10) % 10),
+        (u8)(capped % 10),
+    };
+    for (u8 i = 0; i < 3; i++) {
+        u16 spr = (u16)(base_spr + i);
+        if ((i == 0 && capped < 100) || (i == 1 && capped < 10)) {
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            continue;
+        }
+        scb1_tile(spr, 0, (u16)(TILE_HUD_SMALL_DIGIT_BASE + digits[i]), PAL_AMMO_COUNTER);
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, y, 0, 1);
+        scb4(spr, (u16)(x + i * 5));
+    }
+}
+
+static void render_ammo_counters(void) {
+    static const u8 row_y[4] = {194, 202, 210, 218};
+    render_counter_value(HUD_COUNTER_BASE + 0, 268, row_y[0], player_ammo);
+    render_counter_value(HUD_COUNTER_BASE + 3, 293, row_y[0], player_max_bullets);
+    render_counter_value(HUD_COUNTER_BASE + 6, 268, row_y[1], player_shells);
+    render_counter_value(HUD_COUNTER_BASE + 9, 293, row_y[1], player_max_shells);
+    render_counter_value(HUD_COUNTER_BASE + 12, 268, row_y[2], player_rockets);
+    render_counter_value(HUD_COUNTER_BASE + 15, 293, row_y[2], player_max_rockets);
+    render_counter_value(HUD_COUNTER_BASE + 18, 268, row_y[3], player_cells);
+    render_counter_value(HUD_COUNTER_BASE + 21, 293, row_y[3], player_max_cells);
 }
 
 static u8 face_frame_for_health(void);
@@ -1759,6 +1796,42 @@ static u8 weapon_status_bits(void) {
     return (u8)(bits | (current_weapon << 4));
 }
 
+static void load_hud_key_palette(u16 key, int def_idx) {
+    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
+        u8 r = g_enemy_palette_rgb[def_idx][i][0];
+        u8 g = g_enemy_palette_rgb[def_idx][i][1];
+        u8 b = g_enemy_palette_rgb[def_idx][i][2];
+        pal_set((u16)(PAL_HUD_KEY_BASE + key), (u16)(i + 1), RGB(r, g, b));
+    }
+}
+
+static void render_hud_keys(void) {
+    static const u16 key_thing_types[HUD_KEY_COUNT] = {5, 13, 6};
+    static const u8 key_bits[HUD_KEY_COUNT] = {1, 2, 4};
+    static const u8 key_y[HUD_KEY_COUNT] = {194, 204, 214};
+
+    for (u16 key = 0; key < HUD_KEY_COUNT; key++) {
+        u16 spr = (u16)(HUD_KEY_BASE + key);
+        if (!(player_keys & key_bits[key])) {
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            continue;
+        }
+        int def_idx = enemy_sprite_def_for_type(key_thing_types[key]);
+        if (def_idx < 0) {
+            scb2(spr, 0x0F, 0x00);
+            scb3(spr, SCRH + 32, 0, 1);
+            continue;
+        }
+        load_hud_key_palette(key, def_idx);
+        scb1_tile(spr, 0, (u16)(TILE_HUD_KEYCARD_BASE + key), (u16)(PAL_HUD_KEY_BASE + key));
+        scb2(spr, 0x08, 0x7F);
+        scb3(spr, key_y[key], 0, 1);
+        scb4(spr, 236);
+    }
+    shown_keys = player_keys;
+}
+
 static void draw_weapon_status(void) {
     u8 bits = weapon_status_bits() & 0x0F;
     for (u8 weapon = 0; weapon < 4; weapon++) {
@@ -1774,34 +1847,24 @@ static void update_status_numbers(u8 pressed) {
     u16 ammo = weapon_ammo();
     u16 armor = player_armor;
     u16 frags = player_kills;
-    if (health != shown_health) {
-        draw_number3(HUD_HEALTH_COL, HUD_NUM_ROW, health, PAL_HUD);
-        shown_health = health;
-    }
+
+    render_hud_value((u16)(HUD_VALUE_BASE + 3), HUD_HEALTH_X, health, 3, PAL_HUD);
+    shown_health = health;
     update_hud_face(pressed);
-    if (ammo != shown_ammo) {
-        draw_number3(HUD_AMMO_COL, HUD_NUM_ROW, ammo, PAL_HUD);
-        shown_ammo = ammo;
-    }
-    if (frags != shown_frags) {
-        clear_fix_area(HUD_FRAG_COL, (u16)(HUD_NUM_ROW + 2), 4, 1);
-        draw_number2(HUD_FRAG_COL, HUD_NUM_ROW, frags, PAL_HUD);
-        shown_frags = frags;
-    }
+    render_hud_value(HUD_VALUE_BASE, HUD_AMMO_X, ammo, 3, PAL_HUD);
+    shown_ammo = ammo;
+    render_hud_value((u16)(HUD_VALUE_BASE + 6), HUD_FRAG_X, frags, 2, PAL_HUD);
+    shown_frags = frags;
     if (armor_flash_timer) {
-        draw_number3(HUD_ARMOR_COL, HUD_NUM_ROW, armor, PAL_MAP_PLAYER);
+        render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_MAP_PLAYER);
         shown_armor = 0xFFFF;
         armor_flash_timer--;
-    } else if (armor != shown_armor) {
-        draw_number3(HUD_ARMOR_COL, HUD_NUM_ROW, armor, PAL_HUD);
+    } else {
+        render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_HUD);
         shown_armor = armor;
     }
-    if (player_keys != shown_keys) {
-        fix_poke(36, HUD_FIX_BOTTOM_ROW, (player_keys & 1) ? PAL_MAP_PLAYER : PAL_MAP_WALL, FIX_KEY_BASE);
-        fix_poke(37, HUD_FIX_BOTTOM_ROW, (player_keys & 2) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 1));
-        fix_poke(38, HUD_FIX_BOTTOM_ROW, (player_keys & 4) ? PAL_MAP_PLAYER : PAL_MAP_WALL, (u16)(FIX_KEY_BASE + 2));
-        shown_keys = player_keys;
-    }
+    render_hud_keys();
+    render_ammo_counters();
     if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
 }
 
@@ -2041,7 +2104,7 @@ static void init_hud(void) {
     for (u16 i = 0; i < HUD_COUNT; i++) {
         u16 spr = HUD_BASE + i;
         for (u16 row = 0; row < HUD_WIN; row++) {
-            u16 src_row = (u16)(HUD_WIN - 1 - row);
+            u16 src_row = row;
             u16 tile = (u16)(TILE_HUD_BASE + src_row * HUD_COUNT + i);
             scb1_tile(spr, row, tile, PAL_HUD);
         }
@@ -2421,9 +2484,11 @@ static void restart_level(void) {
     player_ammo = 50;
     player_shells = 0;
     player_rockets = 0;
+    player_cells = 0;
     player_max_bullets = PLAYER_MAX_BULLETS;
     player_max_shells = PLAYER_MAX_SHELLS;
     player_max_rockets = PLAYER_MAX_ROCKETS;
+    player_max_cells = PLAYER_MAX_CELLS;
     player_score = 0;
     player_kills = 0;
     player_items = 0;
