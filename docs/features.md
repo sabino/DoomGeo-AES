@@ -112,7 +112,8 @@ readable.
   successful map line-of-sight check, which avoids false sprite culling from the
   coarse wall depth buffer.
 - Barrels explode and can apply radius damage.
-- Killed monsters leave corpse frames or drops where implemented.
+- Killed monsters show a short Doom death-transition frame before settling into
+  corpse frames or drops where implemented.
 
 ## Map And Level Flow
 

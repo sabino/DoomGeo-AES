@@ -306,8 +306,11 @@ static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_x[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_y[NG_RUNTIME_THING_COUNT];
 static u8  explosion_timer[NG_RUNTIME_THING_COUNT];
+static u8  death_anim_timer[NG_RUNTIME_THING_COUNT];
 static u8  death_drop_timer[NG_RUNTIME_THING_COUNT];
 static u16 thing_type_override[NG_RUNTIME_THING_COUNT];
+static u16 death_anim_final_type[NG_RUNTIME_THING_COUNT];
+static u16 death_anim_drop_type[NG_RUNTIME_THING_COUNT];
 static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
@@ -605,7 +608,7 @@ static u8 thing_is_runtime_threat(u16 thing_type) {
 }
 
 static u8 thing_is_corpse(u16 thing_type) {
-    return thing_type >= 9001 && thing_type <= 9005;
+    return (thing_type >= 9001 && thing_type <= 9005) || (thing_type >= 9010 && thing_type <= 9014);
 }
 
 static u8 thing_is_shootable(u16 thing_type) {
@@ -747,6 +750,24 @@ static u16 monster_corpse_type(u16 thing_type) {
         return 9004; /* demon/spectre corpse */
     case 3003:
         return 9005; /* baron corpse */
+    default:
+        return 0;
+    }
+}
+
+static u16 monster_death_anim_type(u16 thing_type) {
+    switch (thing_type) {
+    case 3004:
+        return 9010; /* former human death transition */
+    case 9:
+        return 9011; /* shotgun guy death transition */
+    case 3001:
+        return 9012; /* imp death transition */
+    case 3002:
+    case 58:
+        return 9013; /* demon/spectre death transition */
+    case 3003:
+        return 9014; /* baron death transition */
     default:
         return 0;
     }
@@ -907,6 +928,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         u16 source_type = runtime_thing_type(thing_index);
         u16 drop_type = monster_drop_type(source_type);
         u16 corpse_type = monster_corpse_type(source_type);
+        u16 death_type = monster_death_anim_type(source_type);
         u8 score_awarded = 0;
         u8 hp = monster_hp(thing_index);
         if (damage >= hp) hp = 0;
@@ -917,10 +939,15 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                 enemy_hp[i] = hp;
                 enemy_awake[i] = 1;
                 if (hp == 0) {
-                    if (drop_type && corpse_type) {
-                        thing_type_override[i] = corpse_type;
-                        death_drop_type[i] = drop_type;
-                        death_drop_timer[i] = 18;
+                    u16 final_type = corpse_type ? corpse_type : drop_type;
+                    u16 final_drop = (drop_type && corpse_type) ? drop_type : 0;
+                    if (death_type && final_type) {
+                        thing_type_override[i] = death_type;
+                        death_anim_final_type[i] = final_type;
+                        death_anim_drop_type[i] = final_drop;
+                        death_anim_timer[i] = 14;
+                        death_drop_type[i] = 0;
+                        death_drop_timer[i] = 0;
                         enemy_dead[i] = 0;
                     } else if (drop_type) {
                         thing_type_override[i] = drop_type;
@@ -1200,7 +1227,23 @@ static void update_enemy_hit_flash(void) {
                 redraw_minimap_thing_cell(i);
             }
         }
-        if (death_drop_timer[i]) {
+        if (death_anim_timer[i]) {
+            death_anim_timer[i]--;
+            if (!death_anim_timer[i]) {
+                thing_type_override[i] = death_anim_final_type[i];
+                if (death_anim_drop_type[i]) {
+                    death_drop_type[i] = death_anim_drop_type[i];
+                    death_drop_timer[i] = 18;
+                } else {
+                    death_drop_type[i] = 0;
+                    death_drop_timer[i] = 0;
+                }
+                death_anim_final_type[i] = 0;
+                death_anim_drop_type[i] = 0;
+                redraw_minimap_thing_cell(i);
+                hide_enemies();
+            }
+        } else if (death_drop_timer[i]) {
             death_drop_timer[i]--;
             if (!death_drop_timer[i]) {
                 thing_type_override[i] = death_drop_type[i];
@@ -3128,8 +3171,11 @@ static void restart_level(void) {
         monster_face_x[i] = 0;
         monster_face_y[i] = 1;
         explosion_timer[i] = 0;
+        death_anim_timer[i] = 0;
         death_drop_timer[i] = 0;
         thing_type_override[i] = 0;
+        death_anim_final_type[i] = 0;
+        death_anim_drop_type[i] = 0;
         death_drop_type[i] = 0;
     }
     reset_enemy_slot_cache();

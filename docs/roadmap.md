@@ -20,8 +20,9 @@ after the current documentation pass.
 - Improve plasma/BFG fidelity: projectile visuals, BFG trace behavior, and
   visible pickup sprites when the source WAD provides them.
 - Complete enemy sprite coverage beyond the current A/B rotation groups plus
-  front-facing attack/pain frames: mirrored back angles, death animation frames,
-  richer attack/pain angles, and more faithful thing placement still need work.
+  front-facing attack/pain/death-transition frames: mirrored back angles,
+  multi-step death sequences, richer attack/pain angles, and more faithful
+  thing placement still need work.
 - Continue tuning line-of-sight, wall-depth fallback, and encounter placement
   now that monster tiles fit inside the visible C-ROM tile range.
 - Add more pickup/effect frames where the current sprite set still uses limited
