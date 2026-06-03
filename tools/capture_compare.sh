@@ -8,7 +8,7 @@ MAP="${DOOM_MAP:-E1M1}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
-COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-2}"
+COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-}"
 FREEDOOM_VERSION="${FREEDOOM_VERSION:-0.13.0}"
 FREEDOOM_ZIP=".tools/assets/freedoom-${FREEDOOM_VERSION}.zip"
 FREEDOOM_DIR=".tools/assets/freedoom-${FREEDOOM_VERSION}"
@@ -81,7 +81,7 @@ cleanup_spawned() {
 }
 
 switch_workspace() {
-    if command -v i3-msg >/dev/null 2>&1; then
+    if [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
         i3-msg workspace "$COMPARISON_WORKSPACE" >/dev/null 2>&1 || true
     fi
 }

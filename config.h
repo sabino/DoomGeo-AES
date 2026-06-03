@@ -21,7 +21,7 @@
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #define WALLH    GAME_H             /* projection scale: wall height @ dist 1 */
-#define MAX_H    (WALL_WIN * 16)    /* allow near walls to grow behind HUD    */
+#define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation.  Weapon slots
