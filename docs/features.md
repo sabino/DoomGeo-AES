@@ -129,8 +129,9 @@ readable.
 - Movement uses fixed-point position/direction with a Doom-like body radius.
 - Doors are converted from Doom linedefs, can require keys, and open in grouped
   cells.
-- Exits freeze the level and show compact kill/item/secret stat rows before
-  restart.
+- Exits freeze the level and show compact kill/item/secret completion
+  percentage rows before restart, computed from the converted map's runtime
+  monsters, pickups, and secret cells.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
   combat.
 - Secret cells can be discovered once and increment the secret count.

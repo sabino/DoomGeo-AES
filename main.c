@@ -343,6 +343,9 @@ static u16 player_score = 0;
 static u16 player_kills = 0;
 static u16 player_items = 0;
 static u16 player_secrets = 0;
+static u16 level_total_kills = 0;
+static u16 level_total_items = 0;
+static u16 level_total_secrets = 0;
 static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
@@ -595,6 +598,32 @@ static u8 pickup_is_collectible(u16 thing_type) {
     default:
         return 0;
     }
+}
+
+static void compute_level_totals(void) {
+    level_total_kills = 0;
+    level_total_items = 0;
+    level_total_secrets = 0;
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type = g_runtime_things[i].type;
+        if (thing_is_monster(type)) {
+            if (level_total_kills < 999) level_total_kills++;
+        } else if (thing_is_pickup(type)) {
+            if (level_total_items < 999) level_total_items++;
+        }
+    }
+    for (u16 y = 0; y < MAP_H; y++) {
+        for (u16 x = 0; x < MAP_W; x++) {
+            if (map_cell_secret(x, y) && level_total_secrets < 999) level_total_secrets++;
+        }
+    }
+}
+
+static u16 completion_percent(u16 value, u16 total) {
+    unsigned long pct;
+    if (!total) return 100;
+    pct = ((unsigned long)value * 100UL + (total / 2)) / total;
+    return pct > 100 ? 100 : (u16)pct;
 }
 
 static u8 thing_is_barrel(u16 thing_type) {
@@ -1969,9 +1998,9 @@ static void draw_stat3(u16 col, u16 row, u16 label, u16 value) {
 static void draw_exit_stats(void) {
     const u16 col = (SCRW / 16) - 2;
     draw_exit_message();
-    draw_stat3(col, 12, FIX_KEY_MSG_K, player_kills);
-    draw_stat3(col, 13, (u16)(FIX_EXIT_BASE + 2), player_items);
-    draw_stat3(col, 14, FIX_SECRET_S, player_secrets);
+    draw_stat3(col, 12, FIX_KEY_MSG_K, completion_percent(player_kills, level_total_kills));
+    draw_stat3(col, 13, (u16)(FIX_EXIT_BASE + 2), completion_percent(player_items, level_total_items));
+    draw_stat3(col, 14, FIX_SECRET_S, completion_percent(player_secrets, level_total_secrets));
 }
 
 static void draw_pickup_message(void) {
@@ -3343,6 +3372,7 @@ static void restart_level(void) {
     init_weapon();
     reset_enemy_slot_cache();
     hide_enemies();
+    compute_level_totals();
     force_fix_hud_redraw();
 }
 
@@ -3359,6 +3389,7 @@ int main(void) {
     force_fix_hud_redraw();
     rc_init();
     init_runtime_things();
+    compute_level_totals();
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
