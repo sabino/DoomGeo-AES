@@ -1772,7 +1772,7 @@ static void render_counter_value(u16 base_spr, int x, int y, u16 value) {
 }
 
 static void render_ammo_counters(void) {
-    static const u8 row_y[4] = {194, 202, 210, 218};
+    static const u8 row_y[4] = {195, 202, 209, 216};
     render_counter_value(HUD_COUNTER_BASE + 0, 270, row_y[0], player_ammo);
     render_counter_value(HUD_COUNTER_BASE + 3, 298, row_y[0], player_max_bullets);
     render_counter_value(HUD_COUNTER_BASE + 6, 270, row_y[1], player_shells);
