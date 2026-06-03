@@ -154,7 +154,7 @@ static void restore_weapon_palette(void) {
 }
 
 static void restore_counter_palette(void) {
-    for (int i = 1; i < 16; i++) pal_set(PAL_AMMO_COUNTER, (u16)i, RGB(31, 25, 2));
+    for (int i = 1; i < 16; i++) pal_set(0, (u16)i, RGB(31, 25, 2));
 }
 
 static void set_weapon_flash_palette(void) {
@@ -1705,10 +1705,10 @@ enum {
 
 enum {
     HUD_VALUE_Y = GAME_H - 7 + 11,
-    HUD_AMMO_X = 16 + 17,
-    HUD_HEALTH_X = 72 + 21,
-    HUD_FRAG_X = 136 + 27,
-    HUD_ARMOR_X = 192 + 8
+    HUD_AMMO_X = 16 + 17 - 24,
+    HUD_HEALTH_X = 72 + 21 - 32,
+    HUD_FRAG_X = 136 + 27 - 40,
+    HUD_ARMOR_X = 192 + 8 - 16
 };
 
 static void clear_fix_area(u16 col, u16 row, u16 cols, u16 rows) {
@@ -1745,7 +1745,7 @@ static void render_hud_value(u16 base_spr, int base_x, u16 value, u8 digits_coun
     }
 }
 
-static void render_counter_value(u16 base_spr, int x, int y, u16 value) {
+static void draw_counter_value(u16 col_right, u16 row, u16 value) {
     u16 capped = value > 999 ? 999 : value;
     u8 digits[3] = {
         (u8)((capped / 100) % 10),
@@ -1753,29 +1753,24 @@ static void render_counter_value(u16 base_spr, int x, int y, u16 value) {
         (u8)(capped % 10),
     };
     for (u8 i = 0; i < 3; i++) {
-        u16 spr = (u16)(base_spr + i);
+        u16 col = (u16)(col_right - 2 + i);
         if ((i == 0 && capped < 100) || (i == 1 && capped < 10)) {
-            scb2(spr, 0x0F, 0x00);
-            scb3(spr, SCRH + 32, 0, 1);
+            fix_poke(col, row, 0, FIX_BLANK);
             continue;
         }
-        scb1_tile(spr, 0, (u16)(TILE_HUD_SMALL_DIGIT_BASE + digits[i]), PAL_AMMO_COUNTER);
-        scb2(spr, 0x0F, 0xFF);
-        scb3(spr, y, 0, 1);
-        scb4(spr, (u16)(x + i * 5));
+        fix_poke(col, row, 0, (u16)(FIX_DIGIT_BASE + digits[i]));
     }
 }
 
 static void render_ammo_counters(void) {
-    static const u8 row_y[4] = {194, 202, 210, 218};
-    render_counter_value(HUD_COUNTER_BASE + 0, 268, row_y[0], player_ammo);
-    render_counter_value(HUD_COUNTER_BASE + 3, 293, row_y[0], player_max_bullets);
-    render_counter_value(HUD_COUNTER_BASE + 6, 268, row_y[1], player_shells);
-    render_counter_value(HUD_COUNTER_BASE + 9, 293, row_y[1], player_max_shells);
-    render_counter_value(HUD_COUNTER_BASE + 12, 268, row_y[2], player_rockets);
-    render_counter_value(HUD_COUNTER_BASE + 15, 293, row_y[2], player_max_rockets);
-    render_counter_value(HUD_COUNTER_BASE + 18, 268, row_y[3], player_cells);
-    render_counter_value(HUD_COUNTER_BASE + 21, 293, row_y[3], player_max_cells);
+    draw_counter_value(34, 24, player_ammo);
+    draw_counter_value(38, 24, player_max_bullets);
+    draw_counter_value(34, 25, player_shells);
+    draw_counter_value(38, 25, player_max_shells);
+    draw_counter_value(34, 26, player_rockets);
+    draw_counter_value(38, 26, player_max_rockets);
+    draw_counter_value(34, 27, player_cells);
+    draw_counter_value(38, 27, player_max_cells);
 }
 
 static u8 face_frame_for_health(void);
