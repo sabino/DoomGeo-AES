@@ -1805,8 +1805,8 @@ static void update_status_numbers(u8 pressed) {
     if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
 }
 
-static void draw_crosshair(void) {
-    fix_poke(SCRW / 16, HORIZON / 8, PAL_MAP_PLAYER, FIX_AIM);
+static void clear_crosshair(void) {
+    fix_poke(SCRW / 16, HORIZON / 8, 0, FIX_BLANK);
 }
 
 static void force_fix_hud_redraw(void) {
@@ -1818,7 +1818,7 @@ static void force_fix_hud_redraw(void) {
     shown_weapon_status = 0xFF;
     hud_face_frame = 0xFF;
     update_status_numbers(0);
-    draw_crosshair();
+    clear_crosshair();
     update_center_message();
 }
 

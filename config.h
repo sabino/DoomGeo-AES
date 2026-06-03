@@ -21,7 +21,7 @@
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #define WALLH    GAME_H             /* projection scale: wall height @ dist 1 */
-#define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
+#define MAX_H    (WALL_WIN * 16)    /* allow near walls to grow behind HUD    */
 
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation.  Weapon slots
@@ -46,7 +46,7 @@
 #define HUD_BASE  (ENEMY_BASE + ENEMY_COUNT)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
-#define HUD_Y_OFFSET 1              /* Neo Geo sprite Y anchor correction for the bottom status bar */
+#define HUD_Y_OFFSET 0              /* STBAR starts exactly at the playfield edge */
 #define SPR_TOTAL 381               
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */

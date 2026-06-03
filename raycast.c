@@ -261,7 +261,8 @@ void rc_render(void) {
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
 
-        int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
+        int top = (GAME_H - h) / 2;
+        if (top < 0) top = 0;               /* avoid Neo Geo Y-wrap on close walls */
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */
         if (vsh < 0)   vsh = 0;
         if (vsh > 255) vsh = 255;
