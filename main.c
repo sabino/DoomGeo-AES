@@ -1425,8 +1425,7 @@ static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
     }
 }
 
-static u8 monster_view_angle_bucket(int thing_index) {
-    int px, py;
+static u8 monster_view_angle_bucket(int thing_index, int px, int py) {
     int to_x;
     int to_y;
     int dot;
@@ -1435,7 +1434,6 @@ static u8 monster_view_angle_bucket(int thing_index) {
     int face_x;
     int face_y;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 1;
-    rc_player_q8(&px, &py);
     to_x = px - thing_x_q8[thing_index];
     to_y = py - thing_y_q8[thing_index];
     face_x = monster_face_x[thing_index];
@@ -1454,17 +1452,18 @@ static u8 monster_view_angle_bucket(int thing_index) {
     return cross >= 0 ? 4 : 6;
 }
 
-static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
+static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_px, int view_py) {
     int first = -1;
     int first_walk_angle = -1;
-    u8 walk_angle = thing_is_monster(thing_type) ? monster_view_angle_bucket(thing_index) : 0;
+    u8 is_monster = thing_is_monster(thing_type);
+    u8 walk_angle = is_monster ? monster_view_angle_bucket(thing_index, view_px, view_py) : 0;
     u8 wanted_angle = walk_angle;
     u8 fallback_angle = 0;
-    u8 wanted_anim = thing_is_monster(thing_type) ? (u8)((monster_ai_tick >> 3) & 1) : 0;
-    if (thing_is_monster(thing_type) && thing_index >= 0 && enemy_attack_anim[thing_index]) {
+    u8 wanted_anim = is_monster ? (u8)((monster_ai_tick >> 3) & 1) : 0;
+    if (is_monster && thing_index >= 0 && enemy_attack_anim[thing_index]) {
         wanted_angle = (u8)(100 + walk_angle);
         fallback_angle = 9;
-    } else if (thing_is_monster(thing_type) && thing_index >= 0 && enemy_hit_flash[thing_index]) {
+    } else if (is_monster && thing_index >= 0 && enemy_hit_flash[thing_index]) {
         wanted_angle = (u8)(200 + walk_angle);
         fallback_angle = 10;
     }
@@ -1474,11 +1473,11 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
         u8 angle_hits = 0;
         int first_angle = -1;
         if (pass == 1 && fallback_angle == 0) continue;
-        if (pass == 2 && !thing_is_monster(thing_type)) continue;
+        if (pass == 2 && !is_monster) continue;
         for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
             if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
             if (first < 0) first = i;
-            if (!thing_is_monster(thing_type)) return first;
+            if (!is_monster) return first;
             if (g_enemy_sprite_defs[i].angle == target_angle || (target_angle == 0 && g_enemy_sprite_defs[i].angle == 0)) {
                 if (first_angle < 0) first_angle = i;
                 if (angle_hits == wanted_anim) return i;
@@ -1491,7 +1490,7 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {
     for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
         if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
         if (first < 0) first = i;
-        if (!thing_is_monster(thing_type)) return first;
+        if (!is_monster) return first;
         if (g_enemy_sprite_defs[i].angle == walk_angle && first_walk_angle < 0) first_walk_angle = i;
     }
     if (thing_is_pickup(thing_type)) {
@@ -4541,9 +4540,13 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
     return origin_y;
 }
 
-static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash, u8 fallback_projection) {
+static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8,
+                           u8 flash, u8 fallback_projection, int view_px, int view_py) {
     int idx;
-    int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
+    u8 is_monster = thing_is_monster(thing_type);
+    u8 is_projectile = thing_is_projectile(thing_type);
+    u8 is_explosion = thing_is_explosion(thing_type);
+    int def_idx = enemy_sprite_def_for_type(thing_type, thing_index, view_px, view_py);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
     enum { MONSTER_MIN_H = 52, MONSTER_FALLBACK_MIN_H = 52 };
@@ -4554,11 +4557,11 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     }
     def = &g_enemy_sprite_defs[def_idx];
 
-    if (thing_is_monster(thing_type) && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
+    if (is_monster && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
         h = fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H;
     }
-    if (thing_is_projectile(thing_type) && h > 0 && h < 18) h = 18;
-    if (thing_is_explosion(thing_type) && h > 0 && h < 26) h = 26;
+    if (is_projectile && h > 0 && h < 18) h = 18;
+    if (is_explosion && h > 0 && h < 26) h = 26;
 
     enemies[slot].thing_index = thing_index;
     enemies[slot].sprite_def = def_idx;
@@ -4573,8 +4576,8 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     else if (h > 46) idx = 2;
     else if (h > 24) idx = 3;
     else idx = 4;
-    if (thing_is_monster(thing_type) && idx > 1) idx = 1;
-    if (thing_is_projectile(thing_type) && idx > 3) idx = 3;
+    if (is_monster && idx > 1) idx = 1;
+    if (is_projectile && idx > 3) idx = 3;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
 
@@ -4590,7 +4593,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     {
         u8 rendered = 0;
         int top;
-        if ((thing_is_explosion(thing_type) && thing_index < 0) || thing_is_projectile(thing_type)) {
+        if ((is_explosion && thing_index < 0) || is_projectile) {
             top = (GAME_H - meta->height) / 2;
         } else {
             top = world_sprite_origin_y(thing_type, h) - meta->origin_y + ENEMY_GROUND_LIFT;
@@ -4807,9 +4810,13 @@ static int select_visible_things(int found) {
     for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
-            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0, candidates[i].fallback_projection);
+            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h,
+                                        candidates[i].dist_q8, 0, candidates[i].fallback_projection, px, py);
         } else {
-            rendered = render_type_slot((u16)found, candidates[i].thing_index, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, (candidates[i].thing_index >= 0 && enemy_hit_flash[candidates[i].thing_index]) ? 1 : 0, candidates[i].fallback_projection);
+            rendered = render_type_slot((u16)found, candidates[i].thing_index, candidates[i].thing_type, candidates[i].sx,
+                                        candidates[i].h, candidates[i].dist_q8,
+                                        (candidates[i].thing_index >= 0 && enemy_hit_flash[candidates[i].thing_index]) ? 1 : 0,
+                                        candidates[i].fallback_projection, px, py);
         }
         if (rendered) found++;
     }
@@ -4822,7 +4829,7 @@ static int render_visible_projectile(int found) {
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) {
         if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
     }
-    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0, 0)) return found + 1;
+    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
 }
 
@@ -4832,7 +4839,7 @@ static int render_visible_impact(int found) {
     if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) {
         if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
     }
-    if (render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0, 0)) return found + 1;
+    if (render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
 }
 

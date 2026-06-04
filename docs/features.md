@@ -225,6 +225,10 @@ readable.
 - Sprite fallback projection reuses the player/view state already loaded for the
   candidate pass, and fallback line-of-sight checks use that same cached player
   point instead of querying the raycaster again per candidate.
+- Rendered monster angle-frame selection also reuses the candidate pass player
+  point, avoiding another raycaster position query for each visible monster.
+  Slot rendering keeps monster/projectile/explosion classification local to the
+  slot instead of rechecking the same type several times.
 - The world-sprite selector no longer clears its candidate buffer or visible
   slot ids before immediately overwriting or hiding them. This removes redundant
   per-frame writes from the normal E1M1 render path while preserving the same
