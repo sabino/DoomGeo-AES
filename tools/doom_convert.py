@@ -490,9 +490,18 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
 
 
 MONSTER_TYPES = {
+    7,     # spider mastermind
     9,     # shotgun guy
+    16,    # cyberdemon
     58,    # spectre
+    64,    # arch-vile
+    65,    # heavy weapon dude
+    66,    # revenant
+    67,    # mancubus
+    68,    # arachnotron
     69,    # hell knight
+    71,    # pain elemental
+    84,    # Wolfenstein SS
     3001,  # imp
     3002,  # demon
     3003,  # baron

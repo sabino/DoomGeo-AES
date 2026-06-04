@@ -518,9 +518,18 @@ static u16 runtime_thing_type(int thing_index) {
 
 static u8 thing_is_monster(u16 thing_type) {
     switch (thing_type) {
+    case 7:
     case 9:
+    case 16:
     case 58:
+    case 64:
+    case 65:
+    case 66:
+    case 67:
+    case 68:
     case 69:
+    case 71:
+    case 84:
     case 3001:
     case 3002:
     case 3003:
@@ -657,7 +666,8 @@ static u8 thing_is_runtime_threat(u16 thing_type) {
 }
 
 static u8 thing_is_corpse(u16 thing_type) {
-    return (thing_type >= 9001 && thing_type <= 9005) || (thing_type >= 9010 && thing_type <= 9024);
+    return (thing_type >= 9001 && thing_type <= 9005) || thing_type == 9009
+        || (thing_type >= 9010 && thing_type <= 9031);
 }
 
 static u8 thing_is_shootable(u16 thing_type) {
@@ -759,8 +769,24 @@ static u8 key_bit_for_door(u16 special) {
 
 static u8 monster_start_hp(u16 thing_type) {
     switch (thing_type) {
+    case 84:   /* Wolfenstein SS */
+        return 5;
+    case 65:   /* heavy weapon dude */
+        return 7;
     case 69:   /* hell knight */
         return 10;
+    case 66:   /* revenant */
+    case 68:   /* arachnotron */
+        return 14;
+    case 64:   /* arch-vile */
+        return 18;
+    case 67:   /* mancubus */
+    case 71:   /* pain elemental */
+        return 20;
+    case 7:    /* spider mastermind */
+        return 30;
+    case 16:   /* cyberdemon */
+        return 40;
     case 3004: /* former human */
         return 2;
     case 9:    /* shotgun guy */
@@ -787,6 +813,8 @@ static u16 monster_drop_type(u16 thing_type) {
         return 2007; /* clip */
     case 9:    /* shotgun guy */
         return 2001; /* shotgun */
+    case 65:   /* heavy weapon dude */
+        return 2002; /* chaingun */
     default:
         return 0;
     }
@@ -805,6 +833,10 @@ static u16 monster_corpse_type(u16 thing_type) {
         return 9004; /* demon/spectre corpse */
     case 3003:
         return 9005; /* baron corpse */
+    case 69:
+        return 9009; /* hell knight corpse */
+    case 3005:
+        return 9028; /* cacodemon corpse */
     default:
         return 0;
     }
@@ -823,6 +855,10 @@ static u16 monster_death_anim_type(u16 thing_type) {
         return 9013; /* demon/spectre death sequence */
     case 3003:
         return 9014; /* baron death sequence */
+    case 69:
+        return 9025; /* hell knight death sequence */
+    case 3005:
+        return 9029; /* cacodemon death sequence */
     default:
         return 0;
     }
@@ -830,6 +866,10 @@ static u16 monster_death_anim_type(u16 thing_type) {
 
 static u16 death_anim_next_stage_type(u16 thing_type) {
     if (thing_type >= 9010 && thing_type <= 9019) return (u16)(thing_type + 5);
+    if (thing_type == 9025) return 9026;
+    if (thing_type == 9026) return 9027;
+    if (thing_type == 9029) return 9030;
+    if (thing_type == 9030) return 9031;
     return 0;
 }
 
@@ -839,6 +879,10 @@ static u16 monster_score_value(u16 thing_type) {
         return 100;
     case 9:    /* shotgun guy */
         return 150;
+    case 65:   /* heavy weapon dude */
+        return 180;
+    case 84:   /* Wolfenstein SS */
+        return 200;
     case 3001: /* imp */
         return 200;
     case 3002: /* demon */
@@ -852,6 +896,17 @@ static u16 monster_score_value(u16 thing_type) {
         return 700;
     case 3006: /* lost soul */
         return 100;
+    case 66:   /* revenant */
+    case 67:   /* mancubus */
+    case 68:   /* arachnotron */
+        return 700;
+    case 64:   /* arch-vile */
+    case 71:   /* pain elemental */
+        return 800;
+    case 16:   /* cyberdemon */
+        return 2000;
+    case 7:    /* spider mastermind */
+        return 2500;
     default:
         return 100;
     }
@@ -1368,8 +1423,19 @@ static void player_take_damage(u16 amount) {
 
 static u8 monster_ranged_damage(u16 thing_type) {
     switch (thing_type) {
+    case 7:    /* spider mastermind */
+    case 16:   /* cyberdemon */
+        return 10;
+    case 64:   /* arch-vile */
+        return 8;
     case 69:   /* hell knight */
         return 6;
+    case 65:   /* heavy weapon dude */
+    case 66:   /* revenant */
+    case 67:   /* mancubus */
+    case 68:   /* arachnotron */
+    case 84:   /* Wolfenstein SS */
+        return 5;
     case 3004: /* former human */
         return 3;
     case 9:    /* shotgun guy */
@@ -1388,9 +1454,13 @@ static u8 monster_ranged_damage(u16 thing_type) {
 static u16 monster_projectile_type(u16 thing_type) {
     switch (thing_type) {
     case 3001: /* imp */
+    case 68:   /* arachnotron */
         return 9006;
     case 3005: /* cacodemon */
+    case 67:   /* mancubus */
         return 9008;
+    case 16:   /* cyberdemon */
+    case 66:   /* revenant */
     case 69:   /* hell knight */
     case 3003: /* baron */
         return 9007;
