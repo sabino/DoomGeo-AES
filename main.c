@@ -1163,7 +1163,7 @@ static int best_visible_enemy(void) {
         int center_x;
         int score;
         if (thing < 0) continue;
-        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
         if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -1213,7 +1213,7 @@ static void fire_melee_damage(u8 damage) {
         int center_x;
         int score;
         if (thing < 0) continue;
-        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
         if (enemies[slot].dist_q8 > WORLD_Q8(2)) continue;
         if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -1328,7 +1328,7 @@ static void damage_bfg_visible_targets(void) {
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
-        if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
         if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
     }
