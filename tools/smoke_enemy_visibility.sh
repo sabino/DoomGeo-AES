@@ -32,6 +32,8 @@ SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
 make smoke-screenshot
 
+tools/check_enemy_visibility_screens.py --dir "$OUT_DIR"
+
 cat <<EOF
 enemy visibility smoke complete:
   $OUT_DIR/combat-initial.png

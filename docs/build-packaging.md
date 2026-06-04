@@ -87,7 +87,9 @@ For a combined enemy visibility pass, run `tools/smoke_enemy_visibility.sh`.
 It chains the combat interaction, real E1M1 encounter, hidden-attack, and
 monster-gallery regressions into one command, refreshing the screenshots that
 prove visible targeting, real converted monster projection, no hidden damage,
-and multi-sprite enemy coverage.
+and multi-sprite enemy coverage. The helper finishes by running
+`tools/check_enemy_visibility_screens.py`, a lightweight image-stat sanity check
+that rejects missing, blank, or obviously wrong captures.
 
 For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
 `make death-test-rom`, launches `make death-test-gngeo`, and captures the staged
