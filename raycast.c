@@ -285,7 +285,7 @@ void rc_render(void) {
         int h = projected_height_from_inv(inv_perp);     /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
-        closebuf[x] = (u8)(h >= GAME_H - 4 && kindbuf[x] <= TILE_WALL_ALT_COUNT);
+        closebuf[x] = (u8)(h >= GAME_H - 4 && kindbuf[x] == 0);
 
         int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */

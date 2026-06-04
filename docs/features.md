@@ -41,6 +41,9 @@ readable.
   as a missing sprite or palette glitch.
 - Depth palettes and directional shading give walls/planes distance cues without
   runtime pixel drawing.
+- Point-blank wall fallback is limited to the primary wall atlas. Alternate
+  walls and doors keep their own baked columns at close range, avoiding the
+  wrong-palette block artifacts that could look like red/green missing sprites.
 
 ## HUD And UI
 
