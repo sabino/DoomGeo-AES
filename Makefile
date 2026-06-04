@@ -182,6 +182,14 @@ combat-test-gngeo:
 	$(MAKE) combat-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/combat-test-rom $(GAMEROM)
 
+arsenal-test-rom:
+	$(MAKE) cart BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
+	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip
+
+arsenal-test-gngeo:
+	$(MAKE) arsenal-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
+
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
 ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx
@@ -236,7 +244,7 @@ asm-gngeo: $(ASM_CART)
 smoke-screenshot:
 	tools/smoke_capture.sh
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo combat-test-rom combat-test-gngeo asm-rom asm-gngeo smoke-screenshot
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo combat-test-rom combat-test-gngeo arsenal-test-rom arsenal-test-gngeo asm-rom asm-gngeo smoke-screenshot
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

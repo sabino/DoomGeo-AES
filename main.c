@@ -1862,8 +1862,8 @@ static void update_monster_ai(void) {
     }
 }
 
-#ifdef DOOM_COMBAT_TEST
-static void configure_combat_test(void) {
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST)
+static void place_test_imp(void) {
 #if NG_RUNTIME_THING_COUNT > 0
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -1871,10 +1871,6 @@ static void configure_combat_test(void) {
     static const short lateral_steps[] = { 0, WORLD_Q8(192), -WORLD_Q8(192), WORLD_Q8(384), -WORLD_Q8(384) };
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-
-    player_has_shotgun = 1;
-    player_shells = 24;
-    current_weapon = WEAPON_SHOTGUN;
 
     for (u8 f = 0; f < sizeof(forward_steps) / sizeof(forward_steps[0]); f++) {
         for (u8 l = 0; l < sizeof(lateral_steps) / sizeof(lateral_steps[0]); l++) {
@@ -1895,6 +1891,40 @@ static void configure_combat_test(void) {
         }
     }
 #endif
+}
+#endif
+
+#ifdef DOOM_COMBAT_TEST
+static void configure_combat_test(void) {
+    player_has_shotgun = 1;
+    player_shells = 24;
+    current_weapon = WEAPON_SHOTGUN;
+    place_test_imp();
+}
+#endif
+
+#ifdef DOOM_ARSENAL_TEST
+static void configure_arsenal_test(void) {
+    player_has_shotgun = 1;
+    player_has_chaingun = 1;
+    player_has_rocket_launcher = 1;
+    player_has_plasma = 1;
+    player_has_bfg = 1;
+    player_has_chainsaw = 1;
+    player_has_backpack = 1;
+    player_keys = 1 | 2 | 4;
+    player_ammo = player_max_bullets;
+    player_shells = player_max_shells;
+    player_rockets = player_max_rockets;
+    player_cells = player_max_cells;
+    player_armor = 200;
+    player_armor_class = 2;
+    current_weapon = WEAPON_PLASMA;
+    weapon_frame = 0xFF;
+    shown_ammo = 0xFFFF;
+    shown_keys = 0xFF;
+    shown_weapon_status = 0xFFFF;
+    place_test_imp();
 }
 #endif
 
@@ -3588,6 +3618,9 @@ static void restart_level(void) {
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
 #endif
+#ifdef DOOM_ARSENAL_TEST
+    configure_arsenal_test();
+#endif
     init_background();
     init_walls();
     init_hud();
@@ -3613,6 +3646,9 @@ int main(void) {
     init_runtime_things();
 #ifdef DOOM_COMBAT_TEST
     configure_combat_test();
+#endif
+#ifdef DOOM_ARSENAL_TEST
+    configure_arsenal_test();
 #endif
     compute_level_totals();
 
