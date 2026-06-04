@@ -4309,22 +4309,28 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
     }
 }
 
+static int world_sprite_floor_y(int h) {
+    int floor_y = (GAME_H + h) / 2;
+    if (floor_y < HORIZON + 8) floor_y = HORIZON + 8;
+    if (floor_y > GAME_H - 4) floor_y = GAME_H - 4;
+    return floor_y;
+}
+
 static int world_sprite_origin_y(u16 thing_type, int h) {
-    int origin_y = GAME_H - 6;
+    int origin_y = world_sprite_floor_y(h);
     int weapon_top = GAME_H - WEAPON_WIN * 16 + WEAPON_Y_OFFSET;
 
     if (thing_is_monster(thing_type)) {
-        int perspective_bottom = (GAME_H + h) / 2;
         int lift = h < 48 ? 18 : (h < 80 ? 12 : 6);
-        origin_y = perspective_bottom + lift;
+        origin_y += lift;
         if (origin_y < GAME_H - 70) origin_y = GAME_H - 70;
         if (origin_y > GAME_H - 10) origin_y = GAME_H - 10;
         return origin_y;
     }
 
-    if (thing_is_corpse(thing_type)) return GAME_H - 20;
-    if (thing_is_pickup(thing_type)) return GAME_H - 8;
-    if (thing_is_barrel(thing_type)) return GAME_H - 8;
+    if (thing_is_corpse(thing_type)) return origin_y + 2;
+    if (thing_is_pickup(thing_type)) return origin_y + 1;
+    if (thing_is_barrel(thing_type)) return origin_y + 1;
 
     if (h < 80 && origin_y > weapon_top + 6) origin_y = weapon_top + 6;
     return origin_y;

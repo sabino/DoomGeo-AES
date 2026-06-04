@@ -74,15 +74,16 @@ def main() -> int:
             print(error, file=sys.stderr)
         return 1
 
-    left_powerups = score_region(image, (120, 390, 430, 555))
-    right_powerups = score_region(image, (520, 390, 820, 555))
+    left_powerups = score_region(image, (180, 260, 520, 470))
+    right_powerups = score_region(image, (520, 300, 850, 460))
     imp = score_region(image, (390, 250, 590, 430))
     playfield = score_region(image, (100, 220, 850, 555))
     hud = score_region(image, (0, 560, 960, 672))
 
-    require_min(errors, path, "left powerup pickups", left_powerups, "blue", 1200)
-    require_min(errors, path, "left powerup pickups", left_powerups, "tan", 3000)
-    require_min(errors, path, "right powerup pickups", right_powerups, "tan", 3000)
+    require_min(errors, path, "left powerup pickups", left_powerups, "blue", 500)
+    require_min(errors, path, "left powerup pickups", left_powerups, "tan", 7000)
+    require_min(errors, path, "right powerup pickups", right_powerups, "green", 500)
+    require_min(errors, path, "right powerup pickups", right_powerups, "tan", 2500)
     require_min(errors, path, "visible imp", imp, "tan", 1000)
     require_min(errors, path, "visible imp", imp, "red", 500)
     require_min(errors, path, "powerup playfield", playfield, "colored", 50000)
