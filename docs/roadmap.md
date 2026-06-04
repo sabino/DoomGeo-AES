@@ -30,9 +30,9 @@ after the current documentation pass.
   now that monster tiles fit inside the visible C-ROM tile range. Normal builds
   now preserve converted WAD monster placement; use
   `DOOM_REVEAL_HIDDEN_MONSTERS` only as an explicit debug aid.
-- Add exact sprites/effects for any registered-only powerup frames that are not
-  present in the shareware WAD, and add better player feedback for timed
-  powerups as palette/HUD budget allows.
+- Add exact sprites for any registered-only powerup frames that are not present
+  in the shareware WAD, then consider HUD countdown/status feedback beyond the
+  current timed-powerup palette tint.
 
 ## Rendering Fidelity
 

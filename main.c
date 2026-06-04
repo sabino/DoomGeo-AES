@@ -13,12 +13,18 @@ static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
 static u8 bonus_flash = 0;
 static u8 palette_effect = 0;
+static u8 power_palette_kind = 0;
 static u8 face_pain_timer = 0;
 static u8 face_evil_timer = 0;
 static u8 face_turn_timer = 0;
 static u8 face_turn_frame = 0;
 static u8 face_idle_tick = 0;
 static u8 face_idle_variant = 0;
+static u16 power_invuln_timer = 0;
+static u16 power_invis_timer = 0;
+static u16 power_radsuit_timer = 0;
+static u16 power_lightamp_timer = 0;
+static u8 power_computer_map = 0;
 
 /* ---- palette setup --------------------------------------------------- */
 static u8 shade_channel(u8 value, u16 scale) {
@@ -142,6 +148,98 @@ static void set_bonus_palettes(void) {
     set_bonus_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS);
 }
 
+static u8 power_tint_channel(u8 value, u8 kind, u8 component) {
+    int out = value;
+    switch (kind) {
+    case 1: /* invulnerability: bright washed-out playfield */
+        out = value + 9;
+        break;
+    case 2: /* radiation suit: restrained green cast */
+        if (component == 1) out = value + 6;
+        else out = value * 3 / 4;
+        break;
+    case 3: /* partial invisibility: cool dimming */
+        if (component == 2) out = value + 7;
+        else out = value * 2 / 3;
+        break;
+    case 4: /* light goggles: brighter but not muzzle-flash bright */
+        out = value + 4;
+        break;
+    default:
+        break;
+    }
+    return clamp31(out);
+}
+
+static void set_power_tinted_palette(u16 pal, const u8 rgb[][3], u16 colors, u8 kind) {
+    for (u16 i = 0; i < colors; i++) {
+        u8 r = power_tint_channel(rgb[i][0], kind, 0);
+        u8 g = power_tint_channel(rgb[i][1], kind, 1);
+        u8 b = power_tint_channel(rgb[i][2], kind, 2);
+        pal_set(pal, (u16)(i + 1), RGB(r, g, b));
+    }
+}
+
+static void set_power_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors, u8 kind) {
+    for (int b = 0; b < DEPTH_BANDS; b++) {
+        int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
+        for (int s = 0; s < 2; s++) {
+            int sf = s ? 140 : 256;
+            u16 pal = (u16)(base + s * DEPTH_BANDS + b);
+            for (u16 i = 0; i < colors; i++) {
+                u8 r = (u8)(rgb[i][0] * fn / 256 * sf / 256);
+                u8 g = (u8)(rgb[i][1] * fn / 256 * sf / 256);
+                u8 bl = (u8)(rgb[i][2] * fn / 256 * sf / 256);
+                pal_set(pal, (u16)(i + 1), RGB(power_tint_channel(r, kind, 0),
+                                               power_tint_channel(g, kind, 1),
+                                               power_tint_channel(bl, kind, 2)));
+            }
+        }
+    }
+}
+
+static void set_power_flat_gradients(u8 kind) {
+    set_power_tinted_palette(PAL_CEILING, g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, kind);
+    set_power_tinted_palette(PAL_FLOOR, g_floor_palette_rgb, FLOOR_PALETTE_COLORS, kind);
+    for (u16 row = 0; row < BG_SPLIT; row++) {
+        u16 ceiling_scale = (u16)(90 + row * 24);
+        u16 floor_scale = (u16)(150 + row * 42);
+        for (u16 i = 0; i < CEILING_PALETTE_COLORS; i++) {
+            u8 r = shade_channel(g_ceiling_palette_rgb[i][0], ceiling_scale);
+            u8 g = shade_channel(g_ceiling_palette_rgb[i][1], ceiling_scale);
+            u8 b = shade_channel(g_ceiling_palette_rgb[i][2], ceiling_scale);
+            pal_set((u16)(PAL_CEILING_GRAD_BASE + row), (u16)(i + 1),
+                    RGB(power_tint_channel(r, kind, 0), power_tint_channel(g, kind, 1), power_tint_channel(b, kind, 2)));
+        }
+        for (u16 i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+            u8 r = shade_channel(g_floor_palette_rgb[i][0], floor_scale);
+            u8 g = shade_channel(g_floor_palette_rgb[i][1], floor_scale);
+            u8 b = shade_channel(g_floor_palette_rgb[i][2], floor_scale);
+            pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)(i + 1),
+                    RGB(power_tint_channel(r, kind, 0), power_tint_channel(g, kind, 1), power_tint_channel(b, kind, 2)));
+        }
+    }
+}
+
+static void set_power_palettes(u8 kind) {
+    set_power_flat_gradients(kind);
+    set_power_tinted_palette(PAL_WEAPON, g_weapon_palette_rgb, WEAPON_PALETTE_COLORS, kind);
+    set_power_depth_palette_range(PAL_DEPTH_BASE, g_wall_palette_rgb, WALL_PALETTE_COLORS, kind);
+    for (u16 alt = 0; alt < WALL_ALT_TEXTURE_COUNT; alt++) {
+        u16 base = (u16)(PAL_WALL_ALT_DEPTH_BASE + alt * PAL_WALL_ALT_DEPTH_STRIDE);
+        set_power_depth_palette_range(base, g_wall_alt_palette_rgb[alt], WALL_ALT_PALETTE_COLORS, kind);
+    }
+    set_power_depth_palette_range(PAL_DOOR_DEPTH_BASE, g_door_palette_rgb, DOOR_PALETTE_COLORS, kind);
+}
+
+static u8 current_power_palette_kind(void) {
+    if (power_invuln_timer) return 1;
+    if (power_radsuit_timer) return 2;
+    if (power_invis_timer) return 3;
+    if (power_lightamp_timer) return 4;
+    return 0;
+}
+
 static void restore_weapon_palette(void) {
     for (int i = 0; i < WEAPON_PALETTE_COLORS; i++) {
         pal_set(PAL_WEAPON, (u16)(i + 1), RGB(g_weapon_palette_rgb[i][0], g_weapon_palette_rgb[i][1], g_weapon_palette_rgb[i][2]));
@@ -213,6 +311,7 @@ static void set_hurt_palettes(void) {
 }
 
 static void update_hurt_flash(void) {
+    u8 active_power_kind = current_power_palette_kind();
     if (hurt_flash) {
         if (palette_effect != 1) {
             set_hurt_palettes();
@@ -231,10 +330,18 @@ static void update_hurt_flash(void) {
             palette_effect = 2;
         }
         muzzle_flash--;
+    } else if (active_power_kind) {
+        if (palette_effect != 4 || power_palette_kind != active_power_kind) {
+            set_power_palettes(active_power_kind);
+            palette_effect = 4;
+            power_palette_kind = active_power_kind;
+            REG_BACKDROP = RGB(0, 0, 0);
+        }
     } else if (palette_effect) {
         if (palette_effect == 1 || palette_effect == 2) REG_BACKDROP = RGB(0, 0, 0);
         else restore_play_palettes();
         palette_effect = 0;
+        power_palette_kind = 0;
     }
 }
 
@@ -338,11 +445,6 @@ static volatile u16 player_ammo = 50;
 static volatile u16 player_shells = 0;
 static volatile u16 player_rockets = 0;
 static volatile u16 player_cells = 0;
-static u16 power_invuln_timer = 0;
-static u16 power_invis_timer = 0;
-static u16 power_radsuit_timer = 0;
-static u16 power_lightamp_timer = 0;
-static u8 power_computer_map = 0;
 static u8 player_berserk = 0;
 static u16 player_max_bullets = 200;
 static u16 player_max_shells = 50;
@@ -411,6 +513,7 @@ static void update_weapon_flash(void) {
     } else if (weapon_flash_on) {
         restore_weapon_palette();
         weapon_flash_on = 0;
+        if (palette_effect == 4) power_palette_kind = 0;
     }
 }
 
@@ -2116,6 +2219,7 @@ static void configure_powerup_test(void) {
     place_test_thing(3, 2045, WORLD_Q8(520), WORLD_Q8(300));   /* light amplification */
     place_test_thing(4, 2022, WORLD_Q8(760), -WORLD_Q8(160));  /* invulnerability fallback */
     place_test_thing(5, 2023, WORLD_Q8(760), WORLD_Q8(160));   /* berserk fallback */
+    power_lightamp_timer = 240;                                /* visible tint smoke test */
     place_powerup_test_imp();
 }
 #endif
@@ -3939,6 +4043,7 @@ static void restart_level(void) {
     bonus_flash = 0;
     armor_flash_timer = 0;
     palette_effect = 0;
+    power_palette_kind = 0;
     face_pain_timer = 0;
     face_evil_timer = 0;
     face_turn_timer = 0;

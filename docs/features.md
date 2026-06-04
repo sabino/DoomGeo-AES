@@ -123,7 +123,9 @@ readable.
 - `make powerup-test-rom` and `make powerup-test-gngeo` build an isolated E1M1
   powerup verification ROM. It compiles with `DOOM_POWERUP_TEST`, places the
   currently supported powerup pickups and a separate visible imp in front of the
-  player, and leaves the normal cart path unchanged.
+  player, starts with a short light-amplification palette tint so timed-powerup
+  feedback can be inspected in screenshots, and leaves the normal cart path
+  unchanged.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma
@@ -142,9 +144,10 @@ readable.
   and strengthens fist damage, partial invisibility makes readable ranged
   monster attacks miss intermittently, radiation suits suppress damaging-floor
   ticks, computer maps mark the automap pickup as collected, and light goggles
-  are accepted as a timed pickup. Shareware builds bake the powerup sprites
-  whose lumps are present and use safe fallback pickup sprites for missing
-  registered-only frames.
+  are accepted as a timed pickup. Active timed powerups now get a low-priority
+  playfield/weapon palette tint that resumes after hurt, pickup, and muzzle
+  flashes. Shareware builds bake the powerup sprites whose lumps are present and
+  use safe fallback pickup sprites for missing registered-only frames.
 - Former humans, shotgun guys, imps, demons/spectres, Hell Knights, Barons,
   cacodemons, lost souls, Doom II heavy weapon dudes, revenants, mancubi,
   arachnotrons, arch-viles, pain elementals, cyberdemons, spider masterminds,
