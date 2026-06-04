@@ -181,9 +181,10 @@ readable.
   resolving thing type or exact q8 pickup distance. This keeps key, item,
   weapon, and dynamic-drop pickup behavior unchanged while avoiding most
   per-frame all-thing pickup checks.
-- Per-frame thing timer maintenance skips entries with no active flash,
-  attack, explosion, death-animation, or delayed-drop timers before touching
-  the detailed state transitions.
+- Per-frame thing timer maintenance is bounded to the shootable candidate list
+  and then skips entries with no active flash, attack, explosion,
+  death-animation, or delayed-drop timers before touching detailed state
+  transitions.
 - Weapon explosion, BFG cone, barrel splash, and sound-alert loops now reject
   dead entries and test cheap distance, readability, path, or forward-cone
   bounds before resolving runtime thing types or doing line-of-sight work. The
