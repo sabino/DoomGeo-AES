@@ -118,11 +118,12 @@
 #define FIX_DEAD_D 57               /* 57,58 plus EXIT's E draw DEAD         */
 #define FIX_DEAD_A 58
 #define FIX_KEY_BASE 59             /* 59..61 = B/R/Y key HUD glyphs         */
-#define FIX_KEY_MSG_K 62            /* K for compact locked-door KEY message */
-#define FIX_AMMO_M 63               /* M,O for compact empty-ammo AMMO msg   */
-#define FIX_AMMO_O 64
-#define FIX_SECRET_S 65             /* S,C for compact secret message        */
-#define FIX_SECRET_C 66
+#define FIX_KEY_MSG_K 62            /* K,Y for compact locked-door KEY message */
+#define FIX_KEY_MSG_Y 63
+#define FIX_AMMO_M 64               /* M,O for compact empty-ammo AMMO msg   */
+#define FIX_AMMO_O 65
+#define FIX_SECRET_S 66             /* S,C for compact secret message        */
+#define FIX_SECRET_C 67
 
  
 #define MAP_FIX_COL 1             

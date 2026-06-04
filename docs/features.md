@@ -56,8 +56,9 @@ readable.
   fix-layer rows are kept inside the metal status bar, away from the weapon
   and enemy playfield sprites. Key indicators and short messages (`KEY`,
   `AMMO`, `MED`, `ARM`, `DOR`, `SEC`, `EXIT`, `DEAD`) use fix-layer glyphs.
-- Locked-door messages include the required key color glyph, so the E1M2 red
-  keycard path can be verified visually instead of only through generated data.
+- Locked-door and key pickup messages draw a compact `KEY` label followed by
+  the required or collected key color glyph, so the E1M2 red keycard path can be
+  verified visually instead of only through generated data.
 - Owned HUD keys use the baked Doom keycard patches from the WAD, shrunken into
   the status-bar key cells with a shared WAD-derived blue/red/yellow HUD key
   palette instead of coarse placeholder glyphs or borrowed world-sprite

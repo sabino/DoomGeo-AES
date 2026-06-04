@@ -2788,8 +2788,8 @@ static void draw_key_message_for(u8 key_bits) {
     u8 key = key_glyph_for_bits(key_bits);
     fix_poke(col, row, PAL_MAP_PLAYER, FIX_KEY_MSG_K);
     fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
-    fix_poke((u16)(col + 2), row, (u16)(PAL_HUD_KEY_BASE + key), (u16)(FIX_KEY_BASE + key));
-    fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, FIX_KEY_MSG_K);
+    fix_poke((u16)(col + 2), row, PAL_MAP_PLAYER, FIX_KEY_MSG_Y);
+    fix_poke((u16)(col + 3), row, (u16)(PAL_HUD_KEY_BASE + key), (u16)(FIX_KEY_BASE + key));
 }
 
 static void draw_ammo_message(void) {
