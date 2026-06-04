@@ -955,7 +955,9 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x
     lump_ids = wad.by_name.get(sprite_name)
     if not lump_ids:
         return [], [], [], start_tile
-    patch = decode_patch(wad.lump_data(lump_ids[0]))
+    data = wad.lump_data(lump_ids[0])
+    _patch_w, _patch_h, left_offset, top_offset = patch_header(data)
+    patch = decode_patch(data)
     playpal = playpal_rgb(wad)
     palette = texture_palette(patch, playpal)
     src_h = len(patch)
@@ -969,7 +971,10 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x
         dst_h = max(1, int(round(src_h * scale)))
         strips = (dst_w + 15) // 16
         rows = (dst_h + 15) // 16
-        meta.append((sprite_name, scale, next_tile, strips, rows, dst_w, dst_h))
+        origin_x_src = (src_w - left_offset) if flip_x else left_offset
+        origin_x = int(round(origin_x_src * scale))
+        origin_y = int(round(top_offset * scale))
+        meta.append((sprite_name, scale, next_tile, strips, rows, dst_w, dst_h, origin_x, origin_y))
         for row in range(rows):
             for strip in range(strips):
                 tile = [[0] * 16 for _ in range(16)]
@@ -1120,6 +1125,8 @@ def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wal
         f.write("    u8 rows;\n")
         f.write("    u8 width;\n")
         f.write("    u8 height;\n")
+        f.write("    s16 origin_x;\n")
+        f.write("    s16 origin_y;\n")
         f.write("} DoomSpriteScale;\n\n")
         f.write("typedef struct DoomEnemySpriteDef {\n")
         f.write("    u16 thing_type;\n")
@@ -1133,8 +1140,8 @@ def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wal
         f.write("};\n\n")
         f.write(f"#define ENEMY_SCALE_COUNT {len(sprite_meta)}\n")
         f.write("static const DoomSpriteScale g_enemy_scales[ENEMY_SCALE_COUNT] = {\n")
-        for _name, _scale, base, strips, rows, width, height in sprite_meta:
-            f.write(f"    {{{base},{strips},{rows},{width},{height}}},\n")
+        for _name, _scale, base, strips, rows, width, height, origin_x, origin_y in sprite_meta:
+            f.write(f"    {{{base},{strips},{rows},{width},{height},{origin_x},{origin_y}}},\n")
         f.write("};\n\n#endif /* DOOM_GFX_GENERATED_H */\n")
 
 
@@ -1337,8 +1344,8 @@ def main():
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")
     for thing_type, angle, first_scale, scale_count, frame in sprite_defs:
         print(f"  monster sprite: thing={thing_type} angle={angle} frame={frame} scales={first_scale}..{first_scale + scale_count - 1}")
-    for name, scale, base, strips, rows, width, height in sprite_meta:
-        print(f"    sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height}")
+    for name, scale, base, strips, rows, width, height, origin_x, origin_y in sprite_meta:
+        print(f"    sprite frame: {name} scale={scale:.2f} tile={base} strips={strips} rows={rows} size={width}x{height} origin={origin_x},{origin_y}")
     print(f"  tiles encoded: blank wall-cache solid "
           f"({len(tiles)*128} C-ROM bytes used)")
 

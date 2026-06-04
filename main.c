@@ -3761,26 +3761,25 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
     }
 }
 
-static int world_sprite_bottom_y(u16 thing_type, int h, const DoomSpriteScale *meta) {
-    int bottom = GAME_H - 6;
+static int world_sprite_origin_y(u16 thing_type, int h) {
+    int origin_y = GAME_H - 6;
     int weapon_top = GAME_H - WEAPON_WIN * 16 + WEAPON_Y_OFFSET;
 
     if (thing_is_monster(thing_type)) {
         int perspective_bottom = (GAME_H + h) / 2;
         int lift = h < 48 ? 18 : (h < 80 ? 12 : 6);
-        bottom = perspective_bottom + lift;
-        if (bottom < GAME_H - 70) bottom = GAME_H - 70;
-        if (bottom > GAME_H - 10) bottom = GAME_H - 10;
-        return bottom;
+        origin_y = perspective_bottom + lift;
+        if (origin_y < GAME_H - 70) origin_y = GAME_H - 70;
+        if (origin_y > GAME_H - 10) origin_y = GAME_H - 10;
+        return origin_y;
     }
 
     if (thing_is_corpse(thing_type)) return GAME_H - 4;
     if (thing_is_pickup(thing_type)) return GAME_H - 8;
     if (thing_is_barrel(thing_type)) return GAME_H - 8;
 
-    if (h < 80 && bottom > weapon_top + 6) bottom = weapon_top + 6;
-    if (bottom < meta->height) bottom = meta->height;
-    return bottom;
+    if (h < 80 && origin_y > weapon_top + 6) origin_y = weapon_top + 6;
+    return origin_y;
 }
 
 static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash, u8 fallback_projection) {
@@ -3826,17 +3825,15 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
             enemy_tile_key[slot] = tile_key;
         }
     }
-    enemies[slot].screen_x = sx - meta->width / 2;
+    enemies[slot].screen_x = sx - meta->origin_x;
     enemies[slot].screen_w = meta->width;
     {
         u8 rendered = 0;
-        int bottom = (GAME_H + h) / 2;
         int top;
         if ((thing_is_explosion(thing_type) && thing_index < 0) || thing_is_projectile(thing_type)) {
             top = (GAME_H - meta->height) / 2;
         } else {
-            bottom = world_sprite_bottom_y(thing_type, h, meta);
-            top = bottom - meta->height + ENEMY_GROUND_LIFT;
+            top = world_sprite_origin_y(thing_type, h) - meta->origin_y + ENEMY_GROUND_LIFT;
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
