@@ -428,6 +428,9 @@ static u8  level_complete = 0;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u32 bg_pending_key = 0xFFFFFFFFUL;
 static u8  bg_update_col = 0;
+static int bg_direction_dir_x = 0x7FFFFFFF;
+static int bg_direction_dir_y = 0x7FFFFFFF;
+static u8  bg_direction_bucket = 0;
 static u8  key_message_timer = 0;
 static u8  ammo_message_timer = 0;
 static u8  door_message_timer = 0;
@@ -1185,6 +1188,9 @@ static void invalidate_background_cache(void) {
     bg_scroll_key = 0xFFFFFFFFUL;
     bg_pending_key = 0xFFFFFFFFUL;
     bg_update_col = 0;
+    bg_direction_dir_x = 0x7FFFFFFF;
+    bg_direction_dir_y = 0x7FFFFFFF;
+    bg_direction_bucket = 0;
 }
 
 static void spawn_dynamic_drop(u16 thing_type, short x_q8, short y_q8) {
@@ -3820,7 +3826,12 @@ static void update_background_scroll(void) {
 
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
-    direction = plane_direction_bucket(dir_x, dir_y);
+    if (dir_x != bg_direction_dir_x || dir_y != bg_direction_dir_y) {
+        bg_direction_dir_x = dir_x;
+        bg_direction_dir_y = dir_y;
+        bg_direction_bucket = plane_direction_bucket(dir_x, dir_y);
+    }
+    direction = bg_direction_bucket;
     {
         int scroll = (px >> 6) + (py >> 6);
         while (scroll >= BG_COUNT) scroll -= BG_COUNT;
