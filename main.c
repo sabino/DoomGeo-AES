@@ -582,6 +582,8 @@ static u16 thing_monster_indices[NG_RUNTIME_THING_COUNT];
 static u16 thing_monster_count = 0;
 static u16 thing_shootable_indices[NG_RUNTIME_THING_COUNT];
 static u16 thing_shootable_count = 0;
+static u16 thing_render_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_render_count = 0;
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
@@ -841,15 +843,26 @@ static void index_shootable_candidate(u16 thing_index) {
     }
 }
 
+static void index_render_candidate(u16 thing_index) {
+    for (u16 i = 0; i < thing_render_count; i++) {
+        if (thing_render_indices[i] == thing_index) return;
+    }
+    if (thing_render_count < NG_RUNTIME_THING_COUNT) {
+        thing_render_indices[thing_render_count++] = thing_index;
+    }
+}
+
 static void init_runtime_things(void) {
     thing_monster_count = 0;
     thing_shootable_count = 0;
+    thing_render_count = 0;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u8 thing_class;
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
         thing_class = thing_render_class(g_runtime_things[i].type);
         thing_static_class[i] = thing_class;
+        if (thing_class != THING_CLASS_NONE) index_render_candidate((u16)i);
         if (thing_class == THING_CLASS_MONSTER) {
             index_monster_candidate((u16)i);
             index_shootable_candidate((u16)i);
@@ -2477,6 +2490,7 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
     enemy_hit_flash[thing] = 0;
     enemy_attack_anim[thing] = 0;
     enemy_ranged_readable_ticks[thing] = 0;
+    if (thing_render_class(type) != THING_CLASS_NONE) index_render_candidate(thing);
     if (thing_is_monster(type)) index_monster_candidate(thing);
     if (thing_is_shootable(type)) index_shootable_candidate(thing);
     return 1;
@@ -2510,6 +2524,7 @@ static void place_test_imp(void) {
             enemy_attack_cooldown[0] = 56;
             enemy_hit_flash[0] = 0;
             enemy_attack_anim[0] = 0;
+            index_render_candidate(0);
             index_monster_candidate(0);
             index_shootable_candidate(0);
             set_monster_facing_from_delta(0, px - x, py - y);
@@ -4678,7 +4693,8 @@ static int select_visible_things(int found) {
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
 
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 ri = 0; ri < thing_render_count; ri++) {
+        int i = thing_render_indices[ri];
         int sx, h, dist_q8;
         u8 bucket;
         ThingCandidate candidate;
