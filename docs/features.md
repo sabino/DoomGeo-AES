@@ -166,7 +166,9 @@ readable.
   making projectile combat easier to read against dark wall and floor palettes.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
-  coarse wall depth buffer.
+  coarse wall depth buffer. Fallback-projected monsters use a stronger minimum
+  size and must still be large/readable before they can make ranged attacks, so
+  the game does not punish the player from tiny projection artifacts.
 - Runtime sprite lookup now refuses to draw missing sprite definitions instead
   of falling back to the first baked enemy, which prevents wrong-looking
   monsters or corrupt placeholder sprites when a WAD lacks optional art.
@@ -175,8 +177,9 @@ readable.
   world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
 - Monster visibility tests now count readable on-screen slots, not merely
-  projected-but-edge-clipped sprite metadata. This keeps hidden-monster reveal
-  and attack gating tied to sprites the player can actually see.
+  projected-but-edge-clipped sprite metadata. Ranged attack gating is stricter
+  than drawing, while close melee checks world distance plus line-of-sight so
+  nearby enemies remain dangerous without depending on a cached draw slot.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
   into corpse frames or drops where implemented. Shareware former humans,
