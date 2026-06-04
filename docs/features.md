@@ -45,6 +45,10 @@ readable.
   health, frags/kills, and armor.
 - The large status numbers are positioned over the AMMO, HEALTH, FRAG, and
   ARMOR fields with the Doom red-number palette.
+- The right-side ammo reserve counters use the WAD `STYSNUM` small digits with
+  a second dark sprite pass offset behind the yellow foreground, matching the
+  original status-bar shadow treatment more closely while staying in the sprite
+  HUD path.
 - Weapon indicators now use a Doom-style two-row ARMS layout for pistol through
   BFG weapon numbers 2-7 instead of the old continuous debug strip. The ARMS
   fix-layer rows are kept inside the metal status bar, away from the weapon
