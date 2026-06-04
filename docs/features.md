@@ -115,7 +115,8 @@ readable.
   readable on-screen world-sprite slots, so hidden/off-screen things do not
   attack through the Neo Geo sprite fallback path. Player weapon hits also
   target rendered enemies only, keeping combat feedback tied to visible sprites.
-  Imps/Barons can launch visible fireball sprites.
+  Imps/Barons can launch visible fireball sprites; those fireballs are dropped
+  if their source monster leaves the readable rendered slot set before impact.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing, which keeps distant shooters readable under the reduced 20-column
   wall pass instead of letting them collapse into near-invisible sprite strips.

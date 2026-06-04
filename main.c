@@ -277,6 +277,7 @@ static u8  missing_key_bits = 0;
 static u8  monster_ai_tick = 0;
 static u8  projectile_active = 0;
 static u8  projectile_from_player = 0;
+static int projectile_source_thing = -1;
 static u16 projectile_type = 0;
 static u8  projectile_timer = 0;
 static u8  projectile_damage = 0;
@@ -417,6 +418,14 @@ static u8 enemy_slot_is_readable(u16 slot) {
     center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
     if (center_x < 24 || center_x > SCRW - 24) return 0;
     return 1;
+}
+
+static u8 thing_has_readable_slot(int thing_index) {
+    if (thing_index < 0) return 0;
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        if (enemies[slot].thing_index == thing_index && enemy_slot_is_readable(slot)) return 1;
+    }
+    return 0;
 }
 
 static void reset_enemy_slot_cache(void);
@@ -1387,6 +1396,7 @@ static u8 spawn_monster_projectile(int thing, u16 type, u8 damage) {
     projectile_type = type;
     projectile_damage = damage;
     projectile_from_player = 0;
+    projectile_source_thing = thing;
     projectile_active = 1;
     return 1;
 }
@@ -1404,6 +1414,7 @@ static u8 spawn_player_projectile(u16 type, u8 timer) {
     projectile_type = type;
     projectile_damage = 0;
     projectile_from_player = 1;
+    projectile_source_thing = -1;
     projectile_active = 1;
     return 1;
 }
@@ -1413,6 +1424,7 @@ static void detonate_player_projectile(void) {
     if (projectile_type == 9007) damage_bfg_visible_targets();
     projectile_active = 0;
     projectile_from_player = 0;
+    projectile_source_thing = -1;
     hide_enemies();
 }
 
@@ -1441,11 +1453,23 @@ static void update_projectile(void) {
     if (!game_active()) {
         projectile_active = 0;
         projectile_from_player = 0;
+        projectile_source_thing = -1;
         return;
+    }
+    if (!projectile_from_player) {
+        if (projectile_source_thing < 0 || enemy_dead[projectile_source_thing]
+            || !thing_has_readable_slot(projectile_source_thing)) {
+            projectile_active = 0;
+            projectile_source_thing = -1;
+            return;
+        }
     }
     if (projectile_type == 9000 && projectile_damage == 0) {
         if (projectile_timer) projectile_timer--;
-        if (!projectile_timer) projectile_active = 0;
+        if (!projectile_timer) {
+            projectile_active = 0;
+            projectile_source_thing = -1;
+        }
         return;
     }
     projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
@@ -1457,6 +1481,7 @@ static void update_projectile(void) {
         }
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         projectile_active = 0;
+        projectile_source_thing = -1;
         return;
     }
     visible = project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8);
@@ -1465,12 +1490,16 @@ static void update_projectile(void) {
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         if (visible) player_take_damage(projectile_damage);
         projectile_active = 0;
+        projectile_source_thing = -1;
         return;
     }
     if (projectile_timer) projectile_timer--;
     if (!projectile_timer) {
         if (projectile_from_player) detonate_player_projectile();
-        else projectile_active = 0;
+        else {
+            projectile_active = 0;
+            projectile_source_thing = -1;
+        }
     }
 }
 
@@ -3338,6 +3367,7 @@ static void restart_level(void) {
     monster_path_timer = 0;
     projectile_active = 0;
     projectile_from_player = 0;
+    projectile_source_thing = -1;
     projectile_type = 0;
     projectile_timer = 0;
     projectile_damage = 0;
