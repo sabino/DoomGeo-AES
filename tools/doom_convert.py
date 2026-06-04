@@ -523,6 +523,7 @@ PICKUP_TYPES = {
     2002,  # chaingun
     2003,  # rocket launcher
     2004,  # plasma rifle
+    2005,  # chainsaw
     2006,  # BFG 9000
     2007,  # clip
     2008,  # shells
@@ -537,6 +538,7 @@ PICKUP_TYPES = {
     2046,  # box of rockets
     2047,  # cell charge
     2048,  # ammo box
+    2049,  # box of shells
     2035,  # explosive barrel
 }
 

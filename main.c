@@ -580,6 +580,7 @@ static u8 thing_is_pickup(u16 thing_type) {
     case 2046:
     case 2047:
     case 2048:
+    case 2049:
         return 1;
     default:
         return 0;
@@ -609,6 +610,7 @@ static u8 pickup_is_collectible(u16 thing_type) {
     case 2048: /* ammo box */
         return player_ammo < player_max_bullets;
     case 2008: /* shells */
+    case 2049: /* box of shells */
         return player_shells < player_max_shells;
     case 2010: /* rocket */
     case 2046: /* box of rockets */
@@ -978,6 +980,8 @@ static u16 fallback_sprite_type_for_missing_pickup(u16 thing_type) {
         return 6;
     case 40:   /* blue skull */
         return 5;
+    case 2049: /* box of shells */
+        return 2008; /* shells */
     default:
         return 0;
     }
@@ -2146,6 +2150,10 @@ static u8 apply_pickup(u16 thing_type) {
         break;
     case 2008: /* shells */
         if (!add_capped_u16(&player_shells, 4, player_max_shells)) return 0;
+        pickup_message_type = 3;
+        break;
+    case 2049: /* box of shells */
+        if (!add_capped_u16(&player_shells, 20, player_max_shells)) return 0;
         pickup_message_type = 3;
         break;
     case 2010: /* rocket */

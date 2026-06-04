@@ -98,9 +98,9 @@ readable.
 
 ## Things, Pickups, And Enemies
 
-- Runtime things include common E1M1 pickups, keys, ammo, cell ammo, armor,
-  health, backpack, weapons, barrels, monsters, projectiles, corpses, and
-  explosions.
+- Runtime things include common E1M1 pickups, keys, bullet/shell/rocket/cell
+  ammo, armor, health, backpack, weapons, barrels, monsters, projectiles,
+  corpses, and explosions.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -121,8 +121,10 @@ readable.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma
-  rifle, and BFG thing IDs. Pickup sprites use exact WAD frames when present;
-  missing shareware-only frames are skipped instead of breaking the build.
+  rifle, and BFG thing IDs. The converter now preserves map chainsaws, and
+  shell boxes use their own thing ID and WAD sprite when present. Pickup sprites
+  use exact WAD frames when present; missing shareware-only frames are skipped
+  instead of breaking the build.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
 - Green and blue armor pickups update both armor value and armor class. Blue
