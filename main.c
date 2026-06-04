@@ -487,6 +487,7 @@ static u16 death_anim_drop_type[NG_RUNTIME_THING_COUNT];
 static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
+static u8 thing_static_class[NG_RUNTIME_THING_COUNT];
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
@@ -661,6 +662,7 @@ static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer);
 static u8 key_bit_for_thing(u16 thing_type);
+static u8 thing_render_class(u16 thing_type);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
@@ -727,6 +729,7 @@ static void init_runtime_things(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
+        thing_static_class[i] = thing_render_class(g_runtime_things[i].type);
     }
 }
 
@@ -4455,12 +4458,42 @@ static void insert_thing_candidate(ThingCandidate *candidates, int *count, const
     if (*count < THING_CANDIDATE_COUNT) (*count)++;
 }
 
-static u8 thing_render_bucket(u16 thing_type) {
+enum {
+    THING_CLASS_NONE = 0,
+    THING_CLASS_MONSTER = 1,
+    THING_CLASS_THREAT = 2,
+    THING_CLASS_PICKUP = 3,
+    THING_CLASS_CORPSE = 4
+};
+
+static u8 thing_render_class(u16 thing_type) {
     if (thing_is_monster(thing_type)) return 1;
     if (thing_is_runtime_threat(thing_type)) return 2;
-    if (thing_is_pickup(thing_type)) return pickup_is_collectible(thing_type) ? 3 : 5;
+    if (thing_is_pickup(thing_type)) return 3;
     if (thing_is_corpse(thing_type)) return 4;
     return 0;
+}
+
+static u8 thing_render_bucket_for_class(u8 thing_class, u16 thing_type) {
+    if (thing_class == THING_CLASS_PICKUP) return pickup_is_collectible(thing_type) ? 3 : 5;
+    return thing_class;
+}
+
+static u8 thing_render_bucket(u16 thing_type) {
+    return thing_render_bucket_for_class(thing_render_class(thing_type), thing_type);
+}
+
+static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {
+    u16 type;
+    u8 thing_class;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) {
+        if (thing_type) *thing_type = 0;
+        return 0;
+    }
+    type = runtime_thing_type(thing_index);
+    if (thing_type) *thing_type = type;
+    thing_class = thing_type_override[thing_index] ? thing_render_class(type) : thing_static_class[thing_index];
+    return thing_render_bucket_for_class(thing_class, type);
 }
 
 static int thing_candidate_score(u8 bucket, u16 thing_type, int sx, int h, int dist_q8) {
@@ -4498,8 +4531,7 @@ static int select_visible_things(int found) {
         u16 thing_type;
         if (enemy_dead[i]) continue;
         if (!thing_maybe_projectable(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y)) continue;
-        thing_type = runtime_thing_type(i);
-        bucket = thing_render_bucket(thing_type);
+        bucket = runtime_thing_render_bucket(i, &thing_type);
         if (!bucket) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         u8 fallback_projection = 0;
