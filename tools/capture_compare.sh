@@ -19,6 +19,7 @@ DOOM_IWAD="${DOOM_IWAD:-.tools/assets/doom1.wad.zip}"
 native_pid=""
 make_pid=""
 neo_make_target="gngeo"
+neo_make_args=()
 neo_press_start="1"
 waypoint_note=""
 
@@ -175,12 +176,18 @@ drive_native_waypoint() {
 configure_waypoint() {
     case "$WAYPOINT" in
         start)
+            neo_make_target="episode-map-gngeo"
+            neo_make_args=("EPISODE_MAP=${MAP}")
             ;;
         e1m1-start)
             MAP="E1M1"
+            neo_make_target="episode-map-gngeo"
+            neo_make_args=("EPISODE_MAP=E1M1")
             ;;
         e1m2-start)
             MAP="E1M2"
+            neo_make_target="episode-map-gngeo"
+            neo_make_args=("EPISODE_MAP=E1M2")
             ;;
         e1m1-encounter)
             MAP="E1M1"
@@ -255,7 +262,7 @@ sleep 1.2
 drive_native_waypoint "$native_pid" "$native_title"
 capture_window "$native_pid" "$native_title" "$native_png"
 
-setsid env SDL_VIDEODRIVER=x11 make "$neo_make_target" DOOM_MAP="$MAP" > "${LOGDIR}/gngeo-compare.log" 2>&1 < /dev/null &
+setsid env SDL_VIDEODRIVER=x11 make "$neo_make_target" "${neo_make_args[@]}" DOOM_MAP="$MAP" > "${LOGDIR}/gngeo-compare.log" 2>&1 < /dev/null &
 make_pid=$!
 disown "$make_pid" 2>/dev/null || true
 neo_pid=""

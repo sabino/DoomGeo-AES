@@ -70,7 +70,7 @@ static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 static u8  kindbuf[NUM_COLS];    /* 0 = wall, 1..N = alt wall, N+1 = door   */
 static u8  curkind[NUM_COLS];
-static u8  closebuf[NUM_COLS];   /* point-blank walls use stable coarse art */
+static u8  closebuf[NUM_COLS];   /* reserved for emergency coarse-wall mips */
 static u8  curclose[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
@@ -394,7 +394,10 @@ void rc_render(void) {
         int h = projected_height_from_inv(inv_perp);     /* slice height px */
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
-        closebuf[x] = (u8)(h >= GAME_H - 4 && kindbuf[x] == 0);
+        /* Keep close walls on the baked Doom texture atlas.  The old coarse
+         * TILE_BRICK fallback avoided shimmer, but it turned nearby E1M1/E1M2
+         * walls into unreadable flat slabs and hid the converted texture cues. */
+        closebuf[x] = 0;
 
         int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */

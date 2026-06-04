@@ -340,6 +340,12 @@ readable.
   native and Neo Geo map spawns; non-start native views are approximate scripted
   movement from the native spawn while the Neo Geo side uses the corresponding
   focused verification ROM target when available.
+- The wall atlas keeps seven alternate texture banks but now spends two of
+  those banks on high-coverage Episode 1 textures (`SLADWALL` and `COMPTALL`)
+  instead of lower-impact slots. The converter maps related stone, tech,
+  computer, light, and brown variants into those existing classes so E1M2 walls
+  retain more Doom identity without adding runtime WAD parsing or more wall
+  sprites.
 - `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
   completion ROM. It starts two converted cells left of the real generated
   E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,

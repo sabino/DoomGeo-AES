@@ -414,19 +414,33 @@ def wall_texture_class(name: str) -> int:
         "BROWNGRN": 1,
         "BROWN1": 2,
         "SUPPORT2": 3,
-        "LITE3": 4,
-        "COMPTILE": 5,
-        "DOORSTOP": 6,
+        "DOORSTOP": 3,
+        "SLADWALL": 4,
+        "STONE2": 4,
+        "COMPTALL": 5,
+        "PIPE2": 5,
+        "TEKWALL1": 5,
+        "TEKWALL4": 5,
+        "METAL1": 5,
+        "COMPTILE": 6,
+        "COMPUTE2": 6,
+        "LITE3": 6,
+        "LITE4": 6,
+        "LITE5": 6,
         "BROWN144": 7,
+        "BROWN96": 7,
+        "BRNBIGL": 7,
+        "BRNBIGC": 7,
+        "BRNBIGR": 7,
     }
     return classes.get(name, 0)
 
 
 def wall_texture_priority(texture_class: int) -> int:
     priorities = {
-        6: 90,  # DOORSTOP
-        5: 80,  # COMPTILE
-        4: 70,  # LITE3
+        6: 90,  # COMPTILE / computer and light panels
+        5: 85,  # COMPTALL / tech walls
+        4: 75,  # SLADWALL / stone walls
         3: 60,  # SUPPORT2
         7: 45,  # BROWN144
         1: 40,  # BROWNGRN
