@@ -1758,9 +1758,28 @@ static void clear_projectile(void) {
     projectile_damage = 0;
 }
 
+static u8 player_rocket_hit_shootable(void) {
+    enum { ROCKET_HIT_RANGE_Q8 = WORLD_Q8(144) };
+    if (!projectile_from_player || projectile_type != 9008) return 0;
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        u16 type = runtime_thing_type(i);
+        if (enemy_dead[i] || !thing_is_shootable(type)) continue;
+        if (iabs16(thing_x_q8[i] - projectile_x_q8) <= ROCKET_HIT_RANGE_Q8
+            && iabs16(thing_y_q8[i] - projectile_y_q8) <= ROCKET_HIT_RANGE_Q8) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void detonate_player_projectile(void) {
+    u16 type = projectile_type;
     spawn_impact_effect(projectile_x_q8, projectile_y_q8, 12);
-    if (projectile_type == 9007) damage_bfg_targets();
+    if (type == 9007) {
+        damage_bfg_targets();
+    } else if (type == 9008) {
+        damage_rocket_radius(projectile_x_q8, projectile_y_q8);
+    }
     clear_projectile();
     hide_enemies();
 }
@@ -1812,6 +1831,10 @@ static void update_projectile(void) {
         }
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         clear_projectile();
+        return;
+    }
+    if (player_rocket_hit_shootable()) {
+        detonate_player_projectile();
         return;
     }
     rc_player_q8(&px, &py);
@@ -3756,7 +3779,9 @@ static void update_weapon(u8 pressed) {
             fire_timer = 20;
             trigger_weapon_flash();
             alert_monsters_by_sound();
-            damage_rocket_target();
+            if (!spawn_player_projectile(9008, 24)) {
+                damage_rocket_target();
+            }
         } else if (current_weapon == WEAPON_PLASMA && player_has_plasma) {
             if (player_cells > 0) {
                 player_cells--;
@@ -4120,7 +4145,9 @@ static int select_visible_things(int found, u8 pass) {
 static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
-    if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
+    if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) {
+        if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
+    }
     if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0, 0)) return found + 1;
     return found;
 }
@@ -4128,7 +4155,9 @@ static int render_visible_projectile(int found) {
 static int render_visible_impact(int found) {
     int sx, h, dist_q8;
     if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
-    if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
+    if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) {
+        if (!project_point_q8(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) return found;
+    }
     if (render_type_slot((u16)found, -1, 9000, sx, h, dist_q8, 0, 0)) return found + 1;
     return found;
 }

@@ -103,6 +103,11 @@ readable.
 - Muzzle and impact feedback use palette flashes and projected explosion
   sprites. Monster fireballs now spawn the same impact burst when they hit a
   wall or the player instead of disappearing silently.
+- The rocket launcher now launches a visible forward projectile using the
+  current baked fireball strip placeholder. It detonates into the existing
+  compact splash-damage path when it hits a wall, crosses a shootable thing, or
+  times out; if the one-projectile runtime slot is already busy, it falls back
+  to the older instant splash path.
 
 ## Things, Pickups, And Enemies
 
