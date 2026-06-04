@@ -3854,6 +3854,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
+    enum { MONSTER_MIN_H = 49, MONSTER_FALLBACK_MIN_H = 64 };
 
     if (def_idx < 0) {
         hide_enemy_slot(slot);
@@ -3861,7 +3862,9 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     }
     def = &g_enemy_sprite_defs[def_idx];
 
-    if (thing_is_monster(thing_type) && h > 0 && h < (fallback_projection ? 56 : 34)) h = fallback_projection ? 56 : 34;
+    if (thing_is_monster(thing_type) && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
+        h = fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H;
+    }
     if (thing_is_projectile(thing_type) && h > 0 && h < 28) h = 28;
     if (thing_is_explosion(thing_type) && h > 0 && h < 34) h = 34;
 

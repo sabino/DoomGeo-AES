@@ -198,8 +198,10 @@ readable.
   applies damage and hurt feedback instead of depending on whether the fireball
   still projects cleanly on the exact collision frame.
 - Visible monsters are clamped to a minimum projected sprite size before
-  drawing, which keeps distant shooters readable under the reduced 20-column
-  wall pass instead of letting them collapse into near-invisible sprite strips.
+  drawing. Normal live monsters stay in at least the half-size baked strip tier
+  and fallback-projected monsters get a slightly stronger floor, which keeps
+  distant shooters readable under the reduced 20-column wall pass instead of
+  letting them collapse into near-invisible sprite strips.
 - Monster, pickup, barrel, and corpse sprites preserve the source WAD patch
   `leftoffset`/`topoffset` while being baked into Neo Geo strips. Runtime
   placement applies those origins to a floor/reference baseline, keeping things
