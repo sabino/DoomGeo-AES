@@ -53,6 +53,11 @@ readable.
   keep the older 16-column atlases. The current preferred wall texture is
   `STARTAN3`, with alternate atlases for common E1M1 walls and `BIGDOOR2`
   doors.
+- Each baked wall strip samples the narrow source texture band represented by
+  that phase instead of repeating a single source texel across the 16-pixel
+  Neo Geo tile. The runtime still draws one sprite strip per wall column, but
+  close doors and panels retain more horizontal texture detail after hardware
+  shrink.
 - Floor and ceiling use compact pre-baked perspective tile caches selected by
   player direction and coarse position. Clarity mode uses four direction buckets
   to free C-ROM and sprite-tile headroom for the denser wall atlases; the other

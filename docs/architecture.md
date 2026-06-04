@@ -55,6 +55,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 
 - Doom wall textures are precomposed from `TEXTURE1`/`PNAMES`/patches into tile
   strip atlases.
+- Wall strip tiles are still selected by compact texture phase at runtime, but
+  each offline tile now preserves the horizontal source band for that phase
+  instead of flattening it to one repeated texel column.
 - The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
   clarity mode emits 32-phase wall/door atlases and a four-direction plane
   cache, while quality/balanced/speed keep the 16-phase wall atlases and

@@ -493,13 +493,14 @@ def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
 def sample_wall_column_tile(texture, playpal, palette, tex_col, tex_row, cols, rows):
     height = len(texture)
     width = len(texture[0])
-    tx = min(width - 1, int((tex_col + 0.5) * width / cols))
+    src_x0 = tex_col * width / cols
+    src_x1 = (tex_col + 1) * width / cols
     tile = [[0] * 16 for _ in range(16)]
     for y in range(16):
         ty = min(height - 1, int(((tex_row * 16) + y + 0.5) * height / (rows * 16)))
-        color = quantize_color(texture[ty][tx], playpal, palette)
         for x in range(16):
-            tile[y][x] = color
+            tx = min(width - 1, int(src_x0 + (x + 0.5) * (src_x1 - src_x0) / 16))
+            tile[y][x] = quantize_color(texture[ty][tx], playpal, palette)
     return tile
 
 
