@@ -2110,11 +2110,13 @@ static int player_projectile_hit_shootable(void) {
     projectile_cell_y = projectile_y_q8 >> 8;
     for (u16 si = 0; si < thing_shootable_count; si++) {
         u16 i = thing_shootable_indices[si];
-        if (iabs16((thing_x_q8[i] >> 8) - projectile_cell_x) > coarse_cells) continue;
-        if (iabs16((thing_y_q8[i] >> 8) - projectile_cell_y) > coarse_cells) continue;
+        short thing_x = thing_x_q8[i];
+        short thing_y = thing_y_q8[i];
+        if (iabs16((thing_x >> 8) - projectile_cell_x) > coarse_cells) continue;
+        if (iabs16((thing_y >> 8) - projectile_cell_y) > coarse_cells) continue;
         if (enemy_dead[i] || !runtime_thing_is_shootable(i)) continue;
-        if (iabs16(thing_x_q8[i] - projectile_x_q8) <= hit_range_q8
-            && iabs16(thing_y_q8[i] - projectile_y_q8) <= hit_range_q8) {
+        if (iabs16(thing_x - projectile_x_q8) <= hit_range_q8
+            && iabs16(thing_y - projectile_y_q8) <= hit_range_q8) {
             return i;
         }
     }
