@@ -108,9 +108,12 @@ readable.
 - Weapon pickups and manual weapon changes briefly flash the selected Doom slot
   number in the center fix-layer message area, giving immediate feedback for C
   cycling and C+D-pad shortcuts without opening the minimap.
-- Muzzle and impact feedback use palette flashes and projected explosion
-  sprites. Monster fireballs now spawn the same impact burst when they hit a
-  wall or the player instead of disappearing silently.
+- Muzzle, hurt, and impact feedback use palette flashes and projected explosion
+  sprites. Hurt feedback tints the active Doom playfield and weapon palettes
+  instead of flashing the raw Neo Geo backdrop, avoiding full-height red edge
+  leaks if sprite coverage drops out during busy scenes. Monster fireballs now
+  spawn the same impact burst when they hit a wall or the player instead of
+  disappearing silently.
 - The rocket launcher now launches a visible forward projectile using the
   current baked fireball strip placeholder. It detonates into the existing
   compact splash-damage path when it hits a wall, crosses a shootable thing, or
