@@ -1342,10 +1342,12 @@ static void load_enemy_hit_palette(u16 slot) {
 
 static u8 damage_enemy_at(int thing_index, u8 damage) {
     u8 killed = 0;
+    u16 source_type;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
-    if (!thing_is_shootable(runtime_thing_type(thing_index))) return 0;
+    source_type = runtime_thing_type(thing_index);
+    if (!thing_is_shootable(source_type)) return 0;
     if (enemy_dead[thing_index]) return 0;
-    if (thing_is_barrel(runtime_thing_type(thing_index))) {
+    if (thing_is_barrel(source_type)) {
         thing_type_override[thing_index] = 9000;
         explosion_timer[thing_index] = 12;
         enemy_dead[thing_index] = 0;
@@ -1360,7 +1362,6 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
     {
         short x = thing_x_q8[thing_index];
         short y = thing_y_q8[thing_index];
-        u16 source_type = runtime_thing_type(thing_index);
         u16 drop_type = monster_drop_type(source_type);
         u16 corpse_type = monster_corpse_type(source_type);
         u16 death_type = monster_death_anim_type(source_type);
@@ -1370,7 +1371,10 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
         else hp = (u8)(hp - damage);
 
         for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-            if (thing_is_monster(runtime_thing_type(i)) && thing_x_q8[i] == x && thing_y_q8[i] == y) {
+            u16 type;
+            if (thing_x_q8[i] != x || thing_y_q8[i] != y) continue;
+            type = runtime_thing_type(i);
+            if (thing_is_monster(type)) {
                 enemy_hp[i] = hp;
                 enemy_awake[i] = 1;
                 if (hp == 0) {
@@ -2017,17 +2021,19 @@ static void update_monster_damage(void) {
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
+        u16 type;
         u8 ranged_damage;
         if (thing < 0) continue;
-        if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_can_ranged_attack(slot)) continue;
         if (enemy_ranged_readable_ticks[thing] < RANGED_READABLE_WARMUP) continue;
-        ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
+        type = runtime_thing_type(thing);
+        if (!thing_is_monster(type)) continue;
+        ranged_damage = monster_ranged_damage(type);
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
-            u16 projectile = monster_projectile_type(runtime_thing_type(thing));
+            u16 projectile = monster_projectile_type(type);
             if (power_invis_timer && ((monster_ai_tick + thing) & 1)) {
                 enemy_attack_cooldown[thing] = 24;
                 continue;
@@ -3555,10 +3561,12 @@ static u8 minimap_has_pickup(int vx, int vy) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int x;
         int y;
-        if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
+        if (enemy_dead[i]) continue;
         x = thing_x_q8[i] >> 8;
         y = thing_y_q8[i] >> 8;
-        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
+        if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
+        if (!thing_is_pickup(runtime_thing_type(i))) continue;
+        return 1;
     }
     for (u8 i = 0; i < 8; i++) {
         int x;
@@ -3579,11 +3587,14 @@ static u8 minimap_has_threat(int vx, int vy) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int x;
         int y;
-        u16 type = runtime_thing_type(i);
-        if (enemy_dead[i] || (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type))) continue;
+        u16 type;
+        if (enemy_dead[i]) continue;
         x = thing_x_q8[i] >> 8;
         y = thing_y_q8[i] >> 8;
-        if (x >= x0 && x < x1 && y >= y0 && y < y1) return 1;
+        if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
+        type = runtime_thing_type(i);
+        if (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type)) continue;
+        return 1;
     }
     return 0;
 }
@@ -4495,9 +4506,12 @@ static void update_enemy_ranged_readiness(void) {
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
+        u16 type;
         if (thing < 0) continue;
-        if (enemy_dead[thing] || !thing_is_monster(runtime_thing_type(thing))) continue;
+        if (enemy_dead[thing]) continue;
         if (!enemy_slot_can_ranged_attack(slot)) continue;
+        type = runtime_thing_type(thing);
+        if (!thing_is_monster(type)) continue;
         current[current_count++] = (short)thing;
         if (enemy_ranged_readable_ticks[thing] < 255) enemy_ranged_readable_ticks[thing]++;
     }

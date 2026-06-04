@@ -158,6 +158,10 @@ readable.
   world-sprite slots. That replaces another per-frame scan across all converted
   runtime things with a bounded pass over the seven visible slots plus the
   previous seven-slot list.
+- Combat damage and ranged attack paths reuse resolved runtime thing types
+  after cheap coordinate, cooldown, and readability checks, reducing repeated
+  per-frame classification work during active fights without changing damage,
+  drops, or score behavior.
 - Close monster melee now uses the same bounded readable-slot list instead of
   scanning every converted runtime thing. It still requires close world
   distance, projection, screen position, and line-of-sight before applying
@@ -414,6 +418,9 @@ readable.
 - Minimap overlay checks compare source-cell ranges for doors, exits, pickups,
   and threats instead of repeatedly converting every thing back into minimap
   coordinates for each drawn cell.
+- Pickup and threat overlay checks also reject out-of-range source cells before
+  resolving thing type, so opening/redrawing the map does less classification
+  work on distant E1M1 objects.
 - Moving monsters repaint their old and new minimap source cells while the map
   is open, so threat markers stay tied to real WAD/AI positions instead of
   leaving stale dots behind.
