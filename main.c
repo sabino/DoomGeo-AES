@@ -668,6 +668,8 @@ static void spawn_impact_effect(short x_q8, short y_q8, u8 timer);
 static u8 key_bit_for_thing(u16 thing_type);
 static u8 thing_render_class(u16 thing_type);
 static u8 runtime_thing_is_monster(int thing_index);
+static u8 runtime_thing_is_pickup(int thing_index);
+static u8 runtime_thing_is_threat(int thing_index);
 
 static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
@@ -2879,8 +2881,8 @@ static void collect_nearby_pickups(void) {
         if (enemy_dead[i]) continue;
         if (iabs16((thing_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
         if (iabs16((thing_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
+        if (!runtime_thing_is_pickup(i)) continue;
         type = runtime_thing_type(i);
-        if (!thing_is_pickup(type)) continue;
         if (iabs16(px - thing_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - thing_y_q8[i]) <= PICKUP_RANGE_Q8) {
             if (apply_pickup(type)) {
                 if (player_items < 999) player_items++;
@@ -3650,7 +3652,7 @@ static u8 minimap_has_pickup(int vx, int vy) {
         x = thing_x_q8[i] >> 8;
         y = thing_y_q8[i] >> 8;
         if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
-        if (!thing_is_pickup(runtime_thing_type(i))) continue;
+        if (!runtime_thing_is_pickup(i)) continue;
         return 1;
     }
     for (u8 i = 0; i < 8; i++) {
@@ -3672,13 +3674,11 @@ static u8 minimap_has_threat(int vx, int vy) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int x;
         int y;
-        u16 type;
         if (enemy_dead[i]) continue;
         x = thing_x_q8[i] >> 8;
         y = thing_y_q8[i] >> 8;
         if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
-        type = runtime_thing_type(i);
-        if (!thing_is_monster(type) && !thing_is_barrel(type) && !thing_is_explosion(type)) continue;
+        if (!runtime_thing_is_threat(i)) continue;
         return 1;
     }
     return 0;
@@ -4492,6 +4492,20 @@ static u8 runtime_thing_is_monster(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_monster(thing_type_override[thing_index]);
     return thing_static_class[thing_index] == THING_CLASS_MONSTER;
+}
+
+static u8 runtime_thing_is_pickup(int thing_index) {
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_type_override[thing_index]) return thing_is_pickup(thing_type_override[thing_index]);
+    return thing_static_class[thing_index] == THING_CLASS_PICKUP;
+}
+
+static u8 runtime_thing_is_threat(int thing_index) {
+    u8 thing_class;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+    if (thing_type_override[thing_index]) return thing_is_runtime_threat(thing_type_override[thing_index]);
+    thing_class = thing_static_class[thing_index];
+    return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
 }
 
 static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {
