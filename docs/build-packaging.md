@@ -54,7 +54,8 @@ launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 such as the E1M2 key-test ROM, the focused red key/door ROM, the combat
 verification ROM, the focused real E1M1 encounter ROM, the close-combat
 verification ROM, the living-monster gallery ROM, the weapons/keycard arsenal
-verification ROM, or the powerup verification ROM:
+verification ROM, the death/drop verification ROM, or the powerup verification
+ROM:
 
 ```sh
 SMOKE_BUILD_TARGET=combat-test-rom \
@@ -75,6 +76,10 @@ For a real converted E1M1 monster visibility pass, run
 `tools/smoke_e1m1_encounter.sh`. It builds `make encounter-test-rom`, launches
 `make encounter-test-gngeo`, and captures both the initial focused encounter and
 one pistol-fire frame against an existing WAD-derived shotgun guy.
+
+For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
+`make death-test-rom`, launches `make death-test-gngeo`, and captures the staged
+shareware corpse sprites plus the dropped shotgun pickup above the status bar.
 
 ```sh
 SMOKE_BUILD_TARGET=melee-test-rom \

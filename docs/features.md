@@ -168,6 +168,8 @@ readable.
   corpse/drop verification ROM. It compiles with `DOOM_DEATH_TEST`, places
   shareware Doom corpse sprites and a dropped shotgun in front of the player,
   and leaves the normal cart path unchanged.
+- `tools/smoke_death_drop.sh` captures that death/drop ROM through the same
+  GnGeo screenshot path used by the other visual regression helpers.
 - `make powerup-test-rom` and `make powerup-test-gngeo` build an isolated E1M1
   powerup verification ROM. It compiles with `DOOM_POWERUP_TEST`, places the
   currently supported powerup pickups and a separate visible imp in front of the
