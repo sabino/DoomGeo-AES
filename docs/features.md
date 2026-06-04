@@ -216,9 +216,12 @@ readable.
   attack/pain buckets and finally to walking frames when a WAD has incomplete
   reaction art.
 - Monsters keep health, awake state, pain flash/pause, attack cooldown, and a
-  mutable position layer. Awakened monsters follow a coarse player distance
-  field so they can move around converted E1M1 walls instead of getting stuck
-  on direct-line chase.
+  mutable position layer. Sleeping monsters now wake from line-of-sight or the
+  weapon sound-alert path instead of waking through walls by proximity alone,
+  so the normal E1M1 start does not create hidden pressure before the player
+  has seen or alerted enemies. Awakened monsters follow a coarse player
+  distance field so they can move around converted E1M1 walls instead of
+  getting stuck on direct-line chase.
 - Normal builds keep monsters at their converted WAD positions. The old helper
   that relocated hidden monsters near the player is now available only behind
   the explicit `DOOM_REVEAL_HIDDEN_MONSTERS` debug macro, so real-map play does

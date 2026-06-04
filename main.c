@@ -2207,6 +2207,7 @@ static void update_monster_ai(void) {
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
+            if (!line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
             enemy_awake[i] = 1;
             enemy_attack_cooldown[i] = 28;
         }
