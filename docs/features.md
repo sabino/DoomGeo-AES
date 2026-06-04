@@ -216,6 +216,9 @@ readable.
   before runtime type lookup and exact projection. The exact projector and
   screen bounds still decide everything near the view, so visible E1M1
   monsters, drops, and pickups keep their normal priority path.
+- Sprite fallback projection reuses the player/view state already loaded for the
+  candidate pass, and fallback line-of-sight checks use that same cached player
+  point instead of querying the raycaster again per candidate.
 - The world-sprite selector no longer clears its candidate buffer or visible
   slot ids before immediately overwriting or hiding them. This removes redundant
   per-frame writes from the normal E1M1 render path while preserving the same

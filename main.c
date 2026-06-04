@@ -798,16 +798,14 @@ static u8 player_line_of_sight_to(short x_q8, short y_q8) {
     return line_of_sight_q8((short)px, (short)py, x_q8, y_q8);
 }
 
-static u8 project_point_q8(short world_x_q8, short world_y_q8, int *screen_x, int *height, int *dist_q8) {
-    int px, py;
-    int dir_x, dir_y, plane_x, plane_y;
+static u8 project_point_from_view_q8(short world_x_q8, short world_y_q8, int px, int py,
+                                     int dir_x, int dir_y, int plane_x, int plane_y,
+                                     int *screen_x, int *height, int *dist_q8) {
     long sprite_x;
     long sprite_y;
     long det;
     long transform_x;
     long transform_y;
-    rc_player_q8(&px, &py);
-    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     sprite_x = (long)world_x_q8 - px;
     sprite_y = (long)world_y_q8 - py;
     det = (long)plane_x * dir_y - (long)dir_x * plane_y;
@@ -821,6 +819,15 @@ static u8 project_point_q8(short world_x_q8, short world_y_q8, int *screen_x, in
     if (*height > GAME_H) *height = GAME_H;
     *dist_q8 = (int)transform_y;
     return 1;
+}
+
+static u8 project_point_q8(short world_x_q8, short world_y_q8, int *screen_x, int *height, int *dist_q8) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    return project_point_from_view_q8(world_x_q8, world_y_q8, px, py, dir_x, dir_y, plane_x, plane_y,
+                                      screen_x, height, dist_q8);
 }
 
 static u8 game_active(void) {
@@ -4739,9 +4746,10 @@ static int select_visible_things(int found) {
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
-            if (!project_point_q8(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
+            if (!project_point_from_view_q8(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y,
+                                            &sx, &h, &dist_q8)) continue;
             if (sx < -48 || sx > SCRW + 48) continue;
-            if (!player_line_of_sight_to(thing_x_q8[i], thing_y_q8[i])) continue;
+            if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
             fallback_projection = 1;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
@@ -4771,9 +4779,10 @@ static int select_visible_things(int found) {
         if (!thing_maybe_projectable(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
-            if (!project_point_q8(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) continue;
+            if (!project_point_from_view_q8(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y,
+                                            &sx, &h, &dist_q8)) continue;
             if (sx < -48 || sx > SCRW + 48) continue;
-            if (!player_line_of_sight_to(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+            if (!line_of_sight_q8((short)px, (short)py, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
             fallback_projection = 1;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
