@@ -3388,6 +3388,8 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     def = &g_enemy_sprite_defs[def_idx];
 
     if (thing_is_monster(thing_type) && h > 0 && h < 34) h = 34;
+    if (thing_is_projectile(thing_type) && h > 0 && h < 28) h = 28;
+    if (thing_is_explosion(thing_type) && h > 0 && h < 34) h = 34;
 
     enemies[slot].thing_index = thing_index;
     enemies[slot].sprite_def = def_idx;

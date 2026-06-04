@@ -152,6 +152,8 @@ readable.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing, which keeps distant shooters readable under the reduced 20-column
   wall pass instead of letting them collapse into near-invisible sprite strips.
+- Visible fireballs and impact bursts also keep a small minimum projected size,
+  making projectile combat easier to read against dark wall and floor palettes.
 - Thing projection falls back to a q8 player/view-vector projection after a
   successful map line-of-sight check, which avoids false sprite culling from the
   coarse wall depth buffer.
