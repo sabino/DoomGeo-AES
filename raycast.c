@@ -124,6 +124,17 @@ void rc_invalidate_view(void) {
     view_dirty = 1;
 }
 
+void rc_set_pose_q8(short x_q8, short y_q8, short dir_x_q8, short dir_y_q8) {
+    posX = ((fix)x_q8) << (FBITS - 8);
+    posY = ((fix)y_q8) << (FBITS - 8);
+    dirX = ((fix)dir_x_q8) << (FBITS - 8);
+    dirY = ((fix)dir_y_q8) << (FBITS - 8);
+    planeX = -fmul(dirY, FIX(0.66));
+    planeY =  fmul(dirX, FIX(0.66));
+    update_projection_cache();
+    rc_invalidate_view();
+}
+
 static void rotate(int sign) {
     fix cs = FIX(ROT_COS);
     fix sn = sign < 0 ? -FIX(ROT_SIN) : FIX(ROT_SIN);
