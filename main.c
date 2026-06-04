@@ -2406,6 +2406,31 @@ static int trace_closed_door_in_view(int px, int py, int dir_x, int dir_y) {
     }
 }
 
+static int touching_closed_door(int px, int py) {
+    enum { TOUCH_Q8 = WORLD_Q8(72) };
+    static const signed char probes[5][2] = {
+        { 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 }
+    };
+    int best = -1;
+    int best_score = 0x7FFFFFFF;
+    for (u8 i = 0; i < 5; i++) {
+        int x = px + probes[i][0] * TOUCH_Q8;
+        int y = py + probes[i][1] * TOUCH_Q8;
+        int door_index = closed_door_at_cell(x >> 8, y >> 8);
+        if (door_index >= 0) {
+            const NgRuntimeDoor *door = &g_runtime_doors[door_index];
+            int dx = (int)door->x * 256 + 128 - px;
+            int dy = (int)door->y * 256 + 128 - py;
+            int score = iabs16(dx) + iabs16(dy);
+            if (score < best_score) {
+                best = door_index;
+                best_score = score;
+            }
+        }
+    }
+    return best;
+}
+
 static void mark_runtime_cell_open(int x, int y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return;
     map_bit_set(g_runtime_cell_open, (u16)(y * MAP_W + x));
@@ -2490,6 +2515,14 @@ static void open_nearby_door(void) {
     int best_score = 0x7FFFFFFF;
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+
+    {
+        int door_index = touching_closed_door(px, py);
+        if (door_index >= 0) {
+            open_door_index((u16)door_index);
+            return;
+        }
+    }
 
     {
         int door_index = trace_closed_door_in_view(px, py, dir_x, dir_y);

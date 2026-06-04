@@ -168,6 +168,10 @@ readable.
 - Movement uses fixed-point position/direction with a Doom-like body radius.
 - Doors are converted from Doom linedefs, can require keys, and open in grouped
   cells.
+- Door use first checks cells touching the player's collision body, then falls
+  back to the forward use trace and nearby view cone. This makes large
+  converted door groups easier to open when the player is already rubbing the
+  door edge or slightly off-center.
 - Exits freeze the level and show compact kill/item/secret completion
   percentage rows before restart, computed from the converted map's runtime
   monsters, pickups, and secret cells.
