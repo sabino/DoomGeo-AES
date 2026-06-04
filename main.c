@@ -501,12 +501,26 @@ static const char *intro_glyph_rows(char ch) {
     switch (ch) {
     case 'A': return "111101111101101";
     case 'B': return "110101110101110";
+    case 'C': return "111100100100111";
     case 'D': return "110101101101110";
     case 'E': return "111100110100111";
+    case 'F': return "111100110100100";
     case 'G': return "111100101101111";
+    case 'H': return "101101111101101";
+    case 'I': return "111010010010111";
+    case 'K': return "101101110101101";
+    case 'L': return "100100100100111";
     case 'M': return "101111111101101";
+    case 'N': return "101111111111101";
     case 'O': return "111101101101111";
+    case 'P': return "110101110100100";
+    case 'R': return "110101110101101";
     case 'S': return "111100111001111";
+    case 'T': return "111010010010010";
+    case 'U': return "101101101101111";
+    case 'V': return "101101101101010";
+    case 'X': return "101101010101101";
+    case 'Y': return "101101010010010";
     case '0': return "111101101101111";
     case '1': return "010110010010111";
     case '2': return "111001111100111";
@@ -543,42 +557,125 @@ static void intro_draw_rule(u16 col, u16 row, u16 width, u16 pal) {
     for (u16 x = 0; x < width; x++) fix_poke((u16)(col + x), row, pal, FIX_SOLID);
 }
 
-static void intro_draw_map_code(u16 col, u16 row, u16 pal) {
+static void intro_draw_map_code_value(u16 col, u16 row, u16 pal, u8 episode, u8 mission) {
     intro_draw_glyph(col, row, 'E', pal);
-    intro_draw_glyph((u16)(col + 4), row, (char)('0' + DOOM_MAP_EPISODE), pal);
+    intro_draw_glyph((u16)(col + 4), row, (char)('0' + episode), pal);
     intro_draw_glyph((u16)(col + 8), row, 'M', pal);
-    intro_draw_glyph((u16)(col + 12), row, (char)('0' + DOOM_MAP_MISSION), pal);
+    intro_draw_glyph((u16)(col + 12), row, (char)('0' + mission), pal);
 }
 
-static void draw_intro_menu(u8 blink_on) {
+static void intro_draw_map_code(u16 col, u16 row, u16 pal) {
+    intro_draw_map_code_value(col, row, pal, DOOM_MAP_EPISODE, DOOM_MAP_MISSION);
+}
+
+static void intro_draw_menu_item(u16 row, const char *text, u8 selected, u8 blink_on) {
+    if (selected && blink_on) {
+        fix_poke(6, (u16)(row + 2), PAL_MAP_PLAYER, FIX_SOLID);
+        fix_poke(7, (u16)(row + 2), PAL_MAP_PLAYER, FIX_SOLID);
+    }
+    intro_draw_word(10, row, text, selected ? PAL_HUD : PAL_MAP_WALL);
+}
+
+static void intro_draw_skill_name(u16 col, u16 row, u16 pal) {
+    if (DOOM_RUNTIME_SKILL_MASK == 1) intro_draw_word(col, row, "EASY", pal);
+    else if (DOOM_RUNTIME_SKILL_MASK == 2) intro_draw_word(col, row, "MED", pal);
+    else if (DOOM_RUNTIME_SKILL_MASK == 4) intro_draw_word(col, row, "HARD", pal);
+    else intro_draw_word(col, row, "BUILD", pal);
+}
+
+static void draw_intro_main_menu(u8 selected, u8 blink_on) {
     clear_fix();
     intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
     intro_draw_word(4, 5, "DOOM GEO", PAL_MAP_PLAYER);
     intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
+    intro_draw_menu_item(14, "START", selected == 0, blink_on);
+    intro_draw_menu_item(18, "SKILL", selected == 1, blink_on);
+    intro_draw_menu_item(22, "MAP", selected == 2, blink_on);
+    intro_draw_menu_item(26, "OPTS", selected == 3, blink_on);
+}
+
+static void draw_intro_skill_menu(void) {
+    clear_fix();
+    intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
+    intro_draw_word(8, 5, "SKILL", PAL_MAP_PLAYER);
+    intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
+    intro_draw_skill_name(10, 15, PAL_HUD);
+    intro_draw_word(4, 24, "A BACK", PAL_MAP_PLAYER);
+    intro_draw_word(24, 24, "B OK", PAL_MAP_PLAYER);
+}
+
+static void draw_intro_map_menu(void) {
+    clear_fix();
+    intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
+    intro_draw_word(12, 5, "MAP", PAL_MAP_PLAYER);
+    intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
     intro_draw_map_code(12, 14, PAL_HUD);
-    intro_draw_word(12, 21, "B D", PAL_MAP_PLAYER);
-    if (blink_on) {
-        intro_draw_glyph(7, 14, 'S', PAL_MAP_PLAYER);
-        intro_draw_glyph(28, 14, 'S', PAL_MAP_PLAYER);
+    if (DOOM_NEXT_MAP_EPISODE && DOOM_NEXT_MAP_MISSION) {
+        intro_draw_word(6, 21, "NEXT", PAL_MAP_PLAYER);
+        intro_draw_map_code_value(22, 21, PAL_HUD, DOOM_NEXT_MAP_EPISODE, DOOM_NEXT_MAP_MISSION);
+    } else {
+        intro_draw_word(12, 21, "END", PAL_MAP_PLAYER);
     }
+    intro_draw_word(4, 27, "A BACK", PAL_MAP_PLAYER);
+}
+
+static void draw_intro_options_menu(void) {
+    clear_fix();
+    intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
+    intro_draw_word(6, 5, "OPTIONS", PAL_MAP_PLAYER);
+    intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
+    intro_draw_word(4, 15, "NO SOUND", PAL_HUD);
+    intro_draw_word(4, 24, "A BACK", PAL_MAP_PLAYER);
 }
 
 static void run_intro_menu(void) {
-    u8 prev_start = 0;
+    enum { UP = 0x01, DOWN = 0x02, A = 0x10, B = 0x20, D = 0x80 };
+    enum { INTRO_MAIN = 0, INTRO_SKILL = 1, INTRO_MAP = 2, INTRO_OPTIONS = 3 };
+    u8 page = INTRO_MAIN;
+    u8 selected = 0;
+    u8 prev_pressed = 0;
     u8 tick = 0;
+    u8 dirty = 1;
     init_palettes();
     disable_sprites();
     REG_BACKDROP = RGB(0, 0, 0);
-    draw_intro_menu(1);
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
-        u8 start_now = (u8)(pressed & (0x20 | 0x80)); /* B or D */
-        if (start_now && !prev_start) break;
-        prev_start = start_now;
+        u8 edge = (u8)(pressed & ~prev_pressed);
+        if (page == INTRO_MAIN) {
+            if (edge & UP) {
+                selected = selected ? (u8)(selected - 1) : 3;
+                dirty = 1;
+            } else if (edge & DOWN) {
+                selected = (u8)((selected + 1) & 3);
+                dirty = 1;
+            } else if (edge & (B | D)) {
+                if (selected == 0) break;
+                page = selected;
+                dirty = 1;
+            }
+        } else if (edge & A) {
+            page = INTRO_MAIN;
+            dirty = 1;
+        } else if (edge & (B | D)) {
+            if (page == INTRO_SKILL) {
+                page = INTRO_MAIN;
+                dirty = 1;
+            }
+        }
+        prev_pressed = pressed;
         wait_vblank();
         watchdog_kick();
         tick++;
-        if ((tick & 31) == 0) draw_intro_menu((tick & 32) == 0);
+        if ((tick & 31) == 0) dirty = 1;
+        if (dirty) {
+            u8 blink_on = (tick & 32) == 0;
+            if (page == INTRO_MAIN) draw_intro_main_menu(selected, blink_on);
+            else if (page == INTRO_SKILL) draw_intro_skill_menu();
+            else if (page == INTRO_MAP) draw_intro_map_menu();
+            else draw_intro_options_menu();
+            dirty = 0;
+        }
     }
 }
 

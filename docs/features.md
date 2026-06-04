@@ -18,8 +18,8 @@ readable.
   mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
   or `2` for medium placement.
 - The generated header exposes the current map code and Episode 1 next-map
-  metadata. The intro screen now shows the compiled map instead of a hard-coded
-  E1M1 label, and the completion overlay can show the next standalone map code.
+  metadata. The intro menu shows the compiled map instead of a hard-coded E1M1
+  label, and the completion overlay can show the next standalone map code.
 
 ## Rendering
 
@@ -88,6 +88,10 @@ readable.
 ## HUD And UI
 
 - Doom `STBAR` is baked into the HUD sprite strip area.
+- Normal ROMs now boot to a small fix-layer menu state flow instead of the old
+  one-line intro prompt. It has Start, skill/build info, compiled-map/next-map
+  info, and options placeholder pages. Focused verification ROMs still define
+  `DOOM_SKIP_INTRO` and boot directly into their scenario.
 - Doom status face frames are baked into a dedicated face bank and switch by
   health, turn direction, pain, evil grin, and death state.
 - Large red Doom-style `STTNUM` digits are rendered on the fix layer for ammo,
@@ -526,6 +530,9 @@ readable.
   monsters, pickups, and secret cells. When the generated metadata names a next
   Episode 1 map, the overlay also draws that map code as the next standalone
   ROM to run.
+- The menu can expose compiled-map and next-map metadata, but the current ROM
+  still contains one heavy generated map/graphics set at a time. Full runtime
+  multi-map loading remains a packaging/runtime-data milestone.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
   combat, unless the radiation-suit timer is active. The generated floor visual
   class uses the same sector-special source for hazard tinting, so damaging

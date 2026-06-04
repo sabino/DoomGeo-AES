@@ -92,7 +92,9 @@ plane approximation even though the converted map and Player 1 start are loaded.
 
 | Input | Action |
 | --- | --- |
-| B or D on intro menu | Start E1M1 |
+| D-pad Up / Down on intro menu | Move menu selection |
+| B or D on intro menu | Confirm selection / start compiled map |
+| A on submenu | Return to the main intro menu |
 | D-pad Up / Down | Move forward/back |
 | D-pad Left / Right | Turn |
 | Hold A + Left/Right | Strafe |
@@ -101,7 +103,7 @@ plane approximation even though the converted map and Player 1 start are loaded.
 | Hold C + D-pad | Fast weapon shortcuts: Up shotgun, Right chaingun, Down rocket, Down+Right plasma, Down+Left BFG, Left close/basic. Direction-first and C-first chords both work. |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
-| D after DEAD/EXIT | Restart level |
+| D after DEAD/EXIT | Restart compiled level |
 
 The default GnGeo keyboard mapping is:
 
