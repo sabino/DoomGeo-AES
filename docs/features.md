@@ -13,8 +13,10 @@ readable.
   sector, secret sector, door, exit, and thing data.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
-- Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`, and
-  `DOOM_MAP_HEIGHT` at build time.
+- Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
+  `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
+  mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
+  or `2` for medium placement.
 
 ## Rendering
 

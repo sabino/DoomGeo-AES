@@ -41,6 +41,7 @@ DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
 DOOM_MAP_WIDTH?=76
 DOOM_MAP_HEIGHT?=54
+DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
@@ -254,8 +255,8 @@ $(DOOM_SHAREWARE_ZIP):
 	mkdir -p $(dir $@)
 	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
 
-$(DOOM_MAP_HEADER): tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+$(DOOM_MAP_HEADER): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $@ --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 

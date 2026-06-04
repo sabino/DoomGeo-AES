@@ -687,6 +687,7 @@ def runtime_things(
     start_x: float,
     start_y: float,
     angle: int,
+    skill_mask: int,
 ) -> list[tuple[int, int, int, int]]:
     angle_rad = math.radians(angle)
     dir_x = math.cos(angle_rad)
@@ -694,6 +695,8 @@ def runtime_things(
     rows: list[tuple[float, int, int, int, int]] = []
     for thing in things:
         if thing.type not in RUNTIME_THING_TYPES:
+            continue
+        if (thing.flags & skill_mask) == 0:
             continue
         gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
         cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
@@ -818,6 +821,7 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_REJECT_BYTES {stats['reject_bytes']}\n")
         f.write(f"#define DOOM_CONVERTED_BLOCKMAP_WORDS {stats['blockmap_words']}\n")
         f.write(f"#define DOOM_CONVERTED_THINGS {stats['things']}\n")
+        f.write(f"#define DOOM_RUNTIME_SKILL_MASK 0x{stats['skill_mask'] & 0xffff:04x}\n")
         f.write(f"#define DOOM_CONVERTED_EXITS {len(exits)}\n")
         f.write(f"#define DOOM_CONVERTED_DOORS {len(doors)}\n")
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
@@ -1126,7 +1130,7 @@ def convert(args: argparse.Namespace) -> None:
     sx, sy = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
-    converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle)
+    converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle, args.skill_mask)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
@@ -1157,6 +1161,7 @@ def convert(args: argparse.Namespace) -> None:
             "reject_bytes": len(reject),
             "blockmap_words": len(blockmap),
             "things": len(things),
+            "skill_mask": args.skill_mask,
         },
         converted_things,
         converted_exits,
@@ -1189,6 +1194,7 @@ def main() -> int:
     parser.add_argument("--iwad", required=True, help="Path to a WAD or Freedoom release zip")
     parser.add_argument("--zip-member", help="WAD member inside a zip archive")
     parser.add_argument("--map", default="E1M1", help="Doom map marker to convert")
+    parser.add_argument("--skill-mask", type=lambda value: int(value, 0), default=4, help="Doom THING skill bit mask to include: 1=easy, 2=medium, 4=hard")
     parser.add_argument("--out", required=True, help="Generated C header path")
     parser.add_argument("--assets-header", help="Generated Neo Geo map asset declarations")
     parser.add_argument("--assets-source", help="Generated Neo Geo map asset data")

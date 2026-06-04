@@ -68,6 +68,15 @@ SMOKE_OUTPUT=.tools/screens/latest/arsenal-test.png \
 make smoke-screenshot
 ```
 
+Map conversion honors Doom THING skill flags through `DOOM_SKILL_MASK`.
+The default is `4`, which keeps the hard/Ultra-Violence population used by the
+current E1M1 prototype. Use `DOOM_SKILL_MASK=1` for easy placement or
+`DOOM_SKILL_MASK=2` for medium placement:
+
+```sh
+make DOOM_MAP=E1M1 DOOM_SKILL_MASK=2
+```
+
 Sprite spec checks can be run without a full ROM build when adding optional
 registered, commercial, or Doom II monster art:
 
