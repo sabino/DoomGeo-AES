@@ -551,7 +551,7 @@ static u8 enemy_slot_is_readable(u16 slot) {
 
 static u8 enemy_slot_can_attack(u16 slot) {
     if (!enemy_slot_is_readable(slot)) return 0;
-    if (enemies[slot].fallback_projection && enemies[slot].screen_h < 56) return 0;
+    if (enemies[slot].fallback_projection) return 0;
     return 1;
 }
 

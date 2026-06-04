@@ -227,8 +227,8 @@ readable.
   instant hit; the enemy must remain readable before hitscan/projectile fire
   can begin.
   Monsters drawn through the coarse line-of-sight projection fallback are
-  allowed to remain visible, but their ranged attacks are held until the sprite
-  is large enough to read clearly.
+  allowed to remain visible as feedback, but they cannot melee, shoot, or take
+  direct weapon hits until normal wall-depth projection proves a readable slot.
   Imps, Hell Knights, cacodemons, Barons, and placeholder Doom II projectile
   monsters can launch visible fireball sprites; those fireballs are dropped if
   their source monster leaves the readable rendered slot set before impact.
