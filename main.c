@@ -1428,8 +1428,9 @@ static void explode_barrel_at(int thing_index, short x_q8, short y_q8) {
         int range = iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8);
         u16 type;
         if (range >= WORLD_Q8(520)) continue;
+        if (i == thing_index || enemy_dead[i]) continue;
         type = runtime_thing_type(i);
-        if (i == thing_index || enemy_dead[i] || !thing_is_shootable(type)) continue;
+        if (!thing_is_shootable(type)) continue;
         damage_enemy_at(i, thing_is_barrel(type) ? 1 : 5);
     }
 }
@@ -1459,8 +1460,8 @@ static int best_visible_enemy(void) {
         int score;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 76 && enemies[slot].screen_h < 112) continue;
         score = iabs16(center_x - SCRW / 2) + (enemies[slot].dist_q8 >> 7) - (enemies[slot].screen_h >> 2);
@@ -1511,7 +1512,8 @@ static void fire_melee_damage(u8 damage) {
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (enemies[slot].dist_q8 > PLAYER_MELEE_RANGE_Q8) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        if (enemy_dead[thing]) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
         if (iabs16(center_x - SCRW / 2) > 80) continue;
         score = iabs16(center_x - SCRW / 2) + enemies[slot].dist_q8;
@@ -1593,8 +1595,8 @@ static void damage_shotgun_spread(void) {
         int center_x;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (enemy_dead[thing]) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
 
         center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -1633,7 +1635,8 @@ static void damage_bfg_targets(void) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        if (enemy_dead[thing]) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
     }
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
@@ -1642,7 +1645,8 @@ static void damage_bfg_targets(void) {
         dy = thing_y_q8[thing] - py;
         front = ((dx * dir_x) + (dy * dir_y)) >> 8;
         if (front < WORLD_Q8(192) || front > WORLD_Q8(2816)) continue;
-        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        if (enemy_dead[thing]) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing))) continue;
         if (thing_has_readable_slot(thing)) continue;
         side = ((dx * plane_x) + (dy * plane_y)) >> 8;
         abs_side = iabs16(side);
@@ -1670,8 +1674,6 @@ static void alert_monsters_by_sound(void) {
         if (!thing_is_monster(runtime_thing_type(i))) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
-        } else if (range <= WORLD_Q8(4096) && line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) {
-            audible = 1;
         } else if (monster_path_valid) {
             int cx = thing_x_q8[i] >> 8;
             int cy = thing_y_q8[i] >> 8;
@@ -1679,6 +1681,10 @@ static void alert_monsters_by_sound(void) {
                 u8 path_dist = monster_path_dist[cy][cx];
                 if (path_dist != 0xFF && path_dist <= 32 && range <= WORLD_Q8(8192)) audible = 1;
             }
+        }
+        if (!audible && range <= WORLD_Q8(4096)
+            && line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) {
+            audible = 1;
         }
         if (!audible) continue;
         enemy_awake[i] = 1;

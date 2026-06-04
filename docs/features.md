@@ -180,10 +180,10 @@ readable.
 - Per-frame thing timer maintenance skips entries with no active flash,
   attack, explosion, death-animation, or delayed-drop timers before touching
   the detailed state transitions.
-- Weapon explosion, BFG cone, barrel splash, and sound-alert loops now test
-  cheap distance or forward-cone bounds before resolving runtime thing types or
-  doing line-of-sight work. The final damage and wake-up thresholds are
-  unchanged.
+- Weapon explosion, BFG cone, barrel splash, and sound-alert loops now reject
+  dead entries and test cheap distance, readability, path, or forward-cone
+  bounds before resolving runtime thing types or doing line-of-sight work. The
+  final damage and wake-up thresholds are unchanged.
 - Monster AI applies its active-range gate before resolving thing type, so
   distant converted things do not spend CPU on monster classification during
   movement ticks.
