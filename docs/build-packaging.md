@@ -112,9 +112,10 @@ SMOKE_OUTPUT=.tools/screens/latest/powerup-test.png \
 make smoke-screenshot
 ```
 
-`tools/smoke_capture.sh` serializes emulator launches with a lock under
-`.tools/locks/` so parallel screenshot refreshes do not capture the wrong GnGeo
-window.
+`tools/smoke_capture.sh` serializes emulator launches with an owner-tracked lock
+under `.tools/locks/` so parallel screenshot refreshes do not capture the wrong
+GnGeo window. If a previous aborted run left a directory-only or dead-PID lock,
+the helper clears it automatically before starting the next capture.
 
 Fast weapon shortcut input can be smoke-checked with:
 
