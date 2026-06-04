@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 MAP="${DOOM_MAP:-E1M1}"
+DOOM_SKILL="${DOOM_SKILL:-4}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
@@ -149,7 +150,7 @@ switch_workspace
 trap cleanup_spawned EXIT
 
 setsid env SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
-    "$native_bin" -iwad "$native_iwad" -warp "$episode" "$level" -skill 1 -nomusic -nosound -window \
+    "$native_bin" -iwad "$native_iwad" -warp "$episode" "$level" -skill "$DOOM_SKILL" -nomusic -nosound -window \
     > "${LOGDIR}/native-doom-compare.log" 2>&1 < /dev/null &
 native_pid=$!
 disown "$native_pid" 2>/dev/null || true

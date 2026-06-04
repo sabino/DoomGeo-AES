@@ -4181,7 +4181,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
-    enum { MONSTER_MIN_H = 78, MONSTER_FALLBACK_MIN_H = 78 };
+    enum { MONSTER_MIN_H = 52, MONSTER_FALLBACK_MIN_H = 52 };
 
     if (def_idx < 0) {
         hide_enemy_slot(slot);
@@ -4192,8 +4192,8 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     if (thing_is_monster(thing_type) && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
         h = fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H;
     }
-    if (thing_is_projectile(thing_type) && h > 0 && h < 28) h = 28;
-    if (thing_is_explosion(thing_type) && h > 0 && h < 34) h = 34;
+    if (thing_is_projectile(thing_type) && h > 0 && h < 18) h = 18;
+    if (thing_is_explosion(thing_type) && h > 0 && h < 26) h = 26;
 
     enemies[slot].thing_index = thing_index;
     enemies[slot].sprite_def = def_idx;
@@ -4203,15 +4203,13 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     if (flash || enemy_slot_flash[slot]) load_enemy_hit_palette(slot);
     else load_enemy_palette(slot, def_idx);
 
-    if (h > 110) idx = 0;
-    else if (h > 76) idx = 1;
-    else if (h > 48) idx = 2;
-    else if (h > 30) idx = 3;
+    if (h > 116) idx = 0;
+    else if (h > 78) idx = 1;
+    else if (h > 46) idx = 2;
+    else if (h > 24) idx = 3;
     else idx = 4;
-    if (thing_is_pickup(thing_type) && idx > 1) idx = 1;
-    if (thing_is_corpse(thing_type) && idx > 2) idx = 2;
-    if (thing_is_explosion(thing_type) && idx > 2) idx = 2;
-    if (thing_is_projectile(thing_type) && idx > 2) idx = 2;
+    if ((thing_is_monster(thing_type) || thing_is_pickup(thing_type) || thing_is_barrel(thing_type) || thing_is_corpse(thing_type) || thing_is_explosion(thing_type)) && idx > 2) idx = 2;
+    if (thing_is_projectile(thing_type) && idx > 3) idx = 3;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
 

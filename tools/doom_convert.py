@@ -459,6 +459,8 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
         and grid[base_y][base_x] == 0
         and forward_clearance(grid, raw_x, raw_y, angle) >= 0.75
     )
+    if raw_start_ok:
+        return raw_x, raw_y
 
     for radius in range(0, 3):
         for y in range(max(1, base_y - radius), min(height - 1, base_y + radius + 1)):
@@ -476,13 +478,6 @@ def choose_start_pose(grid: list[list[int]], raw_x: float, raw_y: float, angle: 
                     best_score = score
                     best = (cx, cy)
         if best is not None:
-            if raw_start_ok:
-                cardinal = angle % 360
-                if cardinal in (90, 270):
-                    return best[0], raw_y
-                if cardinal in (0, 180):
-                    return raw_x, best[1]
-                return raw_x, raw_y
             return best
 
     cell_x, cell_y = nearest_open(grid, base_x, base_y)
@@ -707,11 +702,20 @@ def runtime_things(
         if (thing.flags & skill_mask) == 0:
             continue
         gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
-        cell_x, cell_y = nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
-        if abs((cell_x + 0.5) - gx) > 2.5 or abs((cell_y + 0.5) - gy) > 2.5:
+        raw_gx = gx
+        raw_gy = gy
+        cell_x = int(math.floor(gx))
+        cell_y = int(math.floor(gy))
+        if 0 <= cell_y < len(grid) and 0 <= cell_x < len(grid[0]) and grid[cell_y][cell_x] == 0:
+            pass
+        else:
+            cell_x, cell_y = nearest_open(grid, cell_x, cell_y)
+            if abs((cell_x + 0.5) - raw_gx) > 2.5 or abs((cell_y + 0.5) - raw_gy) > 2.5:
+                continue
+            gx = cell_x + 0.5
+            gy = cell_y + 0.5
+        if gx < 1.0 or gy < 1.0 or gx >= len(grid[0]) - 1 or gy >= len(grid) - 1:
             continue
-        gx = cell_x + 0.5
-        gy = cell_y + 0.5
         dx = gx - start_x
         dy = gy - start_y
         forward = dx * dir_x + dy * dir_y
