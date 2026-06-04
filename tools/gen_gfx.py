@@ -60,7 +60,7 @@ PLANE_PERSPECTIVE_TILES = (
     * PLANE_PERSPECTIVE_ROWS
     * PLANE_PERSPECTIVE_COLS
 )
-PLANE_TEXEL_Q8_DIV = 2
+PLANE_TEXEL_Q8_DIV = 1
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
 HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
@@ -413,6 +413,15 @@ def quantize_color(color_index, playpal, palette):
     return quantize_rgb(rgb, palette)
 
 
+def shade_rgb(rgb, scale):
+    return tuple(max(0, min(255, int(round(channel * scale)))) for channel in rgb)
+
+
+def mix_rgb(a, b, amount):
+    inv = 1.0 - amount
+    return tuple(max(0, min(255, int(round(a[i] * inv + b[i] * amount)))) for i in range(3))
+
+
 def quantize_rgb(rgb, palette):
     best = min(
         range(len(palette)),
@@ -560,6 +569,9 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
     fov_plane = 0.66
     horizon = 96
     game_h = 192
+    base_rgb = tuple(sum(rgb[i] for rgb in palette) // len(palette) for i in range(3))
+    floor_blend = (42, 39, 34)
+    ceiling_blend = (32, 35, 58)
 
     for direction in range(PLANE_PERSPECTIVE_DIRS):
         angle = (direction / PLANE_PERSPECTIVE_DIRS) * math.tau
@@ -580,6 +592,7 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
                             p = abs(screen_y - horizon)
                             if p < 8:
                                 p = 8
+                            row_ratio = min(1.0, p / 96.0)
                             dist_q8 = (game_h << 7) / (p + 8)
                             for x in range(16):
                                 screen_x = col * 16 + x
@@ -594,7 +607,13 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
                                     world_y = origin_y + ray_y * dist_q8
                                 sx = int(world_x / PLANE_TEXEL_Q8_DIV) & 63
                                 sy = int(world_y / PLANE_TEXEL_Q8_DIV) & 63
-                                tile[y][x] = quantize_color(flat[sy][sx], playpal, palette)
+                                rgb = playpal[flat[sy][sx]]
+                                if ceiling:
+                                    rgb = shade_rgb(mix_rgb(rgb, ceiling_blend, 0.28), 0.62 + row_ratio * 0.22)
+                                else:
+                                    rgb = shade_rgb(mix_rgb(rgb, base_rgb, 0.22), 0.45 + row_ratio * 0.38)
+                                    rgb = mix_rgb(rgb, floor_blend, 0.12)
+                                tile[y][x] = quantize_rgb(rgb, palette)
                         tiles.append(tile)
     return tiles
 
