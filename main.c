@@ -584,6 +584,8 @@ static u16 thing_shootable_indices[NG_RUNTIME_THING_COUNT];
 static u16 thing_shootable_count = 0;
 static u16 thing_render_indices[NG_RUNTIME_THING_COUNT];
 static u16 thing_render_count = 0;
+static u16 thing_pickup_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_pickup_count = 0;
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
@@ -852,10 +854,20 @@ static void index_render_candidate(u16 thing_index) {
     }
 }
 
+static void index_pickup_candidate(u16 thing_index) {
+    for (u16 i = 0; i < thing_pickup_count; i++) {
+        if (thing_pickup_indices[i] == thing_index) return;
+    }
+    if (thing_pickup_count < NG_RUNTIME_THING_COUNT) {
+        thing_pickup_indices[thing_pickup_count++] = thing_index;
+    }
+}
+
 static void init_runtime_things(void) {
     thing_monster_count = 0;
     thing_shootable_count = 0;
     thing_render_count = 0;
+    thing_pickup_count = 0;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u8 thing_class;
         thing_x_q8[i] = g_runtime_things[i].x_q8;
@@ -868,6 +880,8 @@ static void init_runtime_things(void) {
             index_shootable_candidate((u16)i);
         } else if (thing_class == THING_CLASS_THREAT) {
             index_shootable_candidate((u16)i);
+        } else if (thing_class == THING_CLASS_PICKUP) {
+            index_pickup_candidate((u16)i);
         }
     }
 }
@@ -1552,6 +1566,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
                         enemy_dead[i] = 0;
                     } else if (drop_type) {
                         thing_type_override[i] = drop_type;
+                        index_pickup_candidate((u16)i);
                         enemy_dead[i] = 0;
                     } else if (corpse_type) {
                         thing_type_override[i] = corpse_type;
@@ -1897,6 +1912,7 @@ static void update_enemy_hit_flash(void) {
             death_drop_timer[i]--;
             if (!death_drop_timer[i]) {
                 thing_type_override[i] = death_drop_type[i];
+                if (thing_is_pickup(thing_type_override[i])) index_pickup_candidate((u16)i);
                 death_drop_type[i] = 0;
                 redraw_minimap_thing_cell(i);
                 hide_enemies();
@@ -2491,6 +2507,7 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
     enemy_attack_anim[thing] = 0;
     enemy_ranged_readable_ticks[thing] = 0;
     if (thing_render_class(type) != THING_CLASS_NONE) index_render_candidate(thing);
+    if (thing_is_pickup(type)) index_pickup_candidate(thing);
     if (thing_is_monster(type)) index_monster_candidate(thing);
     if (thing_is_shootable(type)) index_shootable_candidate(thing);
     return 1;
@@ -2568,6 +2585,8 @@ static void configure_key_door_test(void) {
     thing_y_q8[0] = (short)(32 << 8);
     thing_type_override[0] = 13; /* red keycard */
     enemy_dead[0] = 0;
+    index_render_candidate(0);
+    index_pickup_candidate(0);
 
     player_keys = 0;
     shown_keys = 0xFF;
@@ -3020,7 +3039,8 @@ static void collect_nearby_pickups(void) {
     rc_player_q8(&px, &py);
     pcx = px >> 8;
     pcy = py >> 8;
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 pi = 0; pi < thing_pickup_count; pi++) {
+        int i = thing_pickup_indices[pi];
         u16 type;
         if (enemy_dead[i]) continue;
         if (iabs16((thing_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
@@ -3789,7 +3809,8 @@ static u8 minimap_has_pickup(int vx, int vy) {
     int x1 = minimap_src_x1(vx);
     int y0 = minimap_src_y0(vy);
     int y1 = minimap_src_y1(vy);
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 pi = 0; pi < thing_pickup_count; pi++) {
+        int i = thing_pickup_indices[pi];
         int x;
         int y;
         if (enemy_dead[i]) continue;
@@ -3815,7 +3836,8 @@ static u8 minimap_has_threat(int vx, int vy) {
     int x1 = minimap_src_x1(vx);
     int y0 = minimap_src_y0(vy);
     int y1 = minimap_src_y1(vy);
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int i = thing_shootable_indices[si];
         int x;
         int y;
         if (enemy_dead[i]) continue;

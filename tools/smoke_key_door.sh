@@ -85,7 +85,7 @@ sleep 0.5
 capture_window "$wid" "$PICKED_OUT"
 
 press_d
-sleep 0.8
+sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
 DISPLAY="$DISPLAY_VALUE" xdotool keydown Up

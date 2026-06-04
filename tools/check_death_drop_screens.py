@@ -70,14 +70,13 @@ def main() -> int:
             print(error, file=sys.stderr)
         return 1
 
-    left_corpse = score_region(image, (180, 420, 330, 540))
+    corpse_band = score_region(image, (260, 310, 760, 430))
     center_drop = score_region(image, (360, 380, 570, 555))
-    right_corpse = score_region(image, (610, 400, 800, 540))
     playfield = score_region(image, (120, 220, 840, 560))
     hud = score_region(image, (0, 560, 960, 672))
 
-    require_min(errors, path, "left corpse", left_corpse, "red", 180)
-    require_min(errors, path, "right corpse", right_corpse, "red", 700)
+    require_min(errors, path, "corpse band", corpse_band, "red", 2500)
+    require_min(errors, path, "corpse band shadow", corpse_band, "dark", 9000)
     require_min(errors, path, "center dropped weapon", center_drop, "tan", 900)
     require_min(errors, path, "center dropped weapon shadow", center_drop, "dark", 2500)
     require_min(errors, path, "playfield corpse/drop", playfield, "colored", 45000)
