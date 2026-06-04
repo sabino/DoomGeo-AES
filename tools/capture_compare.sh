@@ -173,6 +173,15 @@ if [ -z "$neo_pid" ]; then
     echo "ngdevkit-gngeo process not found" >&2
     exit 1
 fi
+neo_wid="$(window_for_pid_or_name "$neo_pid" "" || true)"
+if [ -n "$neo_wid" ]; then
+    xdotool windowactivate "$neo_wid" >/dev/null 2>&1 || true
+    sleep 0.2
+    xdotool keydown x
+    sleep 0.25
+    xdotool keyup x
+    sleep 1.5
+fi
 capture_window "$neo_pid" "" "$neogeo_png"
 
 convert "$native_png" -resize 640x480\> "${native_png%.png}-fit.png"

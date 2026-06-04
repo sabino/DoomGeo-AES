@@ -9,6 +9,7 @@ RUN_TARGET="${SMOKE_RUN_TARGET:-gngeo}"
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
+START_GAME="${SMOKE_START_GAME:-0}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
@@ -105,6 +106,13 @@ if [ -n "$WORKSPACE" ]; then
 fi
 DISPLAY="$DISPLAY_VALUE" xdotool windowraise "$wid" >/dev/null 2>&1 || true
 DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+if [ "$START_GAME" = "1" ]; then
+    sleep 0.2
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown x
+    sleep 0.25
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup x
+    sleep 1.5
+fi
 sleep 0.5
 
 xwd -silent -id "$wid" -out "$XWD_OUT"

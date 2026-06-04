@@ -50,7 +50,9 @@ For quick local render checks, `make smoke-screenshot` builds the default cart,
 launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
 `SMOKE_WORKSPACE` (`2` by default), and writes
 `.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
-`SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
+`SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, `SMOKE_WAIT_SECS`, or
+`SMOKE_START_GAME=1` when capturing variants or when a normal ROM should press
+B through the intro/menu before capture,
 such as the E1M2 key-test ROM, the focused red key/door ROM, the combat
 verification ROM, the focused real E1M1 encounter ROM, the E1M1 scout-route
 ROM, the close-combat

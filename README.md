@@ -21,18 +21,23 @@ drawing pixels.
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use synthetic fallback psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the exact art. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
+| Flow | Normal ROMs boot to a fix-layer block-letter intro/menu and start E1M1 with B or D. Focused verification ROMs skip the intro so smoke captures still launch directly into their scenario. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
 | Browser build | GitHub Pages package runs the ROM through EmulatorJS/FBNeo, plus a separate 68000 ASM demo build. |
 
 ## Screenshots
 
-| Current gameplay | Minimap overlay |
+| Intro/menu | Current gameplay |
 | --- | --- |
-| ![Current wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) | ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
+| ![Block-letter DoomGeo-AES intro menu with E1M1 selected](docs/screenshots/doomgeo-aes-intro-menu.png) | ![Current wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) |
 
-| HUD status bar | Keycard test ROM |
+| Minimap overlay | HUD status bar |
 | --- | --- |
-| ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
+| ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) | ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) |
+
+| Keycard test ROM |
+| --- |
+| ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
 
 | Focused key-door test ROM | Missing-key message | Key-door opened | Through doorway |
 | --- | --- | --- | --- |
@@ -87,6 +92,7 @@ plane approximation even though the converted map and Player 1 start are loaded.
 
 | Input | Action |
 | --- | --- |
+| B or D on intro menu | Start E1M1 |
 | D-pad Up / Down | Move forward/back |
 | D-pad Left / Right | Turn |
 | Hold A + Left/Right | Strafe |

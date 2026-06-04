@@ -11,6 +11,13 @@
 #error "monster path queue packs x/y into one word; MAP_W and MAP_H must stay <= 255"
 #endif
 
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) \
+    || defined(DOOM_E1M1_EXIT_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_MELEE_TEST) \
+    || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) \
+    || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST)
+#define DOOM_SKIP_INTRO 1
+#endif
+
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 static u8 hurt_flash = 0;
@@ -404,6 +411,77 @@ static void clear_fix(void) {
     vram_addr(VRAM_FIX);
     vram_mod(1);
     for (int i = 0; i < 40 * 32; i++) vram_w(0x0000);
+}
+
+static void disable_sprites(void);
+
+static const char *intro_glyph_rows(char ch) {
+    switch (ch) {
+    case 'A': return "111101111101101";
+    case 'B': return "110101110101110";
+    case 'D': return "110101101101110";
+    case 'E': return "111100110100111";
+    case 'G': return "111100101101111";
+    case 'M': return "101111111101101";
+    case 'O': return "111101101101111";
+    case 'S': return "111100111001111";
+    case '1': return "010110010010111";
+    default: return "000000000000000";
+    }
+}
+
+static void intro_draw_glyph(u16 col, u16 row, char ch, u16 pal) {
+    const char *bits = intro_glyph_rows(ch);
+    for (u16 y = 0; y < 5; y++) {
+        for (u16 x = 0; x < 3; x++) {
+            if (bits[y * 3 + x] == '1') fix_poke((u16)(col + x), (u16)(row + y), pal, FIX_SOLID);
+        }
+    }
+}
+
+static void intro_draw_word(u16 col, u16 row, const char *text, u16 pal) {
+    u16 x = col;
+    while (*text) {
+        if (*text != ' ') intro_draw_glyph(x, row, *text, pal);
+        x = (u16)(x + 4);
+        text++;
+    }
+}
+
+static void intro_draw_rule(u16 col, u16 row, u16 width, u16 pal) {
+    for (u16 x = 0; x < width; x++) fix_poke((u16)(col + x), row, pal, FIX_SOLID);
+}
+
+static void draw_intro_menu(u8 blink_on) {
+    clear_fix();
+    intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
+    intro_draw_word(4, 5, "DOOM GEO", PAL_MAP_PLAYER);
+    intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
+    intro_draw_word(12, 14, "E1M1", PAL_HUD);
+    intro_draw_word(12, 21, "B D", PAL_MAP_PLAYER);
+    if (blink_on) {
+        intro_draw_glyph(7, 14, 'S', PAL_MAP_PLAYER);
+        intro_draw_glyph(28, 14, 'S', PAL_MAP_PLAYER);
+    }
+}
+
+static void run_intro_menu(void) {
+    u8 prev_start = 0;
+    u8 tick = 0;
+    init_palettes();
+    disable_sprites();
+    REG_BACKDROP = RGB(0, 0, 0);
+    draw_intro_menu(1);
+    for (;;) {
+        u8 pressed = (u8)~REG_P1CNT;
+        u8 start_now = (u8)(pressed & (0x20 | 0x80)); /* B or D */
+        if (start_now && !prev_start) break;
+        prev_start = start_now;
+        wait_vblank();
+        watchdog_kick();
+        tick++;
+        if ((tick & 31) == 0) draw_intro_menu((tick & 32) == 0);
+    }
 }
 
 static int prev_px = -1, prev_py = -1;
@@ -4872,51 +4950,10 @@ static void restart_level(void) {
 
 int main(void) {
     watchdog_kick();
-    clear_fix();
-    init_palettes();
-    disable_sprites();
-    init_background();
-    init_walls();
-    init_hud();
-    init_weapon();
-    hide_enemies();
-    force_fix_hud_redraw();
-    rc_init();
-    init_runtime_things();
-#ifdef DOOM_COMBAT_TEST
-    configure_combat_test();
+#ifndef DOOM_SKIP_INTRO
+    run_intro_menu();
 #endif
-#ifdef DOOM_E1M1_ENCOUNTER_TEST
-    configure_e1m1_encounter_test();
-#endif
-#ifdef DOOM_E1M1_SCOUT_TEST
-    configure_e1m1_scout_test();
-#endif
-#ifdef DOOM_E1M1_EXIT_TEST
-    configure_e1m1_exit_test();
-#endif
-#ifdef DOOM_HIDDEN_ATTACK_TEST
-    configure_hidden_attack_test();
-#endif
-#ifdef DOOM_MELEE_TEST
-    configure_melee_test();
-#endif
-#ifdef DOOM_MONSTER_GALLERY_TEST
-    configure_monster_gallery_test();
-#endif
-#ifdef DOOM_ARSENAL_TEST
-    configure_arsenal_test();
-#endif
-#ifdef DOOM_DEATH_TEST
-    configure_death_test();
-#endif
-#ifdef DOOM_POWERUP_TEST
-    configure_powerup_test();
-#endif
-#ifdef DOOM_KEY_DOOR_TEST
-    configure_key_door_test();
-#endif
-    compute_level_totals();
+    restart_level();
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
