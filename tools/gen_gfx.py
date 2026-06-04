@@ -904,10 +904,23 @@ def hud_keycard_tiles(iwad, zip_member):
     for patch in patches:
         tile = [[0] * 16 for _ in range(16)]
         if patch:
-            for y, row in enumerate(patch[:16]):
-                for x, color in enumerate(row[:16]):
+            # Doom's keycard pickup patches are about 14x16 pixels, but the
+            # status bar key cells are much smaller.  Pre-shrink them here so
+            # the 68000 can still draw one Neo Geo sprite per owned key without
+            # covering the armor label or ammo counter table.
+            src_h = len(patch)
+            src_w = len(patch[0]) if src_h else 0
+            dst_w = 8
+            dst_h = 8
+            dst_x0 = 4
+            dst_y0 = 4
+            for y in range(dst_h):
+                sy = min(src_h - 1, (y * src_h + src_h // 2) // dst_h)
+                for x in range(dst_w):
+                    sx = min(src_w - 1, (x * src_w + src_w // 2) // dst_w)
+                    color = patch[sy][sx]
                     if color >= 0:
-                        tile[y][x] = quantize_color(color, playpal, palette)
+                        tile[dst_y0 + y][dst_x0 + x] = quantize_color(color, playpal, palette)
         tiles.append(tile)
     return tiles, "+".join(sources), palette
 
