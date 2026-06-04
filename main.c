@@ -7,6 +7,10 @@
 #include "raycast.h"
 #include "map.h"
 
+#if MAP_W > 255 || MAP_H > 255
+#error "monster path queue packs x/y into one word; MAP_W and MAP_H must stay <= 255"
+#endif
+
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 static u8 hurt_flash = 0;
@@ -2150,12 +2154,12 @@ static void rebuild_monster_path(void) {
         return;
     }
     monster_path_dist[py][px] = 0;
-    monster_path_queue[tail++] = (u16)(py * MAP_W + px);
+    monster_path_queue[tail++] = (u16)((py << 8) | (px & 0xFF));
     while (head < tail) {
         u16 cell = monster_path_queue[head++];
         u8 d;
-        int x = cell % MAP_W;
-        int y = cell / MAP_W;
+        int x = cell & 0xFF;
+        int y = cell >> 8;
         static const signed char dirs[4][2] = {
             { 1,  0}, {-1,  0}, { 0,  1}, { 0, -1}
         };
@@ -2168,7 +2172,7 @@ static void rebuild_monster_path(void) {
             if (map_at(nx, ny)) continue;
             if (monster_path_dist[ny][nx] != 0xFF) continue;
             monster_path_dist[ny][nx] = (u8)(d + 1);
-            monster_path_queue[tail++] = (u16)(ny * MAP_W + nx);
+            monster_path_queue[tail++] = (u16)((ny << 8) | (nx & 0xFF));
         }
     }
     monster_path_valid = 1;
