@@ -48,8 +48,9 @@ readable.
   incrementally over several frames so movement reads less static without
   spending one full vblank on plane uploads. The direction bucket is cached and
   recalculated only when the view vector changes, so straight movement keeps the
-  cheaper scroll update path. Plane column uploads compute a direction/column
-  tile base once and step row addresses by the generated cache width instead of
+  cheaper scroll update path. Plane column uploads compute ceiling/floor
+  direction bases once per updater pass, add the wrapped column inside the
+  upload loop, and step row addresses by the generated cache width instead of
   rebuilding the full perspective index for every tile. The background path
   also asks the raycaster only for the facing vector and wraps coarse scroll with
   bounded subtracts before deciding whether to upload columns. This is a

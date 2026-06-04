@@ -4063,15 +4063,6 @@ static u8 plane_direction_bucket(int dir_x, int dir_y) {
     return best;
 }
 
-static u16 perspective_plane_column_base(u16 base, u8 direction, u8 phase_x, u8 phase_y, u16 col) {
-    u16 index = direction;
-    index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_y);
-    index = (u16)(index * TILE_PLANE_PERSPECTIVE_PHASES + phase_x);
-    index = (u16)(index * TILE_PLANE_PERSPECTIVE_ROWS);
-    index = (u16)(index * TILE_PLANE_PERSPECTIVE_COLS + col);
-    return (u16)(base + index);
-}
-
 static u8 wrap_background_scroll(int scroll) {
     while (scroll < 0) scroll += BG_COUNT * 8;
     while (scroll >= BG_COUNT * 8) scroll -= BG_COUNT * 8;
@@ -4101,6 +4092,9 @@ static void update_background_scroll(void) {
     int dir_x, dir_y;
     u8 direction;
     u8 scroll_col;
+    u16 direction_tile_offset;
+    u16 ceiling_direction_base;
+    u16 floor_direction_base;
     u32 key;
     u8 columns_this_frame = 4;
 
@@ -4119,6 +4113,10 @@ static void update_background_scroll(void) {
         bg_update_col = 0;
     }
     if (bg_scroll_key == bg_pending_key) return;
+    direction_tile_offset = (u16)(direction * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES
+        * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
+    ceiling_direction_base = (u16)(TILE_CEILING_PERSPECTIVE_BASE + direction_tile_offset);
+    floor_direction_base = (u16)(TILE_FLOOR_PERSPECTIVE_BASE + direction_tile_offset);
 
     while (columns_this_frame-- && bg_update_col < BG_COUNT) {
         u16 col = bg_update_col++;
@@ -4127,8 +4125,8 @@ static void update_background_scroll(void) {
         u16 ceiling_tile;
         u16 floor_tile;
         if (plane_col >= BG_COUNT) plane_col = (u16)(plane_col - BG_COUNT);
-        ceiling_tile = perspective_plane_column_base(TILE_CEILING_PERSPECTIVE_BASE, direction, 0, 0, plane_col);
-        floor_tile = perspective_plane_column_base(TILE_FLOOR_PERSPECTIVE_BASE, direction, 0, 0, plane_col);
+        ceiling_tile = (u16)(ceiling_direction_base + plane_col);
+        floor_tile = (u16)(floor_direction_base + plane_col);
         vram_addr(VRAM_SCB1 + spr * 64);
         vram_mod(1);
         for (u16 row = 0; row < BG_WIN; row++) {
