@@ -18,6 +18,14 @@
 #define DOOM_SKIP_INTRO 1
 #endif
 
+enum {
+    THING_CLASS_NONE = 0,
+    THING_CLASS_MONSTER = 1,
+    THING_CLASS_THREAT = 2,
+    THING_CLASS_PICKUP = 3,
+    THING_CLASS_CORPSE = 4
+};
+
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 static u8 hurt_flash = 0;
@@ -570,6 +578,8 @@ static u16 death_drop_type[NG_RUNTIME_THING_COUNT];
 static short thing_x_q8[NG_RUNTIME_THING_COUNT];
 static short thing_y_q8[NG_RUNTIME_THING_COUNT];
 static u8 thing_static_class[NG_RUNTIME_THING_COUNT];
+static u16 thing_monster_indices[NG_RUNTIME_THING_COUNT];
+static u16 thing_monster_count = 0;
 static u8  dynamic_drop_active[8];
 static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
@@ -812,10 +822,14 @@ static u8 game_active(void) {
 }
 
 static void init_runtime_things(void) {
+    thing_monster_count = 0;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
         thing_static_class[i] = thing_render_class(g_runtime_things[i].type);
+        if (thing_static_class[i] == THING_CLASS_MONSTER) {
+            thing_monster_indices[thing_monster_count++] = (u16)i;
+        }
     }
 }
 
@@ -1769,7 +1783,8 @@ static void alert_monsters_by_sound(void) {
         rebuild_monster_path();
         monster_path_timer = 12;
     }
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 mi = 0; mi < thing_monster_count; mi++) {
+        int i = thing_monster_indices[mi];
         int dx, dy, range;
         u8 audible = 0;
         if (enemy_dead[i] || enemy_awake[i]) continue;
@@ -1777,7 +1792,6 @@ static void alert_monsters_by_sound(void) {
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
         if (range > WORLD_Q8(8192)) continue;
-        if (!runtime_thing_is_monster(i)) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
         } else if (monster_path_valid) {
@@ -2367,7 +2381,8 @@ static void update_monster_ai(void) {
     rc_player_q8(&px, &py);
     refresh_monster_path();
     visible_monsters = visible_monster_slots();
-    for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+    for (u16 mi = 0; mi < thing_monster_count; mi++) {
+        int i = thing_monster_indices[mi];
         int dx, dy, adx, ady;
         if (enemy_dead[i] || enemy_hit_flash[i]) continue;
         dx = px - thing_x_q8[i];
@@ -2375,7 +2390,6 @@ static void update_monster_ai(void) {
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
-        if (!runtime_thing_is_monster(i)) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
         if (!enemy_awake[i]) {
@@ -4539,14 +4553,6 @@ static void insert_thing_candidate(ThingCandidate *candidates, int *count, const
     candidates[insert_at] = *candidate;
     if (*count < THING_CANDIDATE_COUNT) (*count)++;
 }
-
-enum {
-    THING_CLASS_NONE = 0,
-    THING_CLASS_MONSTER = 1,
-    THING_CLASS_THREAT = 2,
-    THING_CLASS_PICKUP = 3,
-    THING_CLASS_CORPSE = 4
-};
 
 static u8 thing_render_class(u16 thing_type) {
     if (thing_is_monster(thing_type)) return 1;
