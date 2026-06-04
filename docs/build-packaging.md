@@ -88,6 +88,11 @@ builds `make scout-test-rom`, launches `make scout-test-gngeo`, and captures a
 normal-route waypoint looking toward the first reachable WAD-position shotgun
 guys plus a pistol-fire frame.
 
+For a focused first-level completion check, run `tools/smoke_e1m1_exit.sh`. It
+builds `make exit-test-rom`, starts two converted cells left of the real
+generated E1M1 exit trigger, walks into that trigger, captures the completed
+frame, and checks the `EXIT` plus kill/item/secret percentage overlay.
+
 For an invisible-attacker regression pass, run `tools/smoke_hidden_attack.sh`.
 It builds `make hidden-attack-test-rom`, launches `make hidden-attack-test-gngeo`,
 and captures both the initial frame and a delayed frame. The delayed frame should

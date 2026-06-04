@@ -127,6 +127,9 @@ tools/smoke_combat_interaction.sh
 make encounter-test-rom
 make encounter-test-gngeo
 tools/smoke_e1m1_encounter.sh
+make exit-test-rom
+make exit-test-gngeo
+tools/smoke_e1m1_exit.sh
 tools/smoke_enemy_visibility.sh
 make monster-gallery-rom
 make monster-gallery-gngeo

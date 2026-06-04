@@ -2494,6 +2494,30 @@ static void configure_e1m1_scout_test(void) {
 }
 #endif
 
+#ifdef DOOM_E1M1_EXIT_TEST
+static void configure_e1m1_exit_test(void) {
+    rc_set_pose_q8((short)((57 << 8) + 128), (short)((44 << 8) + 128), 256, 0);
+    current_weapon = WEAPON_PISTOL;
+    player_ammo = 50;
+    player_health = 100;
+    player_armor = 0;
+    player_armor_class = 0;
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        enemy_dead[i] = 1;
+        enemy_awake[i] = 0;
+        enemy_attack_cooldown[i] = 0;
+        enemy_attack_anim[i] = 0;
+        enemy_ranged_readable_ticks[i] = 0;
+    }
+    shown_health = 0xFFFF;
+    shown_armor = 0xFFFF;
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+}
+#endif
+
 #ifdef DOOM_MELEE_TEST
 static void configure_melee_test(void) {
     player_has_chainsaw = 1;
@@ -4734,6 +4758,9 @@ static void restart_level(void) {
 #ifdef DOOM_E1M1_SCOUT_TEST
     configure_e1m1_scout_test();
 #endif
+#ifdef DOOM_E1M1_EXIT_TEST
+    configure_e1m1_exit_test();
+#endif
 #ifdef DOOM_HIDDEN_ATTACK_TEST
     configure_hidden_attack_test();
 #endif
@@ -4786,6 +4813,9 @@ int main(void) {
 #endif
 #ifdef DOOM_E1M1_SCOUT_TEST
     configure_e1m1_scout_test();
+#endif
+#ifdef DOOM_E1M1_EXIT_TEST
+    configure_e1m1_exit_test();
 #endif
 #ifdef DOOM_HIDDEN_ATTACK_TEST
     configure_hidden_attack_test();

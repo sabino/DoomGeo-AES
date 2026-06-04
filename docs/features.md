@@ -251,6 +251,11 @@ readable.
   monster placement.
 - `tools/smoke_e1m1_scout.sh` captures that scout viewpoint and a pistol-fire
   frame, extending the real-map evidence beyond the closer encounter ROM.
+- `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
+  completion ROM. It starts two converted cells left of the real generated
+  E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,
+  captures the completed frame, and checks the `EXIT` plus kill/item/secret
+  percentage overlay.
 - `make hidden-attack-test-rom` and `make hidden-attack-test-gngeo` build a
   readable-slot regression ROM. It places an awake shotgun guy outside the
   readable view and freezes its movement, so the HUD health value must stay
