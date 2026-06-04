@@ -96,9 +96,9 @@ readable.
   weapons (rocket launcher, plasma, BFG), and Left cycles close/basic weapons
   (chainsaw, fist, pistol). Movement directions are masked during these combos
   so weapon selection does not shove the player around.
-- Manual weapon changes briefly flash the selected Doom slot number in the
-  center fix-layer message area, giving immediate feedback for C cycling and
-  C+D-pad group shortcuts without opening the minimap.
+- Weapon pickups and manual weapon changes briefly flash the selected Doom slot
+  number in the center fix-layer message area, giving immediate feedback for C
+  cycling and C+D-pad group shortcuts without opening the minimap.
 - Muzzle and impact feedback use palette flashes and projected explosion
   sprites. Monster fireballs now spawn the same impact burst when they hit a
   wall or the player instead of disappearing silently.

@@ -2342,7 +2342,7 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_shells, 8, player_max_shells);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 2;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -2353,7 +2353,7 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_ammo, 20, player_max_bullets);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 3;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -2364,7 +2364,7 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_rockets, 2, player_max_rockets);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 4;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -2375,7 +2375,7 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_cells, 40, player_max_cells);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 5;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -2385,7 +2385,7 @@ static u8 apply_pickup(u16 thing_type) {
         current_weapon = WEAPON_CHAINSAW;
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 1;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
@@ -2396,7 +2396,7 @@ static u8 apply_pickup(u16 thing_type) {
         add_capped_u16(&player_cells, 40, player_max_cells);
         weapon_frame = 0xFF;
         shown_ammo = 0xFFFF;
-        pickup_message_weapon = 7;
+        pickup_message_weapon = weapon_slot_digit(current_weapon);
         pickup_message_type = 2;
         face_evil_timer = 70;
         break;
