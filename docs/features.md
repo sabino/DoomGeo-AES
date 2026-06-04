@@ -66,7 +66,8 @@ readable.
 - Plasma rifle uses rapid cell-ammo visible-target damage.
 - Fist/chainsaw use close-range rendered-slot melee checks, so they only hit
   visible nearby targets.
-- Shotgun uses spread damage and can hit multiple visible targets.
+- Shotgun uses readable rendered slots for spread damage and can hit multiple
+  visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
 - BFG spends 40 cells, launches a visible forward projectile using the current
   baked fireball sprite path, then detonates into heavy damage on readable
