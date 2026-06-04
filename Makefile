@@ -317,7 +317,10 @@ asm-gngeo: $(ASM_CART)
 smoke-screenshot:
 	tools/smoke_capture.sh
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot
+route-check: $(DOOM_MAP_HEADER)
+	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

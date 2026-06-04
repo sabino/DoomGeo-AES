@@ -216,6 +216,9 @@ readable.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
+- `make route-check` statically verifies the generated E1M1 start-to-exit
+  route against `build/doom_map_generated.h`, including whether completion
+  depends on generated door cells.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without

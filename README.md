@@ -115,6 +115,7 @@ SDL_VIDEODRIVER=x11 make gngeo
 Useful variants:
 
 ```sh
+make route-check
 tools/smoke_gameplay.sh
 make key-test-rom
 make key-test-gngeo

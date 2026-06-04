@@ -20,6 +20,7 @@ run_smoke() {
     "$@"
 }
 
+make route-check
 run_smoke "enemy visibility" tools/smoke_enemy_visibility.sh
 run_smoke "E1M1 exit" tools/smoke_e1m1_exit.sh
 run_smoke "key door" tools/smoke_key_door.sh

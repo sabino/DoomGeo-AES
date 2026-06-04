@@ -65,10 +65,15 @@ SMOKE_OUTPUT=.tools/screens/latest/combat-test.png \
 make smoke-screenshot
 ```
 
-For the broad playable-feature regression pass, run
-`tools/smoke_gameplay.sh`. It chains the verified enemy visibility, key-door,
-weapon shortcut, death/drop, and powerup smoke helpers into one command and
-refreshes the same screenshots under `.tools/screens/latest/`.
+For the generated E1M1 route invariant, run `make route-check`. It verifies
+that the converted player start can reach the converted exit from the current
+`build/doom_map_generated.h` and reports whether the route depends on generated
+door cells.
+
+For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
+It starts with `make route-check`, then chains the verified enemy visibility,
+key-door, weapon shortcut, death/drop, and powerup smoke helpers into one command
+and refreshes the same screenshots under `.tools/screens/latest/`.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
