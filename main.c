@@ -1963,7 +1963,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2031,6 +2031,20 @@ static void place_test_imp(void) {
     }
 #endif
 }
+
+#ifdef DOOM_POWERUP_TEST
+static void place_powerup_test_imp(void) {
+#if NG_RUNTIME_THING_COUNT > 6
+    int px, py;
+    if (!place_test_thing(6, 3001, WORLD_Q8(900), 0)) return;
+    rc_player_q8(&px, &py);
+    enemy_hp[6] = monster_start_hp(3001);
+    enemy_awake[6] = 1;
+    enemy_attack_cooldown[6] = 56;
+    set_monster_facing_from_delta(6, px - thing_x_q8[6], py - thing_y_q8[6]);
+#endif
+}
+#endif
 #endif
 
 #ifdef DOOM_COMBAT_TEST
@@ -2083,6 +2097,26 @@ static void configure_death_test(void) {
         dynamic_drop_type[0] = 2001;
         dynamic_drop_active[0] = 1;
     }
+}
+#endif
+
+#ifdef DOOM_POWERUP_TEST
+static void configure_powerup_test(void) {
+    player_health = 65;
+    player_armor = 50;
+    player_armor_class = 1;
+    player_ammo = 30;
+    shown_health = 0xFFFF;
+    shown_armor = 0xFFFF;
+    shown_ammo = 0xFFFF;
+
+    place_test_thing(0, 2024, WORLD_Q8(520), -WORLD_Q8(300));  /* partial invisibility */
+    place_test_thing(1, 2025, WORLD_Q8(520), -WORLD_Q8(120));  /* radiation suit */
+    place_test_thing(2, 2026, WORLD_Q8(520), WORLD_Q8(120));   /* computer map */
+    place_test_thing(3, 2045, WORLD_Q8(520), WORLD_Q8(300));   /* light amplification */
+    place_test_thing(4, 2022, WORLD_Q8(760), -WORLD_Q8(160));  /* invulnerability fallback */
+    place_test_thing(5, 2023, WORLD_Q8(760), WORLD_Q8(160));   /* berserk fallback */
+    place_powerup_test_imp();
 }
 #endif
 
@@ -3955,6 +3989,9 @@ static void restart_level(void) {
 #ifdef DOOM_DEATH_TEST
     configure_death_test();
 #endif
+#ifdef DOOM_POWERUP_TEST
+    configure_powerup_test();
+#endif
     init_background();
     init_walls();
     init_hud();
@@ -3986,6 +4023,9 @@ int main(void) {
 #endif
 #ifdef DOOM_DEATH_TEST
     configure_death_test();
+#endif
+#ifdef DOOM_POWERUP_TEST
+    configure_powerup_test();
 #endif
     compute_level_totals();
 

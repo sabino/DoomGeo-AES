@@ -38,9 +38,9 @@ drawing pixels.
 | --- | --- |
 | ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) |
 
-| Death/drop test ROM |
-| --- |
-| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+| Death/drop test ROM | Powerup test ROM |
+| --- | --- |
+| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) | ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
 
 | Native Doom comparison |
 | --- |
@@ -89,6 +89,10 @@ make combat-test-rom
 make combat-test-gngeo
 make arsenal-test-rom
 make arsenal-test-gngeo
+make death-test-rom
+make death-test-gngeo
+make powerup-test-rom
+make powerup-test-gngeo
 make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27

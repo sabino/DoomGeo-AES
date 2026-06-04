@@ -120,6 +120,10 @@ readable.
   corpse/drop verification ROM. It compiles with `DOOM_DEATH_TEST`, places
   shareware Doom corpse sprites and a dropped shotgun in front of the player,
   and leaves the normal cart path unchanged.
+- `make powerup-test-rom` and `make powerup-test-gngeo` build an isolated E1M1
+  powerup verification ROM. It compiles with `DOOM_POWERUP_TEST`, places the
+  currently supported powerup pickups and a separate visible imp in front of the
+  player, and leaves the normal cart path unchanged.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma
