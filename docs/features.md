@@ -149,6 +149,11 @@ readable.
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
   older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- Before projection and line-of-sight checks, thing selection now applies a
+  conservative player-facing prefilter that rejects behind-camera and extremely
+  distant candidates. This keeps normal E1M1 visible things intact while
+  avoiding expensive projection work for objects that cannot contribute to the
+  seven visible world-sprite slots.
 - Ranged-attack warmup now tracks only the previous and current readable
   world-sprite slots. That replaces another per-frame scan across all converted
   runtime things with a bounded pass over the seven visible slots plus the

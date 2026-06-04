@@ -4305,10 +4305,24 @@ static int thing_candidate_score(u8 bucket, u16 thing_type, int sx, int h, int d
     return score + ((int)bucket << 15);
 }
 
+static u8 thing_maybe_projectable(short x_q8, short y_q8, int px, int py, int dir_x, int dir_y) {
+    int dx = x_q8 - px;
+    int dy = y_q8 - py;
+    long front = ((long)dx * dir_x + (long)dy * dir_y) >> 8;
+    int range = iabs16(dx) + iabs16(dy);
+    if (front < WORLD_Q8(16)) return 0;
+    if (range > WORLD_Q8(8192)) return 0;
+    return 1;
+}
+
 static int select_visible_things(int found) {
     ThingCandidate candidates[THING_CANDIDATE_COUNT];
     int count = 0;
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
     if (found >= ENEMY_VISIBLE_COUNT) return found;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     for (u16 slot = 0; slot < THING_CANDIDATE_COUNT; slot++) {
         candidates[slot].thing_index = -1;
         candidates[slot].dynamic_index = -1;
@@ -4323,6 +4337,7 @@ static int select_visible_things(int found) {
         bucket = thing_render_bucket(thing_type);
         if (!bucket) continue;
         if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (!thing_maybe_projectable(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
             if (!project_point_q8(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) continue;
@@ -4354,6 +4369,7 @@ static int select_visible_things(int found) {
         bucket = thing_render_bucket(thing_type);
         if (bucket != 3 && bucket != 5) continue;
         if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+        if (!thing_maybe_projectable(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], px, py, dir_x, dir_y)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
             if (!project_point_q8(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) continue;
