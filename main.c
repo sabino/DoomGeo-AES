@@ -2192,6 +2192,9 @@ static void update_monster_ai(void) {
     int px, py;
     u8 visible_monsters;
     if (++monster_ai_tick & 3) return;
+#ifdef DOOM_HIDDEN_ATTACK_TEST
+    return;
+#endif
     rc_player_q8(&px, &py);
     refresh_monster_path();
     visible_monsters = visible_monster_slots();
@@ -2225,7 +2228,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2347,6 +2350,27 @@ static void configure_combat_test(void) {
     player_shells = 24;
     current_weapon = WEAPON_SHOTGUN;
     place_test_imp();
+}
+#endif
+
+#ifdef DOOM_HIDDEN_ATTACK_TEST
+static void configure_hidden_attack_test(void) {
+#if NG_RUNTIME_THING_COUNT > 0
+    int px, py;
+    player_health = 100;
+    hurt_timer = 0;
+    if (!place_test_thing(0, 3004, WORLD_Q8(520), WORLD_Q8(1152))) return;
+    rc_player_q8(&px, &py);
+    enemy_hp[0] = monster_start_hp(3004);
+    enemy_awake[0] = 1;
+    enemy_attack_cooldown[0] = 0;
+    enemy_attack_anim[0] = 0;
+    enemy_ranged_readable_ticks[0] = 255;
+    set_monster_facing_from_delta(0, px - thing_x_q8[0], py - thing_y_q8[0]);
+    shown_health = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#endif
 }
 #endif
 
@@ -4502,6 +4526,9 @@ static void restart_level(void) {
 #ifdef DOOM_E1M1_ENCOUNTER_TEST
     configure_e1m1_encounter_test();
 #endif
+#ifdef DOOM_HIDDEN_ATTACK_TEST
+    configure_hidden_attack_test();
+#endif
 #ifdef DOOM_MELEE_TEST
     configure_melee_test();
 #endif
@@ -4548,6 +4575,9 @@ int main(void) {
 #endif
 #ifdef DOOM_E1M1_ENCOUNTER_TEST
     configure_e1m1_encounter_test();
+#endif
+#ifdef DOOM_HIDDEN_ATTACK_TEST
+    configure_hidden_attack_test();
 #endif
 #ifdef DOOM_MELEE_TEST
     configure_melee_test();
