@@ -666,16 +666,24 @@ static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dx = bx - ax;
     int dy = by - ay;
     int steps = iabs16(dx) > iabs16(dy) ? iabs16(dx) : iabs16(dy);
+    int x_acc;
+    int y_acc;
+    int x_step;
+    int y_step;
     if (steps <= 0) return 1;
     if ((ax >> 8) == (bx >> 8) && (ay >> 8) == (by >> 8)) return 1;
     steps >>= 6;
     if (steps < 1) steps = 1;
     if (steps > 40) steps = 40;
 
+    x_acc = ((int)ax) << 8;
+    y_acc = ((int)ay) << 8;
+    x_step = (dx << 8) / steps;
+    y_step = (dy << 8) / steps;
     for (int i = 1; i < steps; i++) {
-        int x = ax + (dx * i) / steps;
-        int y = ay + (dy * i) / steps;
-        if (map_at(x >> 8, y >> 8)) return 0;
+        x_acc += x_step;
+        y_acc += y_step;
+        if (map_at(x_acc >> 16, y_acc >> 16)) return 0;
     }
     return 1;
 }
