@@ -675,6 +675,12 @@ static u8 thing_is_runtime_threat(u16 thing_type) {
     return thing_is_monster(thing_type) || thing_is_barrel(thing_type) || thing_is_explosion(thing_type);
 }
 
+static int runtime_threat_priority_bias(u16 thing_type) {
+    if (thing_is_monster(thing_type)) return -1024;
+    if (thing_is_barrel(thing_type)) return -256;
+    return 0;
+}
+
 static u8 thing_is_corpse(u16 thing_type) {
     return (thing_type >= 9001 && thing_type <= 9005) || thing_type == 9009
         || (thing_type >= 9010 && thing_type <= 9036);
@@ -3637,6 +3643,7 @@ static int select_visible_things(int found, u8 pass) {
         if (sx < -48 || sx > SCRW + 48) continue;
 
         score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
+        if (pass == 1) score += runtime_threat_priority_bias(thing_type);
         candidate.thing_index = i;
         candidate.dynamic_index = -1;
         candidate.thing_type = thing_type;
