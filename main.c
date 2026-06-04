@@ -438,6 +438,7 @@ static void map_bit_set(u8 *bits, u16 index);
 static void draw_minimap_cell(int mx, int my);
 static void draw_minimap_source_cell(int map_x, int map_y);
 static void redraw_minimap_thing_cell(int thing_index);
+static void set_runtime_thing_position(int thing_index, short x_q8, short y_q8);
 static void close_minimap_for_terminal_message(void);
 
 static int iabs16(int value) {
@@ -1697,15 +1698,15 @@ static void move_monster_toward(int i, int dx, int dy, int adx, int ady) {
 
     if (adx > ady) {
         if (can_monster_step(i, (short)(x + sx), y)) {
-            thing_x_q8[i] = (short)(x + sx);
+            set_runtime_thing_position(i, (short)(x + sx), y);
         } else if (can_monster_step(i, x, (short)(y + sy))) {
-            thing_y_q8[i] = (short)(y + sy);
+            set_runtime_thing_position(i, x, (short)(y + sy));
         }
     } else {
         if (can_monster_step(i, x, (short)(y + sy))) {
-            thing_y_q8[i] = (short)(y + sy);
+            set_runtime_thing_position(i, x, (short)(y + sy));
         } else if (can_monster_step(i, (short)(x + sx), y)) {
-            thing_x_q8[i] = (short)(x + sx);
+            set_runtime_thing_position(i, (short)(x + sx), y);
         }
     }
 }
@@ -1833,8 +1834,7 @@ static u8 reveal_hidden_monster_near_player(int i, int px, int py) {
         }
     }
     if (best_score == 0x3FFFFFFF) return 0;
-    thing_x_q8[i] = (short)best_x;
-    thing_y_q8[i] = (short)best_y;
+    set_runtime_thing_position(i, (short)best_x, (short)best_y);
     set_monster_facing_from_delta(i, px - best_x, py - best_y);
     enemy_hidden_timer[i] = 0;
     enemy_attack_cooldown[i] = 24;
@@ -2889,6 +2889,22 @@ static void redraw_minimap_thing_cell(int thing_index) {
     if (!map_on || thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
     draw_minimap_source_cell(thing_x_q8[thing_index] >> 8, thing_y_q8[thing_index] >> 8);
     prev_px = -1;
+}
+
+static void set_runtime_thing_position(int thing_index, short x_q8, short y_q8) {
+    short old_x;
+    short old_y;
+    if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return;
+    old_x = thing_x_q8[thing_index];
+    old_y = thing_y_q8[thing_index];
+    if (old_x == x_q8 && old_y == y_q8) return;
+    thing_x_q8[thing_index] = x_q8;
+    thing_y_q8[thing_index] = y_q8;
+    if (map_on) {
+        draw_minimap_source_cell(old_x >> 8, old_y >> 8);
+        draw_minimap_source_cell(x_q8 >> 8, y_q8 >> 8);
+        prev_px = -1;
+    }
 }
 
 static void draw_minimap(void) {

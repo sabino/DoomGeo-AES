@@ -203,6 +203,9 @@ readable.
 - Opening the minimap redraws the 38x23 fix-layer view incrementally in small
   frame budgets while repainting the player marker, so the map appears without
   the old one-frame stall.
+- Moving monsters repaint their old and new minimap source cells while the map
+  is open, so threat markers stay tied to real WAD/AI positions instead of
+  leaving stale dots behind.
 - Death and exit transitions close the minimap before drawing their compact
   fix-layer messages, avoiding stale map cells behind terminal status text.
 
