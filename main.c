@@ -1803,6 +1803,7 @@ static u8 visible_monster_slots(void) {
     return count;
 }
 
+#ifdef DOOM_REVEAL_HIDDEN_MONSTERS
 static u8 reveal_hidden_monster_near_player(int i, int px, int py) {
     int dir_x, dir_y, plane_x, plane_y;
     int best_x = 0;
@@ -1839,6 +1840,7 @@ static u8 reveal_hidden_monster_near_player(int i, int px, int py) {
     enemy_attack_cooldown[i] = 24;
     return 1;
 }
+#endif
 
 static void update_monster_ai(void) {
     int px, py;
@@ -1866,10 +1868,13 @@ static void update_monster_ai(void) {
         if (!move_monster_along_path(i)) move_monster_toward(i, dx, dy, adx, ady);
         if (visible_monsters != 0) {
             enemy_hidden_timer[i] = 0;
-        } else if (adx + ady < WORLD_Q8(4608) && visible_monsters == 0) {
+        }
+#ifdef DOOM_REVEAL_HIDDEN_MONSTERS
+        else if (adx + ady < WORLD_Q8(4608) && visible_monsters == 0) {
             if (enemy_hidden_timer[i] < 255) enemy_hidden_timer[i]++;
             if (enemy_hidden_timer[i] > 18 && reveal_hidden_monster_near_player(i, px, py)) visible_monsters = 1;
         }
+#endif
     }
 }
 

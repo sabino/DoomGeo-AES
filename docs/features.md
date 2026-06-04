@@ -141,6 +141,10 @@ readable.
   mutable position layer. Awakened monsters follow a coarse player distance
   field so they can move around converted E1M1 walls instead of getting stuck
   on direct-line chase.
+- Normal builds keep monsters at their converted WAD positions. The old helper
+  that relocated hidden monsters near the player is now available only behind
+  the explicit `DOOM_REVEAL_HIDDEN_MONSTERS` debug macro, so real-map play does
+  not fake encounter placement just to fill a visible sprite slot.
 - Hitscan, projectile, and melee monsters can damage the player only from
   readable on-screen world-sprite slots, so hidden/off-screen things do not
   attack through the Neo Geo sprite fallback path. Player weapon hits also
