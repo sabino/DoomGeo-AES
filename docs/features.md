@@ -187,6 +187,10 @@ readable.
 - Monster AI applies its active-range gate before resolving thing type, so
   distant converted things do not spend CPU on monster classification during
   movement ticks.
+- Monster pathfinding caches the player map cell and avoids rebuilding the
+  full BFS distance field while the player remains in that cell. Door openings
+  and level restart still invalidate the cache so newly opened E1M1 routes are
+  picked up immediately.
 - Visible thing selection rejects behind-camera and far-away things before
   resolving runtime type or render bucket, reducing per-frame sprite candidate
   work while preserving the same final projection and priority rules.

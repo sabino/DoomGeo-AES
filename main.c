@@ -493,6 +493,8 @@ static u8 monster_path_dist[MAP_H][MAP_W];
 static u16 monster_path_queue[MAP_W * MAP_H];
 static u8 monster_path_valid = 0;
 static u8 monster_path_timer = 0;
+static short monster_path_player_cell_x = -1;
+static short monster_path_player_cell_y = -1;
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
@@ -2112,6 +2114,8 @@ static void rebuild_monster_path(void) {
     u16 head = 0;
     u16 tail = 0;
     rc_player_cell(&px, &py);
+    monster_path_player_cell_x = (short)px;
+    monster_path_player_cell_y = (short)py;
     for (u16 y = 0; y < MAP_H; y++) {
         for (u16 x = 0; x < MAP_W; x++) monster_path_dist[y][x] = 0xFF;
     }
@@ -2145,11 +2149,14 @@ static void rebuild_monster_path(void) {
 }
 
 static void refresh_monster_path(void) {
-    if (!monster_path_valid || monster_path_timer == 0) {
+    int px, py;
+    rc_player_cell(&px, &py);
+    if (!monster_path_valid || px != monster_path_player_cell_x || py != monster_path_player_cell_y) {
         rebuild_monster_path();
         monster_path_timer = 12;
     } else {
-        monster_path_timer--;
+        if (monster_path_timer) monster_path_timer--;
+        else monster_path_timer = 12;
     }
 }
 
@@ -3231,6 +3238,9 @@ static void open_door_index(u16 door_index) {
     }
     if (opened) {
         door_message_timer = 35;
+        monster_path_valid = 0;
+        monster_path_player_cell_x = -1;
+        monster_path_player_cell_y = -1;
         rc_invalidate_view();
     }
 }
@@ -4587,6 +4597,8 @@ static void restart_level(void) {
     monster_ai_tick = 0;
     monster_path_valid = 0;
     monster_path_timer = 0;
+    monster_path_player_cell_x = -1;
+    monster_path_player_cell_y = -1;
     projectile_active = 0;
     projectile_from_player = 0;
     projectile_source_thing = -1;
