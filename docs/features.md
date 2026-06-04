@@ -124,7 +124,8 @@ readable.
   into corpse frames or drops where implemented.
 - Former humans and shotgun guys now spawn separate dynamic clip/shotgun drops,
   so their corpse remains visible while the dropped pickup can still be
-  collected.
+  collected. These dynamic drops do not increase the map item-completion
+  counter because they are not part of the converted map's original pickup set.
 
 ## Map And Level Flow
 

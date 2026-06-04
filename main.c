@@ -1934,7 +1934,6 @@ static void collect_nearby_pickups(void) {
         if (!dynamic_drop_active[i]) continue;
         if (iabs16(px - dynamic_drop_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - dynamic_drop_y_q8[i]) <= WORLD_Q8(96)) {
             if (apply_pickup(dynamic_drop_type[i])) {
-                if (player_items < 999) player_items++;
                 dynamic_drop_active[i] = 0;
                 bg_scroll_key = 0xFFFFFFFFUL;
                 hide_enemies();
