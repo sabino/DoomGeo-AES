@@ -2275,7 +2275,7 @@ static void configure_key_door_test(void) {
     /* E1M2 red locked-door group sits west of this open cell cluster. */
     rc_set_pose_q8((short)((32 << 8) + 128), (short)((32 << 8) + 128), -256, 0);
     thing_x_q8[0] = (short)((30 << 8) + 128);
-    thing_y_q8[0] = (short)((31 << 8) + 128);
+    thing_y_q8[0] = (short)(32 << 8);
     thing_type_override[0] = 13; /* red keycard */
     enemy_dead[0] = 0;
 

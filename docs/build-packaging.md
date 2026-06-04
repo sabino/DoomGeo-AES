@@ -77,6 +77,11 @@ SMOKE_OUTPUT=.tools/screens/latest/key-door-test.png \
 make smoke-screenshot
 ```
 
+For the full key-door interaction path, use `tools/smoke_key_door.sh`. It
+captures the initial focused E1M2 scene, the missing-red-key message, the
+post-pickup HUD state, the opened-door frame, and one extra frame after walking
+through the opened doorway.
+
 ```sh
 SMOKE_BUILD_TARGET=arsenal-test-rom \
 SMOKE_RUN_TARGET=arsenal-test-gngeo \

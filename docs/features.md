@@ -128,6 +128,9 @@ readable.
   key/door verification ROM. It starts beside the real red locked-door group,
   faces the door, hides unrelated things, and places a real WAD red keycard in
   front of the player so pickup and locked-door behavior can be tested quickly.
+- `tools/smoke_key_door.sh` automates that focused ROM through missing-key,
+  key pickup, and successful door-open stages, producing comparison screenshots
+  under `.tools/screens/latest`.
 - `make combat-test-rom` and `make combat-test-gngeo` build an isolated E1M1
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the
