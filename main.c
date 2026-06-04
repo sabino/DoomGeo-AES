@@ -702,6 +702,8 @@ static u8  hurt_timer = 0;
 static u8  floor_damage_timer = 0;
 static u8  armor_flash_timer = 0;
 static u8  level_complete = 0;
+static u8  level_next_episode = DOOM_NEXT_MAP_EPISODE;
+static u8  level_next_mission = DOOM_NEXT_MAP_MISSION;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u32 bg_pending_key = 0xFFFFFFFFUL;
 static u8  bg_update_col = 0;
@@ -3513,8 +3515,8 @@ static void draw_exit_stats(void) {
     draw_stat3(col, 12, FIX_KEY_MSG_K, completion_percent(player_kills, level_total_kills));
     draw_stat3(col, 13, (u16)(FIX_EXIT_BASE + 2), completion_percent(player_items, level_total_items));
     draw_stat3(col, 14, FIX_SECRET_S, completion_percent(player_secrets, level_total_secrets));
-    if (DOOM_NEXT_MAP_EPISODE && DOOM_NEXT_MAP_MISSION) {
-        draw_fix_map_code(col, 15, DOOM_NEXT_MAP_EPISODE, DOOM_NEXT_MAP_MISSION);
+    if (level_next_episode && level_next_mission) {
+        draw_fix_map_code(col, 15, level_next_episode, level_next_mission);
     }
 }
 
@@ -3626,12 +3628,18 @@ static void update_floor_damage(void) {
     floor_damage_timer = 32;
 }
 
-static void complete_level(void) {
+static void complete_level_to(u8 next_episode, u8 next_mission) {
     if (level_complete) return;
+    level_next_episode = next_episode;
+    level_next_mission = next_mission;
     level_complete = 1;
     close_minimap_for_terminal_message();
     hide_enemies();
     draw_exit_message();
+}
+
+static void complete_level(void) {
+    complete_level_to(DOOM_NEXT_MAP_EPISODE, DOOM_NEXT_MAP_MISSION);
 }
 
 static u8 is_e1m8_boss_exit_map(void) {
@@ -3656,7 +3664,7 @@ static void check_exit_reached(void) {
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
         if (iabs16(px - exit->x_q8) <= WORLD_Q8(128) && iabs16(py - exit->y_q8) <= WORLD_Q8(128)) {
-            complete_level();
+            complete_level_to(exit->next_episode, exit->next_mission);
             return;
         }
     }
@@ -5296,6 +5304,8 @@ static void restart_level(void) {
     hurt_timer = 0;
     floor_damage_timer = 0;
     level_complete = 0;
+    level_next_episode = DOOM_NEXT_MAP_EPISODE;
+    level_next_mission = DOOM_NEXT_MAP_MISSION;
     invalidate_background_cache();
     key_message_timer = 0;
     missing_key_bits = 0;

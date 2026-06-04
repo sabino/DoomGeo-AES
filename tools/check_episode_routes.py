@@ -39,7 +39,8 @@ def parse_exits(text: str) -> list[tuple[int, int]]:
         raise ValueError("missing g_runtime_exits")
     end = text.index("};", start)
     exits: list[tuple[int, int]] = []
-    for x_q8, y_q8, _special in re.findall(r"\{(-?\d+),(-?\d+),(\d+)\}", text[start:end]):
+    for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+)(?:,\d+,\d+)?\}", text[start:end]):
+        x_q8, y_q8, _special = match.groups()
         exits.append((int(x_q8) >> 8, int(y_q8) >> 8))
     return exits
 

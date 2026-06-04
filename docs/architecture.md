@@ -30,7 +30,9 @@ and emits generated C headers/sources under `build/`:
   the collision grid. On E1M1 this reduces wall-hit refinement from scanning
   325 render lines per column to checking at most 7 lines in a hit cell, with
   about 1.7 lines on an average referenced cell.
-- Door/exit trigger tables.
+- Door/exit trigger tables. Exit records include the raw Doom line special plus
+  the generated Episode/map destination so normal and secret exits can diverge
+  without runtime WAD parsing.
 - Damage and secret bit grids.
 - Per-cell sector floor visual class and light band, derived from sector flat
   names, specials, and light levels for low-cost runtime palette cues.

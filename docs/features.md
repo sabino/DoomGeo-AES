@@ -18,8 +18,11 @@ readable.
   mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
   or `2` for medium placement.
 - The generated header exposes the current map code and Episode 1 next-map
-  metadata. The intro menu shows the compiled map instead of a hard-coded E1M1
-  label, and the completion overlay can show the next standalone map code.
+  metadata. Exit records also carry a compact destination derived from the Doom
+  line special, so E1M3's secret exit can report E1M9 while the normal exit
+  reports E1M4. The intro menu shows the compiled map instead of a hard-coded
+  E1M1 label, and the completion overlay can show the reached exit's next
+  standalone map code.
 
 ## Rendering
 
@@ -544,9 +547,11 @@ readable.
   door edge or slightly off-center.
 - Exits freeze the level and show compact kill/item/secret completion
   percentage rows before restart, computed from the converted map's runtime
-  monsters, pickups, and secret cells. When the generated metadata names a next
-  Episode 1 map, the overlay also draws that map code as the next standalone
-  ROM to run.
+  monsters, pickups, and secret cells. When the reached exit's generated
+  metadata names a next Episode 1 map, the overlay also draws that map code as
+  the next standalone ROM to run. E1M3 normal and secret exits therefore point
+  at different staged ROM targets even though the current cart still packages
+  one generated map at a time.
 - The menu can expose compiled-map and next-map metadata, but the current ROM
   still contains one heavy generated map/graphics set at a time. Full runtime
   multi-map loading remains a packaging/runtime-data milestone.
