@@ -95,12 +95,15 @@ readable.
   missing shareware-only frames are skipped instead of breaking the build.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
-- Former humans, shotgun guys, imps, demons/spectres, Barons, and barrels have
-  partial gameplay support.
-- Former humans, shotgun guys, imps, demons/spectres, and Barons now bake A/B
-  walk frames across the available Doom angle groups. Runtime sprite selection
-  tracks a coarse monster-facing vector so visible enemies are no longer locked
-  to a single front-facing frame.
+- Former humans, shotgun guys, imps, demons/spectres, Barons, lost souls, and
+  barrels have partial gameplay support. Lost souls are accepted from
+  registered/commercial WAD maps and use the current melee movement path until
+  their dedicated charge behavior is implemented.
+- Former humans, shotgun guys, imps, demons/spectres, Barons, and lost souls now
+  bake A/B walk frames across the available Doom angle groups when the source
+  WAD contains those sprite lumps. Runtime sprite selection tracks a coarse
+  monster-facing vector so visible enemies are no longer locked to a single
+  front-facing frame.
 - The same monsters also bake front-facing attack frames. A short runtime attack
   timer swaps the visible sprite to those frames when a monster fires, throws a
   projectile, or bites.

@@ -496,6 +496,7 @@ MONSTER_TYPES = {
     3002,  # demon
     3003,  # baron
     3004,  # former human
+    3006,  # lost soul
 }
 
 PICKUP_TYPES = {

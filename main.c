@@ -524,6 +524,7 @@ static u8 thing_is_monster(u16 thing_type) {
     case 3002:
     case 3003:
     case 3004:
+    case 3006:
         return 1;
     default:
         return 0;
@@ -767,6 +768,8 @@ static u8 monster_start_hp(u16 thing_type) {
         return 8;
     case 3003: /* baron */
         return 20;
+    case 3006: /* lost soul */
+        return 5;
     default:
         return 5;
     }
@@ -837,6 +840,8 @@ static u16 monster_score_value(u16 thing_type) {
         return 400;
     case 3003: /* baron */
         return 1000;
+    case 3006: /* lost soul */
+        return 100;
     default:
         return 100;
     }
