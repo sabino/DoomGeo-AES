@@ -259,6 +259,9 @@ readable.
   placement applies those origins to a floor/reference baseline, keeping things
   centered and seated closer to Doom's source art while still allowing the
   weapon sprite to occlude centered close threats like Doom.
+- Corpse sprites use a slightly higher runtime floor baseline than pickups and
+  barrels, keeping small death/corpse frames readable above the status bar and
+  weapon after a kill.
 - Visible fireballs and impact bursts also keep a small minimum projected size,
   making projectile combat easier to read against dark wall and floor palettes.
 - Thing projection falls back to a q8 player/view-vector projection after a

@@ -65,7 +65,11 @@ make smoke-screenshot
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
-death/corpse feedback frame.
+death/corpse feedback frame. Override `COMBAT_DEATH_WAIT_SECS` if an emulator
+or host is running slowly and the final capture still lands during the shotgun
+pump animation. The helper also steps the player slightly backward before the
+final capture so the weapon sprite does not cover the corpse/drop feedback;
+override `COMBAT_DEATH_REVEAL_STEP_SECS` if that framing needs tuning.
 
 For a real converted E1M1 monster visibility pass, run
 `tools/smoke_e1m1_encounter.sh`. It builds `make encounter-test-rom`, launches

@@ -7,6 +7,8 @@ cd "$ROOT"
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
+DEATH_WAIT_SECS="${COMBAT_DEATH_WAIT_SECS:-2.5}"
+REVEAL_STEP_SECS="${COMBAT_DEATH_REVEAL_STEP_SECS:-0.45}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 INITIAL_OUT="${OUT_DIR}/combat-initial.png"
 FIRED_OUT="${OUT_DIR}/combat-fired.png"
@@ -76,7 +78,11 @@ press_fire
 sleep 0.15
 capture_window "$wid" "$FIRED_OUT"
 
-sleep 1.0
+sleep "$DEATH_WAIT_SECS"
+DISPLAY="$DISPLAY_VALUE" xdotool keydown Down
+sleep "$REVEAL_STEP_SECS"
+DISPLAY="$DISPLAY_VALUE" xdotool keyup Down
+sleep 0.2
 capture_window "$wid" "$DEATH_OUT"
 
 echo "$INITIAL_OUT"

@@ -4103,7 +4103,7 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
         return origin_y;
     }
 
-    if (thing_is_corpse(thing_type)) return GAME_H - 4;
+    if (thing_is_corpse(thing_type)) return GAME_H - 20;
     if (thing_is_pickup(thing_type)) return GAME_H - 8;
     if (thing_is_barrel(thing_type)) return GAME_H - 8;
 
