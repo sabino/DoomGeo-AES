@@ -2574,7 +2574,7 @@ static void map_cell(int mx, int my, u16 pal, u16 tile) {
 }
 
 enum {
-    HUD_FIX_TOP_ROW = (GAME_H / 8) + 1,
+    HUD_FIX_TOP_ROW = (GAME_H / 8) + 3,
     HUD_FIX_BOTTOM_ROW = HUD_FIX_TOP_ROW + 1
 };
 

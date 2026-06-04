@@ -46,9 +46,10 @@ readable.
 - The large status numbers are positioned over the AMMO, HEALTH, FRAG, and
   ARMOR fields with the Doom red-number palette.
 - Weapon indicators now use a Doom-style two-row ARMS layout for pistol through
-  BFG weapon numbers 2-7 instead of the old continuous debug strip. Key
-  indicators and short messages (`KEY`, `AMMO`, `MED`, `ARM`, `DOR`, `SEC`,
-  `EXIT`, `DEAD`) use fix-layer glyphs.
+  BFG weapon numbers 2-7 instead of the old continuous debug strip. The ARMS
+  fix-layer rows are kept inside the metal status bar, away from the weapon
+  and enemy playfield sprites. Key indicators and short messages (`KEY`,
+  `AMMO`, `MED`, `ARM`, `DOR`, `SEC`, `EXIT`, `DEAD`) use fix-layer glyphs.
 - Locked-door messages include the required key color glyph, so the E1M2 red
   keycard path can be verified visually instead of only through generated data.
 - Owned HUD keys use the baked Doom keycard patches from the WAD, shrunken into
