@@ -4636,9 +4636,12 @@ int main(void) {
         update_background_scroll();
         rc_blit();                      /* push to VRAM during vblank         */
         update_impact_effect();
-        update_projectile();
         if (level_complete) hide_enemies();
         else update_enemy();
+        /* Projectile ownership is tied to the current readable enemy slots.
+         * Refresh world sprites first so a monster fireball cannot keep
+         * advancing from stale visibility after the source leaves view. */
+        update_projectile();
         update_monster_damage();
         update_weapon(pressed);
         update_enemy_hit_flash();

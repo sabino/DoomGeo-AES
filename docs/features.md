@@ -117,7 +117,9 @@ readable.
   instead of flashing the raw Neo Geo backdrop, avoiding full-height red edge
   leaks if sprite coverage drops out during busy scenes. Monster fireballs now
   spawn the same impact burst when they hit a wall or the player instead of
-  disappearing silently.
+  disappearing silently. Projectile movement is evaluated after the current
+  frame's world-sprite selection, so monster fireballs cannot keep advancing
+  from stale source visibility after the source leaves the rendered slot set.
 - The rocket launcher now launches a visible forward projectile using the
   current baked fireball strip placeholder. It detonates into the existing
   compact splash-damage path when it hits a wall, crosses a shootable thing, or
