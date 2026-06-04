@@ -160,7 +160,9 @@ tools/smoke_weapon_shortcuts.sh
 The helper builds and launches the arsenal verification ROM, captures a
 baseline frame, sends the configured GnGeo C+Down shortcut, then holds C before
 pressing Right to prove both shortcut key orders. It captures the frames under
-`.tools/screens/latest/` and leaves GnGeo open on `SMOKE_WORKSPACE` for visual
+`.tools/screens/latest/`, runs `tools/check_weapon_shortcut_screens.py` to
+verify that the visible weapon silhouette changes between plasma, rocket, and
+chaingun states, and leaves GnGeo open on `SMOKE_WORKSPACE` for visual
 inspection.
 
 Map conversion honors Doom THING skill flags through `DOOM_SKILL_MASK`.

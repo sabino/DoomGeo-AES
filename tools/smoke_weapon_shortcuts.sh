@@ -84,6 +84,8 @@ sleep 0.8
 xwd -silent -id "$wid" -out "$HELD_XWD"
 convert "$HELD_XWD" "$HELD_OUT"
 
+tools/check_weapon_shortcut_screens.py --dir "$OUT_DIR"
+
 echo "$BEFORE_OUT"
 echo "$AFTER_OUT"
 echo "$HELD_OUT"
