@@ -162,6 +162,9 @@ readable.
   after cheap coordinate, cooldown, and readability checks, reducing repeated
   per-frame classification work during active fights without changing damage,
   drops, or score behavior.
+- Sound-alert and monster-AI passes reject dead, already-awake, flashing, and
+  unreadable-slot entries before distance math or type classification, keeping
+  periodic E1M1 monster work focused on things that can actually wake or move.
 - Close monster melee now uses the same bounded readable-slot list instead of
   scanning every converted runtime thing. It still requires close world
   distance, projection, screen position, and line-of-sight before applying

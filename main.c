@@ -1660,11 +1660,11 @@ static void alert_monsters_by_sound(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, range;
         u8 audible = 0;
+        if (enemy_dead[i] || enemy_awake[i]) continue;
         dx = iabs16(px - thing_x_q8[i]);
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
         if (range > WORLD_Q8(8192)) continue;
-        if (enemy_dead[i] || enemy_awake[i]) continue;
         if (!thing_is_monster(runtime_thing_type(i))) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
@@ -2195,7 +2195,9 @@ static u8 visible_monster_slots(void) {
     u8 count = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
-        if (thing >= 0 && thing_is_monster(runtime_thing_type(thing)) && enemy_slot_is_readable(slot)) count++;
+        if (thing < 0) continue;
+        if (!enemy_slot_is_readable(slot)) continue;
+        if (thing_is_monster(runtime_thing_type(thing))) count++;
     }
     return count;
 }
@@ -2250,12 +2252,12 @@ static void update_monster_ai(void) {
     visible_monsters = visible_monster_slots();
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, adx, ady;
+        if (enemy_dead[i] || enemy_hit_flash[i]) continue;
         dx = px - thing_x_q8[i];
         dy = py - thing_y_q8[i];
         adx = iabs16(dx);
         ady = iabs16(dy);
         if (adx + ady > WORLD_Q8(4608)) continue;
-        if (enemy_dead[i] || enemy_hit_flash[i]) continue;
         if (!thing_is_monster(runtime_thing_type(i))) continue;
         if (adx < WORLD_Q8(288) && ady < WORLD_Q8(288)
             && line_of_sight_q8(thing_x_q8[i], thing_y_q8[i], (short)px, (short)py)) continue;
