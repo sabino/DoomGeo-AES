@@ -77,7 +77,7 @@ It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
 which maps currently have a generated start-to-exit route at the configured
 grid size. The command is intentionally a report instead of a hard CI gate
 while the converter still needs more topology support for locked doors,
-switch/lift progression, and the `E1M8` boss-death exit.
+and switch/lift progression.
 
 For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
 It starts with `make route-check`, then chains the verified enemy visibility,
@@ -106,6 +106,11 @@ For a focused first-level completion check, run `tools/smoke_e1m1_exit.sh`. It
 builds `make exit-test-rom`, starts two converted cells left of the real
 generated E1M1 exit trigger, walks into that trigger, captures the completed
 frame, and checks the `EXIT` plus kill/item/secret percentage overlay.
+
+For the E1M8 special boss-death exit, run `tools/smoke_e1m8_boss_exit.sh`. It
+builds `make e1m8-boss-test-rom` from the real E1M8 generated map, stages the
+two original Baron things in front of the player, fires once, and checks that
+the normal completion overlay appears after both bosses die.
 
 For an invisible-attacker regression pass, run `tools/smoke_hidden_attack.sh`.
 It builds `make hidden-attack-test-rom`, launches `make hidden-attack-test-gngeo`,

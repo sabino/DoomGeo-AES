@@ -281,7 +281,7 @@ readable.
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. This is a progress baseline for real Episode 1 support:
   the current default grid still exposes blocked routes on several maps and
-  marks `E1M8` as needing boss-death completion because it has no linedef exit.
+  reports `E1M8` as a supported boss-death exit because it has no linedef exit.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -322,6 +322,10 @@ readable.
   E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,
   captures the completed frame, and checks the `EXIT` plus kill/item/secret
   percentage overlay.
+- `make e1m8-boss-test-rom` and `make e1m8-boss-test-gngeo` build a focused
+  E1M8 boss-exit verification ROM. It stages the two real E1M8 Baron things in
+  front of the player with low HP, and `tools/smoke_e1m8_boss_exit.sh` fires
+  once, captures the completed frame, and checks the normal `EXIT` overlay.
 - `make hidden-attack-test-rom` and `make hidden-attack-test-gngeo` build a
   readable-slot regression ROM. It places an awake shotgun guy outside the
   readable view and freezes its movement, so the HUD health value must stay

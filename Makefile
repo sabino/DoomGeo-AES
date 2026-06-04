@@ -229,6 +229,14 @@ exit-test-gngeo:
 	$(MAKE) exit-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/exit-test-rom $(GAMEROM)
 
+e1m8-boss-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M8 DOOM_DETAIL=quality BUILDDIR=build/e1m8-boss-test ROM=build/e1m8-boss-test-rom GFX_ROM_DIR=build/e1m8-boss-test-assets CFLAGS="-Ibuild/e1m8-boss-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M8_BOSS_TEST"
+	cp $(ROM)/neogeo.zip build/e1m8-boss-test-rom/neogeo.zip
+
+e1m8-boss-test-gngeo:
+	$(MAKE) e1m8-boss-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/e1m8-boss-test-rom $(GAMEROM)
+
 hidden-attack-test-rom:
 	$(MAKE) cart BUILDDIR=build/hidden-attack-test ROM=build/hidden-attack-test-rom GFX_ROM_DIR=build/hidden-attack-test-assets CFLAGS="-Ibuild/hidden-attack-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_HIDDEN_ATTACK_TEST"
 	cp $(ROM)/neogeo.zip build/hidden-attack-test-rom/neogeo.zip
@@ -337,7 +345,7 @@ route-check: $(DOOM_MAP_HEADER)
 episode-route-report: $(DOOM_IWAD)
 	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

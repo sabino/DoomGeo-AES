@@ -44,6 +44,15 @@ def parse_exits(text: str) -> list[tuple[int, int]]:
     return exits
 
 
+def parse_runtime_thing_types(text: str) -> list[int]:
+    marker = "static const NgRuntimeThing g_runtime_things"
+    start = text.find(marker)
+    if start < 0:
+        raise ValueError("missing g_runtime_things")
+    end = text.index("};", start)
+    return [int(match.group(3)) for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+),0x[0-9a-fA-F]+\}", text[start:end])]
+
+
 def neighbors(x: int, y: int) -> tuple[tuple[int, int], ...]:
     return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
 
@@ -87,7 +96,10 @@ def route_status(header: Path, map_name: str) -> tuple[str, str]:
     exits = parse_exits(text)
     if not exits:
         if map_name.upper() == "E1M8":
-            return "boss_exit_missing", "no linedef exit; E1M8 needs boss-death completion"
+            boss_count = sum(1 for thing_type in parse_runtime_thing_types(text) if thing_type == 3003)
+            if boss_count:
+                return "boss_exit", f"{boss_count} Baron boss things; runtime boss-death completion"
+            return "boss_exit_missing", "no linedef exit and no Baron boss things"
         return "missing_exit", "no generated linedef exit"
     if grid[start[1]][start[0]] != 0:
         return "blocked_start", f"start={start} value={grid[start[1]][start[0]]}"
@@ -162,7 +174,7 @@ def main() -> int:
         except Exception as exc:
             status = "route_error"
             detail = str(exc)
-        if status not in {"route_open", "route_doors"}:
+        if status not in {"route_open", "route_doors", "boss_exit"}:
             failures += 1
         print(f"{map_name:4} {status:18} {detail}")
 

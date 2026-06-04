@@ -14,7 +14,7 @@
 #if defined(DOOM_COMBAT_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) \
     || defined(DOOM_E1M1_EXIT_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_MELEE_TEST) \
     || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) \
-    || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST)
+    || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_E1M8_BOSS_TEST)
 #define DOOM_SKIP_INTRO 1
 #endif
 
@@ -1570,6 +1570,8 @@ static void load_enemy_hit_palette(u16 slot) {
     enemy_palette_def[slot] = -1;
 }
 
+static void check_e1m8_boss_exit(void);
+
 static u8 damage_enemy_at(int thing_index, u8 damage) {
     u8 killed = 0;
     u16 source_type;
@@ -1647,6 +1649,7 @@ static u8 damage_enemy_at(int thing_index, u8 damage) {
             }
         }
     }
+    if (killed) check_e1m8_boss_exit();
     return killed;
 }
 
@@ -2542,7 +2545,7 @@ static void update_monster_ai(void) {
     }
 }
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_E1M8_BOSS_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -2760,6 +2763,56 @@ static void configure_e1m1_exit_test(void) {
     }
     shown_health = 0xFFFF;
     shown_armor = 0xFFFF;
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+}
+#endif
+
+#ifdef DOOM_E1M8_BOSS_TEST
+static void configure_e1m8_boss_test(void) {
+    u8 placed = 0;
+    static const short forward_steps[] = {WORLD_Q8(700), WORLD_Q8(820), WORLD_Q8(940)};
+    static const short lateral_steps[] = {WORLD_Q8(32), WORLD_Q8(80), WORLD_Q8(128), 0, -WORLD_Q8(32)};
+    int px, py;
+    player_has_shotgun = 1;
+    player_shells = 24;
+    current_weapon = WEAPON_SHOTGUN;
+    player_health = 100;
+    rc_player_q8(&px, &py);
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        enemy_dead[i] = 1;
+        enemy_hp[i] = 0;
+        enemy_awake[i] = 0;
+        enemy_attack_cooldown[i] = 0;
+        enemy_attack_anim[i] = 0;
+        enemy_ranged_readable_ticks[i] = 0;
+        thing_type_override[i] = 0;
+        if (g_runtime_things[i].type == 3003 && placed < 2) {
+            short x;
+            short y;
+            u8 found = 0;
+            for (u16 f = 0; f < sizeof(forward_steps) / sizeof(forward_steps[0]) && !found; f++) {
+                for (u16 l = 0; l < sizeof(lateral_steps) / sizeof(lateral_steps[0]); l++) {
+                    short lateral = lateral_steps[(l + placed) % (sizeof(lateral_steps) / sizeof(lateral_steps[0]))];
+                    if (!test_position(&x, &y, forward_steps[f], lateral)) continue;
+                    thing_x_q8[i] = x;
+                    thing_y_q8[i] = y;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) continue;
+            enemy_dead[i] = 0;
+            enemy_hp[i] = 1;
+            enemy_awake[i] = 1;
+            enemy_attack_cooldown[i] = 96;
+            set_monster_facing_from_delta(i, px - thing_x_q8[i], py - thing_y_q8[i]);
+            placed++;
+        }
+    }
+    shown_health = 0xFFFF;
     shown_ammo = 0xFFFF;
     shown_weapon_status = 0xFFFF;
     reset_enemy_slot_cache();
@@ -3360,6 +3413,29 @@ static void update_floor_damage(void) {
     floor_damage_timer = 32;
 }
 
+static void complete_level(void) {
+    if (level_complete) return;
+    level_complete = 1;
+    close_minimap_for_terminal_message();
+    hide_enemies();
+    draw_exit_message();
+}
+
+static u8 is_e1m8_boss_exit_map(void) {
+    return DOOM_MAP_EPISODE == 1 && DOOM_MAP_MISSION == 8;
+}
+
+static void check_e1m8_boss_exit(void) {
+    u8 bosses = 0;
+    if (!is_e1m8_boss_exit_map() || level_complete) return;
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        if (g_runtime_things[i].type != 3003) continue;
+        bosses++;
+        if (!enemy_dead[i] && thing_type_override[i] == 0) return;
+    }
+    if (bosses) complete_level();
+}
+
 static void check_exit_reached(void) {
     int px, py;
     if (level_complete) return;
@@ -3367,10 +3443,7 @@ static void check_exit_reached(void) {
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
         if (iabs16(px - exit->x_q8) <= WORLD_Q8(128) && iabs16(py - exit->y_q8) <= WORLD_Q8(128)) {
-            level_complete = 1;
-            close_minimap_for_terminal_message();
-            hide_enemies();
-            draw_exit_message();
+            complete_level();
             return;
         }
     }
@@ -5155,6 +5228,9 @@ static void restart_level(void) {
 #endif
 #ifdef DOOM_KEY_DOOR_TEST
     configure_key_door_test();
+#endif
+#ifdef DOOM_E1M8_BOSS_TEST
+    configure_e1m8_boss_test();
 #endif
     init_background();
     init_walls();
