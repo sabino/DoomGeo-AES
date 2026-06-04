@@ -524,6 +524,7 @@ static u8 thing_is_monster(u16 thing_type) {
     case 3002:
     case 3003:
     case 3004:
+    case 3005:
     case 3006:
         return 1;
     default:
@@ -647,7 +648,7 @@ static u8 thing_is_explosion(u16 thing_type) {
 }
 
 static u8 thing_is_projectile(u16 thing_type) {
-    return thing_type == 9006 || thing_type == 9007;
+    return thing_type == 9006 || thing_type == 9007 || thing_type == 9008;
 }
 
 static u8 thing_is_runtime_threat(u16 thing_type) {
@@ -768,6 +769,8 @@ static u8 monster_start_hp(u16 thing_type) {
         return 8;
     case 3003: /* baron */
         return 20;
+    case 3005: /* cacodemon */
+        return 12;
     case 3006: /* lost soul */
         return 5;
     default:
@@ -840,6 +843,8 @@ static u16 monster_score_value(u16 thing_type) {
         return 400;
     case 3003: /* baron */
         return 1000;
+    case 3005: /* cacodemon */
+        return 700;
     case 3006: /* lost soul */
         return 100;
     default:
@@ -1364,6 +1369,8 @@ static u8 monster_ranged_damage(u16 thing_type) {
         return 5;
     case 3001: /* imp */
         return 4;
+    case 3005: /* cacodemon */
+        return 6;
     case 3003: /* baron */
         return 8;
     default:
@@ -1375,6 +1382,8 @@ static u16 monster_projectile_type(u16 thing_type) {
     switch (thing_type) {
     case 3001: /* imp */
         return 9006;
+    case 3005: /* cacodemon */
+        return 9008;
     case 3003: /* baron */
         return 9007;
     default:
