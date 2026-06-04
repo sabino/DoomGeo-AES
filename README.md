@@ -30,9 +30,9 @@ drawing pixels.
 | --- | --- |
 | ![Current wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) | ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
 
-| HUD work-in-progress | Keycard test ROM |
+| HUD status bar | Keycard test ROM |
 | --- | --- |
-| ![Current HUD status bar and known number placement issue](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
+| ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
 
 | Combat test ROM | Arsenal test ROM |
 | --- | --- |
@@ -51,6 +51,7 @@ drawing pixels.
 | Hold A + Left/Right | Strafe |
 | B | Fire weapon |
 | C | Cycle to next ready weapon |
+| Hold C + D-pad | Jump between weapon groups |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart level |

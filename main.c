@@ -3086,6 +3086,55 @@ static void toggle_weapon(void) {
     shown_ammo = 0xFFFF;
 }
 
+static u8 select_next_weapon_from_list(const u8 *weapons, u8 count, u8 require_ammo) {
+    u8 start_index = 0xFF;
+    for (u8 i = 0; i < count; i++) {
+        if (weapons[i] == current_weapon) {
+            start_index = i;
+            break;
+        }
+    }
+    for (u8 i = 0; i < count; i++) {
+        u8 index = start_index == 0xFF ? i : (u8)((start_index + i + 1) % count);
+        u8 weapon = weapons[index];
+        if (require_ammo ? weapon_has_ammo(weapon) : player_has_weapon(weapon)) {
+            current_weapon = weapon;
+            weapon_frame = 0xFF;
+            shown_ammo = 0xFFFF;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void select_weapon_group(u8 direction_bits) {
+    static const u8 shotgun_group[] = {WEAPON_SHOTGUN};
+    static const u8 rapid_group[] = {WEAPON_CHAINGUN};
+    static const u8 heavy_group[] = {WEAPON_ROCKET, WEAPON_PLASMA, WEAPON_BFG};
+    static const u8 close_group[] = {WEAPON_CHAINSAW, WEAPON_FIST, WEAPON_PISTOL};
+    const u8 *group = shotgun_group;
+    u8 count = sizeof(shotgun_group);
+    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08 };
+
+    if (direction_bits & RIGHT) {
+        group = rapid_group;
+        count = sizeof(rapid_group);
+    } else if (direction_bits & DOWN) {
+        group = heavy_group;
+        count = sizeof(heavy_group);
+    } else if (direction_bits & LEFT) {
+        group = close_group;
+        count = sizeof(close_group);
+    } else if (direction_bits & UP) {
+        group = shotgun_group;
+        count = sizeof(shotgun_group);
+    }
+
+    if (!select_next_weapon_from_list(group, count, 1)) {
+        select_next_weapon_from_list(group, count, 0);
+    }
+}
+
 static void set_weapon_position(signed char bob_x, signed char bob_y) {
     u16 start_x = (u16)((SCRW - WEAPON_COUNT * 16) / 2);
     int top = GAME_H - WEAPON_WIN * 16 + WEAPON_Y_OFFSET + bob_y;
@@ -3658,9 +3707,14 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
         if (game_active()) {
-            enum { D = 0x80 };
+            enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, A = 0x10, C = 0x40, D = 0x80 };
+            const u8 dpad = UP | DOWN | LEFT | RIGHT;
             u8 d_now = pressed & D;
-            rc_input(pressed);
+            u8 move_pressed = pressed;
+            if ((pressed & C) && !(pressed & A) && (pressed & dpad)) {
+                move_pressed = (u8)(move_pressed & ~dpad);
+            }
+            rc_input(move_pressed);
             update_floor_damage();
             check_secret_reached();
             update_monster_ai();
@@ -3694,9 +3748,11 @@ int main(void) {
         update_status_numbers(pressed);
         update_center_message();
 
-        /* C cycles weapons. Hold A+C for the slower debug minimap toggle. */
+        /* C cycles weapons. C+D-pad jumps between weapon groups; A+C keeps
+         * the slower minimap toggle out of normal weapon flow. */
         {
-            enum { A = 0x10, C = 0x40 };
+            enum { A = 0x10, C = 0x40, UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08 };
+            const u8 dpad = UP | DOWN | LEFT | RIGHT;
             u8 c_now = pressed & C;
             if (c_now && !map_prev) {
                 if (pressed & A) {
@@ -3704,6 +3760,8 @@ int main(void) {
                     if (map_on) start_minimap_redraw();
                     else          clear_minimap();
                     force_fix_hud_redraw();
+                } else if (pressed & dpad) {
+                    select_weapon_group((u8)(pressed & dpad));
                 } else {
                     toggle_weapon();
                 }

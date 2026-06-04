@@ -75,6 +75,11 @@ readable.
   usable ammo.
 - The C-button weapon cycle now prefers weapons that are both owned and ready
   to fire, then falls back to owned empty/melee weapons only if needed.
+- C+D-pad provides direct weapon-group shortcuts without opening the minimap:
+  Up selects the shotgun group, Right selects chaingun, Down cycles heavy
+  weapons (rocket launcher, plasma, BFG), and Left cycles close/basic weapons
+  (chainsaw, fist, pistol). Movement directions are masked during these combos
+  so weapon selection does not shove the player around.
 - Muzzle and impact feedback use palette flashes and projected explosion
   sprites. Monster fireballs now spawn the same impact burst when they hit a
   wall or the player instead of disappearing silently.

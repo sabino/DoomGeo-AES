@@ -5,8 +5,8 @@ after the current documentation pass.
 
 ## Immediate Visual Fixes
 
-- Align the red HUD numbers over the Doom AMMO, HEALTH, FRAG, and ARMOR fields
-  while keeping the current Doom-style font.
+- Keep checking HUD number and ammo-counter alignment against fresh screenshots
+  whenever status-bar assets or weapon placement change.
 - Keep the current safer near-wall clamp unless a better close-wall strategy is
   proven visually.
 - Recheck weapon vertical placement after the HUD number pass so the gun and
@@ -15,6 +15,9 @@ after the current documentation pass.
 
 ## Gameplay And Assets
 
+- Keep tuning fast weapon access after the first C+D-pad weapon-group shortcut
+  pass: verify the groups on hardware/emulator input, then decide whether any
+  direct selection should replace the remaining cycle behavior.
 - Replace the current shareware plasma/BFG placeholder psprites with exact art
   by testing a registered/commercial WAD path.
 - Improve plasma/BFG fidelity: projectile visuals, BFG trace behavior, and
