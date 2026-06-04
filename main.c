@@ -2038,10 +2038,9 @@ static u16 monster_projectile_type(u16 thing_type) {
     }
 }
 
-static u8 spawn_monster_projectile(int thing, u16 type, u8 damage) {
-    int px, py, dx, dy, adx, ady, steps;
+static u8 spawn_monster_projectile(int thing, u16 type, u8 damage, int px, int py) {
+    int dx, dy, adx, ady, steps;
     if (thing < 0 || projectile_active) return 0;
-    rc_player_q8(&px, &py);
     projectile_x_q8 = thing_x_q8[thing];
     projectile_y_q8 = thing_y_q8[thing];
     dx = px - projectile_x_q8;
@@ -2094,7 +2093,6 @@ static int player_projectile_hit_shootable(void) {
     int projectile_cell_x;
     int projectile_cell_y;
     int coarse_cells;
-    if (!projectile_from_player) return -1;
     if (projectile_type == 9006) hit_range_q8 = WORLD_Q8(112);
     else if (projectile_type == 9007) hit_range_q8 = WORLD_Q8(160);
     else if (projectile_type == 9008) hit_range_q8 = WORLD_Q8(144);
@@ -2157,8 +2155,6 @@ static void update_impact_effect(void) {
 }
 
 static void update_projectile(void) {
-    int px, py;
-    int hit_thing;
     if (!projectile_active) return;
     if (!game_active()) {
         clear_projectile();
@@ -2189,19 +2185,23 @@ static void update_projectile(void) {
         clear_projectile();
         return;
     }
-    hit_thing = player_projectile_hit_shootable();
-    if (hit_thing >= 0) {
-        if (projectile_type == 9006) damage_plasma_projectile_target(hit_thing);
-        else detonate_player_projectile();
-        return;
-    }
-    rc_player_q8(&px, &py);
-    if (!projectile_from_player && iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
-        spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
-        player_take_damage(projectile_damage);
-        hurt_timer = 24;
-        clear_projectile();
-        return;
+    if (projectile_from_player) {
+        int hit_thing = player_projectile_hit_shootable();
+        if (hit_thing >= 0) {
+            if (projectile_type == 9006) damage_plasma_projectile_target(hit_thing);
+            else detonate_player_projectile();
+            return;
+        }
+    } else {
+        int px, py;
+        rc_player_q8(&px, &py);
+        if (iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
+            spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
+            player_take_damage(projectile_damage);
+            hurt_timer = 24;
+            clear_projectile();
+            return;
+        }
     }
     if (projectile_timer) projectile_timer--;
     if (!projectile_timer) {
@@ -2263,7 +2263,7 @@ static void update_monster_damage(void) {
                 continue;
             }
             if (projectile) {
-                if (!spawn_monster_projectile(thing, projectile, ranged_damage)) continue;
+                if (!spawn_monster_projectile(thing, projectile, ranged_damage, px, py)) continue;
                 enemy_attack_cooldown[thing] = 72;
                 enemy_attack_anim[thing] = 12;
                 return;

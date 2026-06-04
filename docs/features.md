@@ -191,6 +191,10 @@ readable.
   map-cell rejection before exact q8 distance and type checks. This preserves
   the exact hit/separation thresholds while avoiding most all-thing work for
   objects outside the local collision area.
+- Projectile updates split player-owned target scans from monster-owned player
+  collision checks, avoiding the opposite ownership path each active projectile
+  frame. Monster projectile spawn also reuses the player point already loaded
+  by the ranged-damage pass.
 - Nearby pickup collection uses the same local map-cell prefilter before
   resolving thing type or exact q8 pickup distance. This keeps key, item,
   weapon, and dynamic-drop pickup behavior unchanged while avoiding most
