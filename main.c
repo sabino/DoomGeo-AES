@@ -639,6 +639,7 @@ static void close_minimap_for_terminal_message(void);
 static void start_minimap_redraw(void);
 static void start_minimap_clear(void);
 static void update_minimap_clear(void);
+static void rebuild_monster_path(void);
 
 static int iabs16(int value) {
     return value < 0 ? -value : value;
@@ -1644,15 +1645,31 @@ static void damage_bfg_targets(void) {
 static void alert_monsters_by_sound(void) {
     int px, py;
     rc_player_q8(&px, &py);
+    if (!monster_path_valid) {
+        rebuild_monster_path();
+        monster_path_timer = 12;
+    }
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, range;
+        u8 audible = 0;
         if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
         if (enemy_awake[i]) continue;
         dx = iabs16(px - thing_x_q8[i]);
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
-        if (range > WORLD_Q8(2816)) continue;
-        if (range > WORLD_Q8(1024) && !line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (range <= WORLD_Q8(1024)) {
+            audible = 1;
+        } else if (line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i]) && range <= WORLD_Q8(4096)) {
+            audible = 1;
+        } else if (monster_path_valid) {
+            int cx = thing_x_q8[i] >> 8;
+            int cy = thing_y_q8[i] >> 8;
+            if (cx >= 0 && cy >= 0 && cx < MAP_W && cy < MAP_H) {
+                u8 path_dist = monster_path_dist[cy][cx];
+                if (path_dist != 0xFF && path_dist <= 32 && range <= WORLD_Q8(8192)) audible = 1;
+            }
+        }
+        if (!audible) continue;
         enemy_awake[i] = 1;
         enemy_attack_cooldown[i] = 28;
     }
