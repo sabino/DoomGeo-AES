@@ -743,6 +743,72 @@ def sector_damage_grid(
     return damage_grid
 
 
+def sector_floor_visual_kind(sector: Sector) -> int:
+    if sector_damage_amount(sector.special):
+        return 2
+    floor = sector.floor_pic.upper()
+    if floor.startswith(("NUKAGE", "SLIME", "LAVA")):
+        return 2
+    if floor.startswith(("BLOOD",)):
+        return 3
+    if floor.startswith(("FWATER", "WATER")):
+        return 1
+    return 0
+
+
+def sector_light_band(light_level: int) -> int:
+    if light_level < 96:
+        return 0
+    if light_level < 144:
+        return 1
+    if light_level < 192:
+        return 2
+    return 3
+
+
+def sector_visual_grids(
+    grid: list[list[int]],
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    vertices: list[Vertex],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> tuple[list[list[int]], list[list[int]]]:
+    floor_grid = [[0 for _ in row] for row in grid]
+    light_grid = [[2 for _ in row] for row in grid]
+    sector_bounds: list[tuple[int, int, int, int]] = []
+    sector_edges: list[list[tuple[Vertex, Vertex]]] = []
+    for i in range(len(sectors)):
+        segments = sector_segments(i, linedefs, sidedefs, vertices)
+        sector_edges.append(segments)
+        if segments:
+            xs = [point.x for segment in segments for point in segment]
+            ys = [point.y for segment in segments for point in segment]
+            sector_bounds.append((min(xs), min(ys), max(xs), max(ys)))
+        else:
+            sector_bounds.append((0, 0, -1, -1))
+
+    for gy, row in enumerate(grid):
+        for gx, cell in enumerate(row):
+            if cell:
+                continue
+            doom_x = min_x + ((gx + 0.5) - margin) * scale
+            doom_y = max_y - ((gy + 0.5) - margin) * scale
+            for i, sector in enumerate(sectors):
+                min_sx, min_sy, max_sx, max_sy = sector_bounds[i]
+                if doom_x < min_sx or doom_x > max_sx or doom_y < min_sy or doom_y > max_sy:
+                    continue
+                segments = sector_edges[i]
+                if segments and point_in_sector(doom_x, doom_y, segments):
+                    floor_grid[gy][gx] = sector_floor_visual_kind(sector)
+                    light_grid[gy][gx] = sector_light_band(sector.light_level)
+                    break
+    return floor_grid, light_grid
+
+
 def sector_secret_grid(
     grid: list[list[int]],
     linedefs: list[LineDef],
@@ -965,6 +1031,8 @@ def emit_header(
     texture_grid: list[list[int]],
     texture_phase_grid: list[list[int]],
     damage_grid: list[list[int]],
+    floor_visual_grid: list[list[int]],
+    light_grid: list[list[int]],
     secret_grid: list[list[int]],
     start_x: float,
     start_y: float,
@@ -1090,6 +1158,18 @@ def emit_header(
             f.write(",".join(str(cell) for cell in row))
             f.write("},\n")
         f.write("};\n\n")
+        f.write("static const unsigned char g_map_floor_visual[MAP_H][MAP_W] = {\n")
+        for row in floor_visual_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned char g_map_light[MAP_H][MAP_W] = {\n")
+        for row in light_grid:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
         f.write("static const unsigned char g_map_secret[MAP_H][MAP_W] = {\n")
         for row in secret_grid:
             f.write("    {")
@@ -1144,6 +1224,14 @@ def emit_header(
         f.write("static inline unsigned char map_cell_damage(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
         f.write("    return g_map_damage[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_floor_visual(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
+        f.write("    return g_map_floor_visual[y][x];\n")
+        f.write("}\n\n")
+        f.write("static inline unsigned char map_cell_light(int x, int y) {\n")
+        f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 2;\n")
+        f.write("    return g_map_light[y][x];\n")
         f.write("}\n\n")
         f.write("static inline unsigned char map_cell_secret(int x, int y) {\n")
         f.write("    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;\n")
@@ -1392,6 +1480,7 @@ def convert(args: argparse.Namespace) -> None:
         args.detail_cull,
     )
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
+    floor_visual_grid, light_grid = sector_visual_grids(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     secret_grid = sector_secret_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
     emit_header(
@@ -1400,6 +1489,8 @@ def convert(args: argparse.Namespace) -> None:
         texture_grid,
         texture_phase_grid,
         damage_grid,
+        floor_visual_grid,
+        light_grid,
         secret_grid,
         sx,
         sy,

@@ -69,6 +69,12 @@ readable.
   columns. This is a compromise, not true Doom span rendering; the cache is
   deliberately kept small so monster and pickup sprite tiles stay inside the
   visible Neo Geo C-ROM tile range.
+- The converter also emits a compact per-cell sector floor visual class and
+  light band derived from `SECTORS` floor flat names, specials, and light
+  levels. The runtime uses those generated cells to tint floor/ceiling palettes
+  when the player enters water-like, damaging nukage/slime/lava, blood, or
+  darker/brighter sectors. This keeps sector identity visible without runtime
+  WAD parsing or extra floor-casting work.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
@@ -521,7 +527,9 @@ readable.
   Episode 1 map, the overlay also draws that map code as the next standalone
   ROM to run.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
-  combat, unless the radiation-suit timer is active.
+  combat, unless the radiation-suit timer is active. The generated floor visual
+  class uses the same sector-special source for hazard tinting, so damaging
+  floors are easier to read before they hurt the player.
 - Secret cells can be discovered once and increment the secret count.
 - The minimap uses the Neo Geo fix layer and overlays walls, player, threats,
   pickups, closed doors, and exits.

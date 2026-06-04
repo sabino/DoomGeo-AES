@@ -33,6 +33,8 @@ static u8 muzzle_flash = 0;
 static u8 bonus_flash = 0;
 static u8 palette_effect = 0;
 static u8 power_palette_kind = 0;
+static u8 sector_floor_visual_kind = 0xFF;
+static u8 sector_light_band = 0xFF;
 static u8 face_pain_timer = 0;
 static u8 face_evil_timer = 0;
 static u8 face_turn_timer = 0;
@@ -60,20 +62,77 @@ static void set_shaded_palette(u16 pal, const u8 rgb[][3], u16 colors, u16 scale
     }
 }
 
-static void restore_flat_palettes(void) {
+static u8 clamp31(int value);
+
+static u8 sector_light_scale(u8 light) {
+    switch (light) {
+    case 0: return 88;
+    case 1: return 104;
+    case 2: return 116;
+    default: return 128;
+    }
+}
+
+static u8 sector_floor_tint(u8 value, u8 kind, u8 component) {
+    int out = value;
+    switch (kind) {
+    case 1: /* water */
+        out = (component == 2) ? value + 7 : value * 3 / 4;
+        break;
+    case 2: /* nukage/slime/lava/hazard */
+        out = (component == 1) ? value + 9 : value * 2 / 3;
+        break;
+    case 3: /* blood */
+        out = (component == 0) ? value + 8 : value * 2 / 3;
+        break;
+    default:
+        break;
+    }
+    return clamp31(out);
+}
+
+static void set_sector_flat_palette(u8 kind, u8 light) {
+    u16 light_scale = sector_light_scale(light);
     for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
-        pal_set(PAL_CEILING, (u16)(i + 1), RGB(g_ceiling_palette_rgb[i][0], g_ceiling_palette_rgb[i][1], g_ceiling_palette_rgb[i][2]));
+        u8 r = shade_channel(g_ceiling_palette_rgb[i][0], light_scale);
+        u8 g = shade_channel(g_ceiling_palette_rgb[i][1], light_scale);
+        u8 b = shade_channel(g_ceiling_palette_rgb[i][2], light_scale);
+        pal_set(PAL_CEILING, (u16)(i + 1), RGB(r, g, b));
     }
     for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
-        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(g_floor_palette_rgb[i][0], g_floor_palette_rgb[i][1], g_floor_palette_rgb[i][2]));
+        u8 r = shade_channel(g_floor_palette_rgb[i][0], light_scale);
+        u8 g = shade_channel(g_floor_palette_rgb[i][1], light_scale);
+        u8 b = shade_channel(g_floor_palette_rgb[i][2], light_scale);
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(sector_floor_tint(r, kind, 0),
+                                             sector_floor_tint(g, kind, 1),
+                                             sector_floor_tint(b, kind, 2)));
     }
 
     for (u16 row = 0; row < BG_SPLIT; row++) {
-        u16 ceiling_scale = (u16)(90 + row * 24);
-        u16 floor_scale = (u16)(150 + row * 42);
-        set_shaded_palette((u16)(PAL_CEILING_GRAD_BASE + row), g_ceiling_palette_rgb, CEILING_PALETTE_COLORS, ceiling_scale);
-        set_shaded_palette((u16)(PAL_FLOOR_GRAD_BASE + row), g_floor_palette_rgb, FLOOR_PALETTE_COLORS, floor_scale);
+        u16 ceiling_scale = (u16)((90 + row * 24) * light_scale / 128);
+        u16 floor_scale = (u16)((150 + row * 42) * light_scale / 128);
+        for (u16 i = 0; i < CEILING_PALETTE_COLORS; i++) {
+            u8 r = shade_channel(g_ceiling_palette_rgb[i][0], ceiling_scale);
+            u8 g = shade_channel(g_ceiling_palette_rgb[i][1], ceiling_scale);
+            u8 b = shade_channel(g_ceiling_palette_rgb[i][2], ceiling_scale);
+            pal_set((u16)(PAL_CEILING_GRAD_BASE + row), (u16)(i + 1), RGB(r, g, b));
+        }
+        for (u16 i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+            u8 r = shade_channel(g_floor_palette_rgb[i][0], floor_scale);
+            u8 g = shade_channel(g_floor_palette_rgb[i][1], floor_scale);
+            u8 b = shade_channel(g_floor_palette_rgb[i][2], floor_scale);
+            pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)(i + 1),
+                    RGB(sector_floor_tint(r, kind, 0),
+                        sector_floor_tint(g, kind, 1),
+                        sector_floor_tint(b, kind, 2)));
+        }
     }
+}
+
+static void restore_flat_palettes(void) {
+    u8 kind = sector_floor_visual_kind == 0xFF ? 0 : sector_floor_visual_kind;
+    u8 light = sector_light_band == 0xFF ? 3 : sector_light_band;
+    set_sector_flat_palette(kind, light);
 }
 
 static void set_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
@@ -347,6 +406,21 @@ static void restore_play_palettes(void) {
     restore_counter_palette();
     restore_weapon_palette();
     restore_wall_depth_palettes();
+}
+
+static void update_sector_flat_palette(void) {
+    int px, py;
+    u8 kind;
+    u8 light;
+    rc_player_q8(&px, &py);
+    px >>= 8;
+    py >>= 8;
+    kind = map_cell_floor_visual(px, py);
+    light = map_cell_light(px, py);
+    if (kind == sector_floor_visual_kind && light == sector_light_band) return;
+    sector_floor_visual_kind = kind;
+    sector_light_band = light;
+    if (palette_effect == 0) restore_flat_palettes();
 }
 
 static void set_hurt_palettes(void) {
@@ -5202,6 +5276,8 @@ static void restart_level(void) {
     face_turn_frame = FACE_STRAIGHT_BASE;
     face_idle_tick = 0;
     face_idle_variant = 0;
+    sector_floor_visual_kind = 0xFF;
+    sector_light_band = 0xFF;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
@@ -5274,6 +5350,7 @@ static void restart_level(void) {
 #ifdef DOOM_E1M8_BOSS_TEST
     configure_e1m8_boss_test();
 #endif
+    update_sector_flat_palette();
     init_background();
     init_walls();
     init_hud();
@@ -5321,6 +5398,7 @@ int main(void) {
         rc_render();                    /* DDA during active display          */
         wait_vblank();
         watchdog_kick();
+        update_sector_flat_palette();
         update_hurt_flash();
         update_weapon_flash();
         update_background_scroll();

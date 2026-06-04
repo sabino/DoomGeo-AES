@@ -32,6 +32,8 @@ and emits generated C headers/sources under `build/`:
   about 1.7 lines on an average referenced cell.
 - Door/exit trigger tables.
 - Damage and secret bit grids.
+- Per-cell sector floor visual class and light band, derived from sector flat
+  names, specials, and light levels for low-cost runtime palette cues.
 - Runtime thing list with supported Doom thing types.
 - Runtime thing class/info bytes for monster, threat, pickup, corpse,
   shootable, and render predicates, so the 68000 can test generated metadata
