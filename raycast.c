@@ -215,6 +215,11 @@ void rc_player_q8(int *x_q8, int *y_q8) {
     *y_q8 = posY >> (FBITS - 8);
 }
 
+void rc_dir_q8(int *view_dir_x, int *view_dir_y) {
+    *view_dir_x = dirX >> (FBITS - 8);
+    *view_dir_y = dirY >> (FBITS - 8);
+}
+
 void rc_view_q8(int *view_dir_x, int *view_dir_y, int *view_plane_x, int *view_plane_y) {
     *view_dir_x = dirX >> (FBITS - 8);
     *view_dir_y = dirY >> (FBITS - 8);

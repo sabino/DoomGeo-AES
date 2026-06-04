@@ -4023,6 +4023,14 @@ static u16 perspective_plane_column_base(u16 base, u8 direction, u8 phase_x, u8 
     return (u16)(base + index);
 }
 
+static u8 wrap_background_scroll(int scroll) {
+    while (scroll < 0) scroll += BG_COUNT * 8;
+    while (scroll >= BG_COUNT * 8) scroll -= BG_COUNT * 8;
+    while (scroll >= BG_COUNT * 4) scroll -= BG_COUNT * 4;
+    while (scroll >= BG_COUNT) scroll -= BG_COUNT;
+    return (u8)scroll;
+}
+
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
@@ -4041,26 +4049,21 @@ static void init_background(void) {
 
 static void update_background_scroll(void) {
     int px, py;
-    int dir_x, dir_y, plane_x, plane_y;
+    int dir_x, dir_y;
     u8 direction;
     u8 scroll_col;
     u32 key;
     u8 columns_this_frame = 4;
 
     rc_player_q8(&px, &py);
-    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    rc_dir_q8(&dir_x, &dir_y);
     if (dir_x != bg_direction_dir_x || dir_y != bg_direction_dir_y) {
         bg_direction_dir_x = dir_x;
         bg_direction_dir_y = dir_y;
         bg_direction_bucket = plane_direction_bucket(dir_x, dir_y);
     }
     direction = bg_direction_bucket;
-    {
-        int scroll = (px >> 6) + (py >> 6);
-        while (scroll >= BG_COUNT) scroll -= BG_COUNT;
-        while (scroll < 0) scroll += BG_COUNT;
-        scroll_col = (u8)scroll;
-    }
+    scroll_col = wrap_background_scroll((px >> 6) + (py >> 6));
     key = (u32)direction | ((u32)scroll_col << 8);
     if (key != bg_pending_key) {
         bg_pending_key = key;
@@ -4096,8 +4099,6 @@ static void update_background_scroll(void) {
         }
     }
     if (bg_update_col >= BG_COUNT) bg_scroll_key = bg_pending_key;
-    (void)plane_x;
-    (void)plane_y;
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
