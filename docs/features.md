@@ -69,11 +69,12 @@ readable.
 - Shotgun uses spread damage and can hit multiple visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
 - BFG spends 40 cells, launches a visible forward projectile using the current
-  baked fireball sprite path, then detonates into heavy damage on visible
-  rendered targets.
-- Hitscan, melee, and BFG targeting all use the same readable-slot test as
-  monster attacks, so edge-clipped or metadata-only sprite projections are not
-  treated as valid combat targets.
+  baked fireball sprite path, then detonates into heavy damage on readable
+  rendered targets plus lighter bounded tracer damage against line-of-sight
+  monsters in the player's forward cone.
+- Hitscan and melee targeting use the same readable-slot test as monster
+  attacks, so edge-clipped or metadata-only sprite projections are not treated
+  as valid direct combat targets.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
   usable ammo.
 - The C-button weapon cycle now prefers weapons that are both owned and ready

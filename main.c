@@ -1324,14 +1324,32 @@ static void damage_shotgun_spread(void) {
     damage_visible_enemy(targets[2], 1);
 }
 
-static void damage_bfg_visible_targets(void) {
+static void damage_bfg_targets(void) {
+    int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
     int primary = best_visible_enemy();
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
         if (!enemy_slot_is_readable(slot)) continue;
         if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
         damage_visible_enemy(thing, thing == primary ? 18 : 9);
+    }
+    for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+        int dx, dy, front, side, abs_side;
+        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        if (thing_has_readable_slot(thing)) continue;
+        dx = thing_x_q8[thing] - px;
+        dy = thing_y_q8[thing] - py;
+        front = ((dx * dir_x) + (dy * dir_y)) >> 8;
+        if (front < WORLD_Q8(192) || front > WORLD_Q8(2816)) continue;
+        side = ((dx * plane_x) + (dy * plane_y)) >> 8;
+        abs_side = iabs16(side);
+        if (abs_side > front || abs_side > WORLD_Q8(896)) continue;
+        if (!line_of_sight_q8((short)px, (short)py, thing_x_q8[thing], thing_y_q8[thing])) continue;
+        damage_enemy_at(thing, 7);
     }
 }
 
@@ -1514,7 +1532,7 @@ static u8 spawn_player_projectile(u16 type, u8 timer) {
 
 static void detonate_player_projectile(void) {
     spawn_impact_effect(projectile_x_q8, projectile_y_q8, 12);
-    if (projectile_type == 9007) damage_bfg_visible_targets();
+    if (projectile_type == 9007) damage_bfg_targets();
     projectile_active = 0;
     projectile_from_player = 0;
     projectile_source_thing = -1;
@@ -3248,7 +3266,7 @@ static void update_weapon(u8 pressed) {
                 alert_monsters_by_sound();
                 if (!spawn_player_projectile(9007, 26)) {
                     spawn_weapon_impact_for_target(best_visible_enemy());
-                    damage_bfg_visible_targets();
+                    damage_bfg_targets();
                 }
             } else {
                 ammo_message_timer = 45;
