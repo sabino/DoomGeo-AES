@@ -94,6 +94,17 @@ make smoke-screenshot
 `.tools/locks/` so parallel screenshot refreshes do not capture the wrong GnGeo
 window.
 
+Fast weapon shortcut input can be smoke-checked with:
+
+```sh
+tools/smoke_weapon_shortcuts.sh
+```
+
+The helper builds and launches the arsenal verification ROM, captures a
+baseline frame, sends the configured GnGeo C+Down shortcut, and captures the
+result under `.tools/screens/latest/`. It leaves GnGeo open on
+`SMOKE_WORKSPACE` for visual inspection.
+
 Map conversion honors Doom THING skill flags through `DOOM_SKILL_MASK`.
 The default is `4`, which keeps the hard/Ultra-Violence population used by the
 current E1M1 prototype. Use `DOOM_SKILL_MASK=1` for easy placement or

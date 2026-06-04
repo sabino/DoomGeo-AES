@@ -15,8 +15,9 @@ after the current documentation pass.
 
 ## Gameplay And Assets
 
-- Verify the direct C+D-pad and diagonal weapon shortcuts on hardware/emulator
-  input, then tune the mapping if diagonals are awkward on the target controls.
+- Keep hardware-checking the direct C+D-pad and diagonal weapon shortcuts with
+  `tools/smoke_weapon_shortcuts.sh`, then tune the mapping if diagonals are
+  awkward on the target controls.
 - Replace the current shareware plasma/BFG placeholder psprites with exact art
   by testing a registered/commercial WAD path.
 - Improve BFG/plasma fidelity: BFG trace behavior, better projectile art when a
