@@ -662,6 +662,7 @@ static u8 line_of_sight_q8(short ax, short ay, short bx, short by) {
     int dy = by - ay;
     int steps = iabs16(dx) > iabs16(dy) ? iabs16(dx) : iabs16(dy);
     if (steps <= 0) return 1;
+    if ((ax >> 8) == (bx >> 8) && (ay >> 8) == (by >> 8)) return 1;
     steps >>= 6;
     if (steps < 1) steps = 1;
     if (steps > 40) steps = 40;

@@ -186,6 +186,9 @@ readable.
   dead entries and test cheap distance, readability, path, or forward-cone
   bounds before resolving runtime thing types or doing line-of-sight work. The
   final damage and wake-up thresholds are unchanged.
+- Line-of-sight checks return immediately when both points are in the same
+  converted map cell, avoiding sampled wall-step work for close combat and
+  projection fallback cases that cannot cross a wall cell.
 - Monster AI applies its active-range gate before resolving thing type, so
   distant converted things do not spend CPU on monster classification during
   movement ticks.
