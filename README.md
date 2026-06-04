@@ -59,7 +59,7 @@ drawing pixels.
 | Hold A + Left/Right | Strafe |
 | B | Fire weapon |
 | C | Cycle to next ready weapon |
-| Hold C + D-pad | Jump between weapon groups |
+| Hold C + D-pad | Fast weapon shortcuts: Up shotgun, Right chaingun, Down rocket, Down+Right plasma, Down+Left BFG, Left close/basic |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart level |

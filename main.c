@@ -3711,7 +3711,16 @@ static u8 select_next_weapon_from_list(const u8 *weapons, u8 count, u8 require_a
     return 0;
 }
 
-static void select_weapon_group(u8 direction_bits) {
+static u8 select_weapon_direct(u8 weapon) {
+    if (!weapon_has_ammo(weapon) && !player_has_weapon(weapon)) return 0;
+    current_weapon = weapon;
+    weapon_frame = 0xFF;
+    shown_ammo = 0xFFFF;
+    trigger_weapon_message();
+    return 1;
+}
+
+static void select_weapon_shortcut(u8 direction_bits) {
     static const u8 shotgun_group[] = {WEAPON_SHOTGUN};
     static const u8 rapid_group[] = {WEAPON_CHAINGUN};
     static const u8 heavy_group[] = {WEAPON_ROCKET, WEAPON_PLASMA, WEAPON_BFG};
@@ -3720,16 +3729,27 @@ static void select_weapon_group(u8 direction_bits) {
     u8 count = sizeof(shotgun_group);
     enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08 };
 
-    if (direction_bits & RIGHT) {
-        group = rapid_group;
-        count = sizeof(rapid_group);
-    } else if (direction_bits & DOWN) {
+    if ((direction_bits & DOWN) && (direction_bits & RIGHT)) {
+        if (select_weapon_direct(WEAPON_PLASMA)) return;
         group = heavy_group;
         count = sizeof(heavy_group);
+    } else if ((direction_bits & DOWN) && (direction_bits & LEFT)) {
+        if (select_weapon_direct(WEAPON_BFG)) return;
+        group = heavy_group;
+        count = sizeof(heavy_group);
+    } else if (direction_bits & DOWN) {
+        if (select_weapon_direct(WEAPON_ROCKET)) return;
+        group = heavy_group;
+        count = sizeof(heavy_group);
+    } else if (direction_bits & RIGHT) {
+        if (select_weapon_direct(WEAPON_CHAINGUN)) return;
+        group = rapid_group;
+        count = sizeof(rapid_group);
     } else if (direction_bits & LEFT) {
         group = close_group;
         count = sizeof(close_group);
     } else if (direction_bits & UP) {
+        if (select_weapon_direct(WEAPON_SHOTGUN)) return;
         group = shotgun_group;
         count = sizeof(shotgun_group);
     }
@@ -4431,7 +4451,7 @@ int main(void) {
         update_status_numbers(pressed);
         update_center_message();
 
-        /* C cycles weapons. C+D-pad jumps between weapon groups; A+C keeps
+        /* C cycles weapons. C+D-pad jumps to weapon shortcuts; A+C keeps
          * the slower minimap toggle out of normal weapon flow. */
         {
             enum { A = 0x10, C = 0x40, UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08 };
@@ -4446,7 +4466,7 @@ int main(void) {
                     }
                     force_fix_hud_redraw();
                 } else if (pressed & dpad) {
-                    select_weapon_group((u8)(pressed & dpad));
+                    select_weapon_shortcut((u8)(pressed & dpad));
                 } else {
                     toggle_weapon();
                 }

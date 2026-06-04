@@ -15,9 +15,8 @@ after the current documentation pass.
 
 ## Gameplay And Assets
 
-- Keep tuning fast weapon access after the first C+D-pad weapon-group shortcut
-  pass: verify the groups on hardware/emulator input, then decide whether any
-  direct selection should replace the remaining cycle behavior.
+- Verify the direct C+D-pad and diagonal weapon shortcuts on hardware/emulator
+  input, then tune the mapping if diagonals are awkward on the target controls.
 - Replace the current shareware plasma/BFG placeholder psprites with exact art
   by testing a registered/commercial WAD path.
 - Improve BFG/plasma fidelity: BFG trace behavior, better projectile art when a
