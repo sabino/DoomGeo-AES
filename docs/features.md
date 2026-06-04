@@ -192,7 +192,9 @@ readable.
   the exact hit/separation thresholds while avoiding most all-thing work for
   objects outside the local collision area. Player projectile hit range and
   coarse-cell span are derived once at spawn time and reused for every active
-  projectile frame.
+  projectile frame. Monster movement occupancy reuses the runtime shootable
+  predicate after the coarse cell reject instead of resolving a full type and
+  rechecking monster/barrel classes for each nearby candidate.
 - Projectile updates split player-owned target scans from monster-owned player
   collision checks, avoiding the opposite ownership path each active projectile
   frame. Monster projectile spawn also reuses the player point already loaded
