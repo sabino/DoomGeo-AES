@@ -2793,11 +2793,19 @@ static u8 apply_pickup(u16 thing_type) {
 
 static void collect_nearby_pickups(void) {
     int px, py;
+    int pcx, pcy;
+    enum { PICKUP_RANGE_Q8 = WORLD_Q8(96), PICKUP_RANGE_CELLS = (PICKUP_RANGE_Q8 + 255) >> 8 };
     rc_player_q8(&px, &py);
+    pcx = px >> 8;
+    pcy = py >> 8;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        if (enemy_dead[i] || !thing_is_pickup(runtime_thing_type(i))) continue;
-        if (iabs16(px - thing_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - thing_y_q8[i]) <= WORLD_Q8(96)) {
-            if (apply_pickup(runtime_thing_type(i))) {
+        u16 type;
+        if (iabs16((thing_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16((thing_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
+        type = runtime_thing_type(i);
+        if (enemy_dead[i] || !thing_is_pickup(type)) continue;
+        if (iabs16(px - thing_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - thing_y_q8[i]) <= PICKUP_RANGE_Q8) {
+            if (apply_pickup(type)) {
                 if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
                 redraw_minimap_thing_cell(i);
@@ -2807,7 +2815,9 @@ static void collect_nearby_pickups(void) {
     }
     for (u8 i = 0; i < 8; i++) {
         if (!dynamic_drop_active[i]) continue;
-        if (iabs16(px - dynamic_drop_x_q8[i]) <= WORLD_Q8(96) && iabs16(py - dynamic_drop_y_q8[i]) <= WORLD_Q8(96)) {
+        if (iabs16((dynamic_drop_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16((dynamic_drop_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16(px - dynamic_drop_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - dynamic_drop_y_q8[i]) <= PICKUP_RANGE_Q8) {
             if (apply_pickup(dynamic_drop_type[i])) {
                 dynamic_drop_active[i] = 0;
                 invalidate_background_cache();

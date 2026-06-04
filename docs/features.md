@@ -166,6 +166,10 @@ readable.
   map-cell rejection before exact q8 distance and type checks. This preserves
   the exact hit/separation thresholds while avoiding most all-thing work for
   objects outside the local collision area.
+- Nearby pickup collection uses the same local map-cell prefilter before
+  resolving thing type or exact q8 pickup distance. This keeps key, item,
+  weapon, and dynamic-drop pickup behavior unchanged while avoiding most
+  per-frame all-thing pickup checks.
 - Per-frame thing timer maintenance skips entries with no active flash,
   attack, explosion, death-animation, or delayed-drop timers before touching
   the detailed state transitions.
