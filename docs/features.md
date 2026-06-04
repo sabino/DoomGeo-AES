@@ -173,6 +173,10 @@ readable.
 - Per-frame thing timer maintenance skips entries with no active flash,
   attack, explosion, death-animation, or delayed-drop timers before touching
   the detailed state transitions.
+- Weapon explosion, BFG cone, barrel splash, and sound-alert loops now test
+  cheap distance or forward-cone bounds before resolving runtime thing types or
+  doing line-of-sight work. The final damage and wake-up thresholds are
+  unchanged.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.

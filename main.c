@@ -1419,11 +1419,12 @@ static void explode_barrel_at(int thing_index, short x_q8, short y_q8) {
     rc_player_q8(&px, &py);
     if (iabs16(px - x_q8) + iabs16(py - y_q8) < WORLD_Q8(520)) player_take_damage(12);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        u16 type = runtime_thing_type(i);
+        int range = iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8);
+        u16 type;
+        if (range >= WORLD_Q8(520)) continue;
+        type = runtime_thing_type(i);
         if (i == thing_index || enemy_dead[i] || !thing_is_shootable(type)) continue;
-        if (iabs16(thing_x_q8[i] - x_q8) + iabs16(thing_y_q8[i] - y_q8) < WORLD_Q8(520)) {
-            damage_enemy_at(i, thing_is_barrel(type) ? 1 : 5);
-        }
+        damage_enemy_at(i, thing_is_barrel(type) ? 1 : 5);
     }
 }
 
@@ -1526,11 +1527,12 @@ static void damage_rocket_radius(short x, short y) {
     rc_player_q8(&px, &py);
     if (iabs16(px - x) + iabs16(py - y) < WORLD_Q8(420)) player_take_damage(8);
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
-        u16 type = runtime_thing_type(i);
+        int range = iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y);
+        u16 type;
+        if (range >= WORLD_Q8(560)) continue;
+        type = runtime_thing_type(i);
         if (enemy_dead[i] || !thing_is_shootable(type)) continue;
-        if (iabs16(thing_x_q8[i] - x) + iabs16(thing_y_q8[i] - y) < WORLD_Q8(560)) {
-            damage_enemy_at(i, thing_is_barrel(type) ? 1 : 8);
-        }
+        damage_enemy_at(i, thing_is_barrel(type) ? 1 : 8);
     }
     hide_enemies();
 }
@@ -1630,12 +1632,12 @@ static void damage_bfg_targets(void) {
     }
     for (int thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
         int dx, dy, front, side, abs_side;
-        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
-        if (thing_has_readable_slot(thing)) continue;
         dx = thing_x_q8[thing] - px;
         dy = thing_y_q8[thing] - py;
         front = ((dx * dir_x) + (dy * dir_y)) >> 8;
         if (front < WORLD_Q8(192) || front > WORLD_Q8(2816)) continue;
+        if (!thing_is_shootable(runtime_thing_type(thing)) || enemy_dead[thing]) continue;
+        if (thing_has_readable_slot(thing)) continue;
         side = ((dx * plane_x) + (dy * plane_y)) >> 8;
         abs_side = iabs16(side);
         if (abs_side > front || abs_side > WORLD_Q8(896)) continue;
@@ -1654,14 +1656,15 @@ static void alert_monsters_by_sound(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         int dx, dy, range;
         u8 audible = 0;
-        if (enemy_dead[i] || !thing_is_monster(runtime_thing_type(i))) continue;
-        if (enemy_awake[i]) continue;
         dx = iabs16(px - thing_x_q8[i]);
         dy = iabs16(py - thing_y_q8[i]);
         range = dx + dy;
+        if (range > WORLD_Q8(8192)) continue;
+        if (enemy_dead[i] || enemy_awake[i]) continue;
+        if (!thing_is_monster(runtime_thing_type(i))) continue;
         if (range <= WORLD_Q8(1024)) {
             audible = 1;
-        } else if (line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i]) && range <= WORLD_Q8(4096)) {
+        } else if (range <= WORLD_Q8(4096) && line_of_sight_q8((short)px, (short)py, thing_x_q8[i], thing_y_q8[i])) {
             audible = 1;
         } else if (monster_path_valid) {
             int cx = thing_x_q8[i] >> 8;
