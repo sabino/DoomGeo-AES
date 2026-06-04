@@ -46,6 +46,13 @@ python3 tools/doomgeo_build.py build --tools-prefix /usr
 The system method follows ngdevkit's documented Ubuntu path:
 `ppa:dciabrin/ngdevkit`, `ngdevkit`, and `ngdevkit-gngeo`.
 
+For quick local render checks, `make smoke-screenshot` builds the default cart,
+launches GnGeo on `SMOKE_DISPLAY` (`:1` by default), moves the window to
+`SMOKE_WORKSPACE` (`2` by default), and writes
+`.tools/screens/latest/smoke.png`. Override `SMOKE_BUILD_TARGET`,
+`SMOKE_RUN_TARGET`, `SMOKE_OUTPUT`, or `SMOKE_WAIT_SECS` when capturing variants
+such as the E1M2 key-test ROM.
+
 ## Local Windows Build
 
 ngdevkit's current Windows path is native MSYS2 UCRT64. Run the helper from an

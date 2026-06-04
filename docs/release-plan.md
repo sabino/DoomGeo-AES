@@ -14,7 +14,8 @@ the other only accompanies and tracks the plan.
 - [x] Add a separate 68000 ASM ROM build and expose it from GitHub Pages.
 - [x] Add a fully native Windows/MSYS2 ROM build job after validating ngdevkit UCRT64 in CI.
 - [ ] Add signed release uploads for tagged builds.
-- [ ] Add a smoke-run screenshot capture job for the Linux ROM build.
+- [x] Add a smoke-run screenshot capture helper for the Linux ROM build.
+- [ ] Wire the smoke-run screenshot helper into CI.
 - [x] Decide whether the final user-facing build helper should install ngdevkit through MSYS2, WSL, Docker, or all three on Windows.
 
 ## Evidence
@@ -37,3 +38,5 @@ the other only accompanies and tracks the plan.
   also removes cached WAD/package downloads under `.tools`.
 - The installer decision is MSYS2 UCRT64 for native Windows builds, with WSL
   delegation kept as a fallback when the helper is launched from normal Windows.
+- Local smoke captures are produced by `tools/smoke_capture.sh` through
+  `make smoke-screenshot`, writing PNG evidence under `.tools/screens/latest`.

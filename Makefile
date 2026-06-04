@@ -225,7 +225,10 @@ asm-rom: $(ASM_CART)
 asm-gngeo: $(ASM_CART)
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo asm-rom asm-gngeo
+smoke-screenshot:
+	tools/smoke_capture.sh
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo asm-rom asm-gngeo smoke-screenshot
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
