@@ -755,6 +755,7 @@ static int iabs16(int value) {
 
 #define WORLD_Q8(value) ((value) * MAP_RENDER_SCALE)
 #define MONSTER_SEPARATION_Q8 32
+#define MONSTER_PATH_REBUILD_TICKS 3
 
 static void explode_barrel_at(int thing_index, short x_q8, short y_q8);
 static void player_take_damage(u16 amount);
@@ -1846,7 +1847,7 @@ static void alert_monsters_by_sound(void) {
     rc_player_q8(&px, &py);
     if (!monster_path_valid) {
         rebuild_monster_path();
-        monster_path_timer = 12;
+        monster_path_timer = MONSTER_PATH_REBUILD_TICKS;
     }
     for (u16 mi = 0; mi < thing_monster_count; mi++) {
         int i = thing_monster_indices[mi];
@@ -2345,12 +2346,19 @@ static void rebuild_monster_path(void) {
 static void refresh_monster_path(void) {
     int px, py;
     rc_player_cell(&px, &py);
-    if (!monster_path_valid || px != monster_path_player_cell_x || py != monster_path_player_cell_y) {
+    if (!monster_path_valid) {
         rebuild_monster_path();
-        monster_path_timer = 12;
+        monster_path_timer = MONSTER_PATH_REBUILD_TICKS;
+    } else if (px != monster_path_player_cell_x || py != monster_path_player_cell_y) {
+        if (monster_path_timer) {
+            monster_path_timer--;
+        } else {
+            rebuild_monster_path();
+            monster_path_timer = MONSTER_PATH_REBUILD_TICKS;
+        }
     } else {
         if (monster_path_timer) monster_path_timer--;
-        else monster_path_timer = 12;
+        else monster_path_timer = MONSTER_PATH_REBUILD_TICKS;
     }
 }
 
