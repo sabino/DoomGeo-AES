@@ -526,6 +526,8 @@ static u16 shown_health = 0xFFFF;
 static u16 shown_armor = 0xFFFF;
 static u16 shown_ammo = 0xFFFF;
 static u16 shown_frags = 0xFFFF;
+static u16 shown_counter_current[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+static u16 shown_counter_max[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 static u8 shown_keys = 0xFF;
 static u16 shown_weapon_status = 0xFFFF;
 
@@ -3387,14 +3389,18 @@ static void render_counter_value(u16 base_spr, u16 shadow_base_spr, int x, int y
 
 static void render_ammo_counters(void) {
     static const u8 row_y[4] = {195, 202, 209, 216};
-    render_counter_value(HUD_COUNTER_BASE + 0, HUD_COUNTER_SHADOW_BASE + 0, 270, row_y[0], player_ammo);
-    render_counter_value(HUD_COUNTER_BASE + 3, HUD_COUNTER_SHADOW_BASE + 3, 298, row_y[0], player_max_bullets);
-    render_counter_value(HUD_COUNTER_BASE + 6, HUD_COUNTER_SHADOW_BASE + 6, 270, row_y[1], player_shells);
-    render_counter_value(HUD_COUNTER_BASE + 9, HUD_COUNTER_SHADOW_BASE + 9, 298, row_y[1], player_max_shells);
-    render_counter_value(HUD_COUNTER_BASE + 12, HUD_COUNTER_SHADOW_BASE + 12, 270, row_y[2], player_rockets);
-    render_counter_value(HUD_COUNTER_BASE + 15, HUD_COUNTER_SHADOW_BASE + 15, 298, row_y[2], player_max_rockets);
-    render_counter_value(HUD_COUNTER_BASE + 18, HUD_COUNTER_SHADOW_BASE + 18, 270, row_y[3], player_cells);
-    render_counter_value(HUD_COUNTER_BASE + 21, HUD_COUNTER_SHADOW_BASE + 21, 298, row_y[3], player_max_cells);
+    const u16 current_values[4] = {player_ammo, player_shells, player_rockets, player_cells};
+    const u16 max_values[4] = {player_max_bullets, player_max_shells, player_max_rockets, player_max_cells};
+    for (u8 row = 0; row < 4; row++) {
+        if (current_values[row] != shown_counter_current[row]) {
+            render_counter_value((u16)(HUD_COUNTER_BASE + row * 6), (u16)(HUD_COUNTER_SHADOW_BASE + row * 6), 270, row_y[row], current_values[row]);
+            shown_counter_current[row] = current_values[row];
+        }
+        if (max_values[row] != shown_counter_max[row]) {
+            render_counter_value((u16)(HUD_COUNTER_BASE + row * 6 + 3), (u16)(HUD_COUNTER_SHADOW_BASE + row * 6 + 3), 298, row_y[row], max_values[row]);
+            shown_counter_max[row] = max_values[row];
+        }
+    }
 }
 
 static u8 face_frame_for_health(void);
@@ -3481,22 +3487,28 @@ static void update_status_numbers(u8 pressed) {
     u16 armor = player_armor;
     u16 frags = player_kills;
 
-    render_hud_value((u16)(HUD_VALUE_BASE + 3), HUD_HEALTH_X, health, 3, PAL_HUD);
-    shown_health = health;
+    if (health != shown_health) {
+        render_hud_value((u16)(HUD_VALUE_BASE + 3), HUD_HEALTH_X, health, 3, PAL_HUD);
+        shown_health = health;
+    }
     update_hud_face(pressed);
-    render_hud_value(HUD_VALUE_BASE, HUD_AMMO_X, ammo, 3, PAL_HUD);
-    shown_ammo = ammo;
-    render_hud_value((u16)(HUD_VALUE_BASE + 6), HUD_FRAG_X, frags, 2, PAL_HUD);
-    shown_frags = frags;
+    if (ammo != shown_ammo) {
+        render_hud_value(HUD_VALUE_BASE, HUD_AMMO_X, ammo, 3, PAL_HUD);
+        shown_ammo = ammo;
+    }
+    if (frags != shown_frags) {
+        render_hud_value((u16)(HUD_VALUE_BASE + 6), HUD_FRAG_X, frags, 2, PAL_HUD);
+        shown_frags = frags;
+    }
     if (armor_flash_timer) {
         render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_HUD);
         shown_armor = 0xFFFF;
         armor_flash_timer--;
-    } else {
+    } else if (armor != shown_armor) {
         render_hud_value((u16)(HUD_VALUE_BASE + 8), HUD_ARMOR_X, armor, 3, PAL_HUD);
         shown_armor = armor;
     }
-    render_hud_keys();
+    if (player_keys != shown_keys) render_hud_keys();
     render_ammo_counters();
     if (weapon_status_bits() != shown_weapon_status) draw_weapon_status();
 }
@@ -3510,6 +3522,10 @@ static void force_fix_hud_redraw(void) {
     shown_ammo = 0xFFFF;
     shown_armor = 0xFFFF;
     shown_frags = 0xFFFF;
+    for (u8 i = 0; i < 4; i++) {
+        shown_counter_current[i] = 0xFFFF;
+        shown_counter_max[i] = 0xFFFF;
+    }
     shown_keys = 0xFF;
     shown_weapon_status = 0xFFFF;
     hud_face_frame = 0xFF;

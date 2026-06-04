@@ -201,6 +201,10 @@ readable.
 - Visible thing selection rejects behind-camera and far-away things before
   resolving runtime type or render bucket, reducing per-frame sprite candidate
   work while preserving the same final projection and priority rules.
+- HUD status numbers, key slots, and ammo reserve counters now update only
+  when their displayed values change. The animated face still updates every
+  frame, but quiet E1M1 traversal no longer rewrites the static HUD sprites and
+  small counter digits every vblank.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
