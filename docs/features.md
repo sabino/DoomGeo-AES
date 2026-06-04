@@ -206,6 +206,10 @@ readable.
   world distance and line-of-sight, but it now also requires the same readable
   slot proof as ranged attacks. Player weapon hits also target rendered enemies
   only, keeping combat feedback tied to visible sprites.
+- Ranged monster attacks use a stricter readable-slot gate than player
+  targeting: enough of the sprite must be clipped inside the screen, tall
+  enough to read, and near the forward view before it can fire. Edge slices can
+  still be drawn and shot, but they no longer start hitscan/projectile attacks.
   Monsters drawn through the coarse line-of-sight projection fallback are
   allowed to remain visible, but their ranged attacks are held until the sprite
   is large enough to read clearly.

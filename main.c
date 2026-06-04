@@ -525,11 +525,22 @@ static void update_weapon_flash(void) {
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
+static int enemy_slot_visible_width(u16 slot) {
+    int left, right;
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    left = enemies[slot].screen_x;
+    right = enemies[slot].screen_x + enemies[slot].screen_w;
+    if (left < 0) left = 0;
+    if (right > SCRW) right = SCRW;
+    return right > left ? right - left : 0;
+}
+
 static u8 enemy_slot_is_readable(u16 slot) {
     int center_x;
     if (slot >= ENEMY_VISIBLE_COUNT) return 0;
     if (enemies[slot].thing_index < 0) return 0;
     if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) return 0;
+    if (enemy_slot_visible_width(slot) < 12) return 0;
     if (enemies[slot].screen_x + enemies[slot].screen_w < 16) return 0;
     if (enemies[slot].screen_x > SCRW - 16) return 0;
     center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
@@ -540,6 +551,16 @@ static u8 enemy_slot_is_readable(u16 slot) {
 static u8 enemy_slot_can_attack(u16 slot) {
     if (!enemy_slot_is_readable(slot)) return 0;
     if (enemies[slot].fallback_projection && enemies[slot].screen_h < 56) return 0;
+    return 1;
+}
+
+static u8 enemy_slot_can_ranged_attack(u16 slot) {
+    int center_x;
+    if (!enemy_slot_can_attack(slot)) return 0;
+    if (enemy_slot_visible_width(slot) < 24) return 0;
+    if (enemies[slot].screen_h < 48) return 0;
+    center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
+    if (center_x < 48 || center_x > SCRW - 48) return 0;
     return 1;
 }
 
@@ -1913,7 +1934,7 @@ static void update_monster_damage(void) {
         if (!thing_is_monster(runtime_thing_type(thing))) continue;
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
-        if (!enemy_slot_can_attack(slot)) continue;
+        if (!enemy_slot_can_ranged_attack(slot)) continue;
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
