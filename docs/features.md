@@ -23,8 +23,12 @@ readable.
 - 40 wall-column sprites cover the 320-pixel screen in 8-pixel logical columns
   backed by 16-pixel Neo Geo strips.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
-  visual hits against compact WAD-derived render lines near the hit cell, and
-  writes Neo Geo sprite shrink/position data.
+  visual hits against compact WAD-derived render lines indexed by the hit cell,
+  and writes Neo Geo sprite shrink/position data.
+- The render-line broadphase is done offline by the converter. The E1M1 build
+  currently emits 325 visual render lines and 857 cell references; the runtime
+  checks at most 7 line candidates in a hit cell instead of scanning the whole
+  render-line table for every wall column.
 - This renderer spends more sprite budget on wall fidelity than the older
   20-column pass while holding seven visible world-thing slots for monsters,
   pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline

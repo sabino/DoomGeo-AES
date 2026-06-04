@@ -242,15 +242,14 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     int pos_y_q4 = (int)(posY >> (FBITS - 4));
     int ray_x_q4 = (int)(rayX >> (FBITS - 4));
     int ray_y_q4 = (int)(rayY >> (FBITS - 4));
-    int cell_min_x = cell_x << 4;
-    int cell_min_y = cell_y << 4;
-    int cell_max_x = cell_min_x + 16;
-    int cell_max_y = cell_min_y + 16;
+    unsigned short cell_start = g_render_cell_start[cell_y][cell_x];
+    unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     int best_t_q8 = 0x7FFFFFFF;
     int best_u_q8 = 0;
     int best_line = -1;
 
-    for (int i = 0; i < NG_RENDER_LINE_COUNT; i++) {
+    for (unsigned char n = 0; n < cell_count; n++) {
+        int i = g_render_cell_lines[cell_start + n];
         int x1 = g_render_lines[i].x1_q8 >> 4;
         int y1 = g_render_lines[i].y1_q8 >> 4;
         int x2 = g_render_lines[i].x2_q8 >> 4;
@@ -258,10 +257,6 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         int seg_x = x2 - x1;
         int seg_y = y2 - y1;
         int denom = ray_x_q4 * seg_y - ray_y_q4 * seg_x;
-        int min_x = x1 < x2 ? x1 : x2;
-        int max_x = x1 > x2 ? x1 : x2;
-        int min_y = y1 < y2 ? y1 : y2;
-        int max_y = y1 > y2 ? y1 : y2;
         int rel_x;
         int rel_y;
         int num_t;
@@ -269,7 +264,6 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         int t_q8;
         int u_q8;
 
-        if (max_x < cell_min_x || min_x > cell_max_x || max_y < cell_min_y || min_y > cell_max_y) continue;
         if (denom == 0) continue;
         rel_x = x1 - pos_x_q4;
         rel_y = y1 - pos_y_q4;

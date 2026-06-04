@@ -788,14 +788,16 @@ def render_lines(
     sidedefs: list[SideDef],
     sectors: list[Sector],
     vertices: list[Vertex],
+    grid: list[list[int]],
     texture_widths: dict[str, int],
     min_x: int,
     max_y: int,
     scale: float,
     margin: int,
     detail_cull: float,
-) -> list[tuple[int, int, int, int, int, int]]:
+) -> tuple[list[tuple[int, int, int, int, int, int]], list[list[int]], list[list[int]], list[int]]:
     rows: list[tuple[int, int, int, int, int, int]] = []
+    cell_lists: list[list[list[int]]] = [[[] for _ in row] for row in grid]
     min_solid_len = scale * detail_cull
     default_texture_width = texture_widths.get("STARTAN3", 64)
     for line in linedefs:
@@ -807,9 +809,12 @@ def render_lines(
             continue
         x0, y0 = grid_coord(a.x, a.y, min_x, max_y, scale, margin)
         x1, y1 = grid_coord(b.x, b.y, min_x, max_y, scale, margin)
+        cell_x0, cell_y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
+        cell_x1, cell_y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
         texture_name = solid_line_texture(line, sidedefs)
         texture_width = texture_widths.get(texture_name, default_texture_width)
         texture_class = 8 if line.special in DOOR_SPECIALS else wall_texture_class(texture_name)
+        line_index = len(rows)
         rows.append(
             (
                 int(round(x0 * 256)),
@@ -820,7 +825,22 @@ def render_lines(
                 texture_phase_for_cell(solid_line_texture_x(line, sidedefs), texture_width, 0, 1),
             )
         )
-    return rows
+        for cell_x, cell_y in line_cells(grid, cell_x0, cell_y0, cell_x1, cell_y1):
+            cell_lists[cell_y][cell_x].append(line_index)
+
+    starts: list[list[int]] = [[0 for _ in row] for row in grid]
+    counts: list[list[int]] = [[0 for _ in row] for row in grid]
+    refs: list[int] = []
+    for y, row in enumerate(cell_lists):
+        for x, lines in enumerate(row):
+            starts[y][x] = len(refs)
+            if len(lines) > 255:
+                raise ValueError(f"too many render lines in cell {x},{y}: {len(lines)}")
+            counts[y][x] = len(lines)
+            refs.extend(lines)
+    if len(refs) > 65535:
+        raise ValueError(f"too many render-line cell refs: {len(refs)}")
+    return rows, starts, counts, refs
 
 
 def emit_header(
@@ -840,6 +860,9 @@ def emit_header(
     exits: list[tuple[int, int, int]],
     doors: list[tuple[int, int, int]],
     render_line_rows: list[tuple[int, int, int, int, int, int]],
+    render_cell_starts: list[list[int]],
+    render_cell_counts: list[list[int]],
+    render_cell_refs: list[int],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     angle_rad = math.radians(angle)
@@ -881,6 +904,7 @@ def emit_header(
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
         f.write(f"#define NG_RENDER_LINE_COUNT {len(render_line_rows)}\n\n")
+        f.write(f"#define NG_RENDER_CELL_REF_COUNT {len(render_cell_refs)}\n\n")
         f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n")
         f.write("#define MAP_RUNTIME_OPEN_BYTES MAP_SECRET_BYTES\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
@@ -893,6 +917,24 @@ def emit_header(
         f.write("static const NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT] = {\n")
         for x1, y1, x2, y2, texture, phase in render_line_rows:
             f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase}}},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned short g_render_cell_start[MAP_H][MAP_W] = {\n")
+        for row in render_cell_starts:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned char g_render_cell_count[MAP_H][MAP_W] = {\n")
+        for row in render_cell_counts:
+            f.write("    {")
+            f.write(",".join(str(cell) for cell in row))
+            f.write("},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned short g_render_cell_lines[NG_RENDER_CELL_REF_COUNT] = {\n")
+        for i in range(0, len(render_cell_refs), 24):
+            f.write("    ")
+            f.write(",".join(str(cell) for cell in render_cell_refs[i : i + 24]))
+            f.write(",\n")
         f.write("};\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for y, row in enumerate(grid):
@@ -1192,7 +1234,19 @@ def convert(args: argparse.Namespace) -> None:
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle, args.skill_mask)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
-    converted_render_lines = render_lines(linedefs, sidedefs, sectors, vertices, texture_widths, min_x, max_y, scale, margin, args.detail_cull)
+    converted_render_lines, render_cell_starts, render_cell_counts, render_cell_refs = render_lines(
+        linedefs,
+        sidedefs,
+        sectors,
+        vertices,
+        grid,
+        texture_widths,
+        min_x,
+        max_y,
+        scale,
+        margin,
+        args.detail_cull,
+    )
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     secret_grid = sector_secret_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
@@ -1227,6 +1281,9 @@ def convert(args: argparse.Namespace) -> None:
         converted_exits,
         converted_doors,
         converted_render_lines,
+        render_cell_starts,
+        render_cell_counts,
+        render_cell_refs,
     )
     if args.assets_header and args.assets_source:
         emit_assets(
