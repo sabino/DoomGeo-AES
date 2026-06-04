@@ -3874,6 +3874,8 @@ typedef struct ThingCandidate {
     int score;
 } ThingCandidate;
 
+#define THING_CANDIDATE_COUNT (ENEMY_VISIBLE_COUNT * 3)
+
 static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, short x, short y) {
     for (int slot = 0; slot < count; slot++) {
         if (candidates[slot].x_q8 == x && candidates[slot].y_q8 == y) return 1;
@@ -3884,17 +3886,17 @@ static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, 
 static void insert_thing_candidate(ThingCandidate *candidates, int *count, const ThingCandidate *candidate) {
     int insert_at = *count;
     while (insert_at > 0 && candidate->score < candidates[insert_at - 1].score) insert_at--;
-    if (insert_at >= ENEMY_VISIBLE_COUNT) return;
-    for (int j = ENEMY_VISIBLE_COUNT - 1; j > insert_at; j--) candidates[j] = candidates[j - 1];
+    if (insert_at >= THING_CANDIDATE_COUNT) return;
+    for (int j = THING_CANDIDATE_COUNT - 1; j > insert_at; j--) candidates[j] = candidates[j - 1];
     candidates[insert_at] = *candidate;
-    if (*count < ENEMY_VISIBLE_COUNT) (*count)++;
+    if (*count < THING_CANDIDATE_COUNT) (*count)++;
 }
 
 static int select_visible_things(int found, u8 pass) {
-    ThingCandidate candidates[ENEMY_VISIBLE_COUNT];
+    ThingCandidate candidates[THING_CANDIDATE_COUNT];
     int count = 0;
     if (found >= ENEMY_VISIBLE_COUNT) return found;
-    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+    for (u16 slot = 0; slot < THING_CANDIDATE_COUNT; slot++) {
         candidates[slot].thing_index = -1;
         candidates[slot].dynamic_index = -1;
     }

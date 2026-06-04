@@ -217,6 +217,10 @@ readable.
   offscreen, or fully clipped sprites no longer consume one of the eight visible
   world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
+- Thing selection keeps an oversized sorted candidate buffer behind those eight
+  visible slots. Edge-clipped or missing-art candidates can fail without
+  starving later visible monsters in the same pass, which makes combat scenes
+  less likely to contain an attacking-but-invisible enemy.
 - The first threat pass still sorts by distance, center position, and projected
   size, but live monsters receive a stronger score bias than barrels or transient
   explosions so scarce slots favor enemies the player must react to.
