@@ -193,6 +193,10 @@ readable.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing, which keeps distant shooters readable under the reduced 20-column
   wall pass instead of letting them collapse into near-invisible sprite strips.
+- Monster, pickup, barrel, and corpse sprites now use a runtime floor-baseline
+  anchor instead of inheriting the raw wall-slice bottom for every distance.
+  This keeps distant enemies seated closer to the playfield floor while still
+  allowing the weapon sprite to occlude centered close threats like Doom.
 - Visible fireballs and impact bursts also keep a small minimum projected size,
   making projectile combat easier to read against dark wall and floor palettes.
 - Thing projection falls back to a q8 player/view-vector projection after a
