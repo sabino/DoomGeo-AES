@@ -135,6 +135,9 @@ readable.
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the
   normal cart path unchanged.
+- `tools/smoke_combat_interaction.sh` drives the combat ROM through a shotgun
+  fire interaction and captures before/fire/death frames, proving that a visible
+  enemy can be targeted, damaged, killed, and left as visible feedback.
 - `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
   combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
   chainsaw, and places a visible imp inside the corrected player melee range.

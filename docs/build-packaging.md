@@ -63,6 +63,10 @@ SMOKE_OUTPUT=.tools/screens/latest/combat-test.png \
 make smoke-screenshot
 ```
 
+For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
+It captures the initial visible imp, the shotgun fire frame, and the resulting
+death/corpse feedback frame.
+
 ```sh
 SMOKE_BUILD_TARGET=melee-test-rom \
 SMOKE_RUN_TARGET=melee-test-gngeo \

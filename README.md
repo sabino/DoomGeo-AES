@@ -38,17 +38,21 @@ drawing pixels.
 | --- | --- |
 | ![Focused E1M2 red keycard and locked-door verification ROM](docs/screenshots/doomgeo-aes-key-door-test.png) | ![E1M2 red door opened after collecting the red keycard](docs/screenshots/doomgeo-aes-key-door-opened.png) |
 
-| Combat test ROM | Melee test ROM |
+| Combat test ROM | Combat kill smoke |
 | --- | --- |
-| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) |
+| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
 
-| Monster gallery ROM | Arsenal test ROM |
+| Melee test ROM | Monster gallery ROM |
 | --- | --- |
-| ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) | ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) |
+| ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
 
-| Death/drop test ROM | Powerup test ROM |
+| Arsenal test ROM | Death/drop test ROM |
 | --- | --- |
-| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) | ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
+| ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+
+| Powerup test ROM |
+| --- |
+| ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
 
 | Native Doom comparison |
 | --- |
@@ -98,6 +102,7 @@ make key-door-test-gngeo
 tools/smoke_key_door.sh
 make combat-test-rom
 make combat-test-gngeo
+tools/smoke_combat_interaction.sh
 make monster-gallery-rom
 make monster-gallery-gngeo
 make arsenal-test-rom
