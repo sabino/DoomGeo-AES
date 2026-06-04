@@ -657,6 +657,9 @@ typedef struct EnemyDraw {
     int screen_h;
     int dist_q8;
     u8 fallback_projection;
+    u8 readable;
+    u8 attackable;
+    u8 ranged_attackable;
 } EnemyDraw;
 
 static void trigger_weapon_flash(void) {
@@ -685,43 +688,56 @@ static void update_weapon_flash(void) {
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
 
-static int enemy_slot_visible_width(u16 slot) {
+static int enemy_visible_width_for_geometry(int screen_x, int screen_w) {
     int left, right;
-    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
-    left = enemies[slot].screen_x;
-    right = enemies[slot].screen_x + enemies[slot].screen_w;
+    left = screen_x;
+    right = screen_x + screen_w;
     if (left < 0) left = 0;
     if (right > SCRW) right = SCRW;
     return right > left ? right - left : 0;
 }
 
-static u8 enemy_slot_is_readable(u16 slot) {
+static void update_enemy_slot_flags(u16 slot) {
     int center_x;
+    int visible_w;
+    u8 readable = 0;
+    u8 attackable = 0;
+    u8 ranged_attackable = 0;
+
+    if (slot < ENEMY_VISIBLE_COUNT && enemies[slot].thing_index >= 0
+        && enemies[slot].screen_w > 0 && enemies[slot].screen_h > 0) {
+        visible_w = enemy_visible_width_for_geometry(enemies[slot].screen_x, enemies[slot].screen_w);
+        center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
+        if (visible_w >= 12 && enemies[slot].screen_x + enemies[slot].screen_w >= 16
+            && enemies[slot].screen_x <= SCRW - 16 && center_x >= 24 && center_x <= SCRW - 24) {
+            readable = 1;
+            if (!enemies[slot].fallback_projection) {
+                attackable = 1;
+                if (visible_w >= 24 && enemies[slot].screen_h >= 48 && center_x >= 48 && center_x <= SCRW - 48) {
+                    ranged_attackable = 1;
+                }
+            }
+        }
+    }
+
+    enemies[slot].readable = readable;
+    enemies[slot].attackable = attackable;
+    enemies[slot].ranged_attackable = ranged_attackable;
+}
+
+static u8 enemy_slot_is_readable(u16 slot) {
     if (slot >= ENEMY_VISIBLE_COUNT) return 0;
-    if (enemies[slot].thing_index < 0) return 0;
-    if (enemies[slot].screen_w <= 0 || enemies[slot].screen_h <= 0) return 0;
-    if (enemy_slot_visible_width(slot) < 12) return 0;
-    if (enemies[slot].screen_x + enemies[slot].screen_w < 16) return 0;
-    if (enemies[slot].screen_x > SCRW - 16) return 0;
-    center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
-    if (center_x < 24 || center_x > SCRW - 24) return 0;
-    return 1;
+    return enemies[slot].readable;
 }
 
 static u8 enemy_slot_can_attack(u16 slot) {
-    if (!enemy_slot_is_readable(slot)) return 0;
-    if (enemies[slot].fallback_projection) return 0;
-    return 1;
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    return enemies[slot].attackable;
 }
 
 static u8 enemy_slot_can_ranged_attack(u16 slot) {
-    int center_x;
-    if (!enemy_slot_can_attack(slot)) return 0;
-    if (enemy_slot_visible_width(slot) < 24) return 0;
-    if (enemies[slot].screen_h < 48) return 0;
-    center_x = enemies[slot].screen_x + enemies[slot].screen_w / 2;
-    if (center_x < 48 || center_x > SCRW - 48) return 0;
-    return 1;
+    if (slot >= ENEMY_VISIBLE_COUNT) return 0;
+    return enemies[slot].ranged_attackable;
 }
 
 static u8 thing_has_readable_slot(int thing_index) {
@@ -4478,6 +4494,9 @@ static void hide_enemy_slot(u16 slot) {
     enemies[slot].screen_w = 0;
     enemies[slot].screen_h = 0;
     enemies[slot].fallback_projection = 0;
+    enemies[slot].readable = 0;
+    enemies[slot].attackable = 0;
+    enemies[slot].ranged_attackable = 0;
     enemy_tile_key[slot] = -1;
 }
 
@@ -4487,6 +4506,9 @@ static void reset_enemy_slot_cache(void) {
         enemy_tile_key[slot] = -1;
         enemy_slot_flash[slot] = 0;
         ranged_readable_prev[slot] = -1;
+        enemies[slot].readable = 0;
+        enemies[slot].attackable = 0;
+        enemies[slot].ranged_attackable = 0;
     }
     ranged_readable_prev_count = 0;
 }
@@ -4590,6 +4612,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
     }
     enemies[slot].screen_x = sx - meta->origin_x;
     enemies[slot].screen_w = meta->width;
+    update_enemy_slot_flags(slot);
     {
         u8 rendered = 0;
         int top;
@@ -4618,6 +4641,9 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, in
             enemies[slot].screen_w = 0;
             enemies[slot].screen_h = 0;
             enemies[slot].fallback_projection = 0;
+            enemies[slot].readable = 0;
+            enemies[slot].attackable = 0;
+            enemies[slot].ranged_attackable = 0;
             return 0;
         }
     }

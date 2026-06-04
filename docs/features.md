@@ -229,6 +229,10 @@ readable.
   point, avoiding another raycaster position query for each visible monster.
   Slot rendering keeps monster/projectile/explosion classification local to the
   slot instead of rechecking the same type several times.
+- Readable, attackable, and ranged-attackable world-sprite slot flags are
+  cached when each slot is rendered. Targeting, melee, monster ranged attacks,
+  projectile ownership, and AI visibility checks reuse those flags instead of
+  recomputing screen clipping and center bounds several times per frame.
 - The world-sprite selector no longer clears its candidate buffer or visible
   slot ids before immediately overwriting or hiding them. This removes redundant
   per-frame writes from the normal E1M1 render path while preserving the same
