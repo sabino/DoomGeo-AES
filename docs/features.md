@@ -95,16 +95,16 @@ readable.
   missing shareware-only frames are skipped instead of breaking the build.
 - Pickups update live ammo/health/armor/key/weapon state and remain in the map
   if the player cannot use them yet.
-- Former humans, shotgun guys, imps, demons/spectres, Barons, cacodemons, lost
-  souls, and barrels have partial gameplay support. Cacodemons and lost souls
-  are accepted from registered/commercial WAD maps when those sprite lumps are
-  present; lost souls use the current melee movement path until their dedicated
-  charge behavior is implemented.
-- Former humans, shotgun guys, imps, demons/spectres, Barons, cacodemons, and
-  lost souls now bake A/B walk frames across the available Doom angle groups
-  when the source WAD contains those sprite lumps. Runtime sprite selection
-  tracks a coarse monster-facing vector so visible enemies are no longer locked
-  to a single front-facing frame.
+- Former humans, shotgun guys, imps, demons/spectres, Hell Knights, Barons,
+  cacodemons, lost souls, and barrels have partial gameplay support. Hell
+  Knights, cacodemons, and lost souls are accepted from registered/commercial
+  WAD maps when those sprite lumps are present; lost souls use the current melee
+  movement path until their dedicated charge behavior is implemented.
+- Former humans, shotgun guys, imps, demons/spectres, Hell Knights, Barons,
+  cacodemons, and lost souls now bake A/B walk frames across the available Doom
+  angle groups when the source WAD contains those sprite lumps. Runtime sprite
+  selection tracks a coarse monster-facing vector so visible enemies are no
+  longer locked to a single front-facing frame.
 - The same monsters also bake front-facing attack frames. A short runtime attack
   timer swaps the visible sprite to those frames when a monster fires, throws a
   projectile, or bites.
@@ -119,9 +119,9 @@ readable.
   readable on-screen world-sprite slots, so hidden/off-screen things do not
   attack through the Neo Geo sprite fallback path. Player weapon hits also
   target rendered enemies only, keeping combat feedback tied to visible sprites.
-  Imps, cacodemons, and Barons can launch visible fireball sprites; those
-  fireballs are dropped if their source monster leaves the readable rendered
-  slot set before impact.
+  Imps, Hell Knights, cacodemons, and Barons can launch visible fireball
+  sprites; those fireballs are dropped if their source monster leaves the
+  readable rendered slot set before impact.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing, which keeps distant shooters readable under the reduced 20-column
   wall pass instead of letting them collapse into near-invisible sprite strips.

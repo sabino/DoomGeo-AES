@@ -520,6 +520,7 @@ static u8 thing_is_monster(u16 thing_type) {
     switch (thing_type) {
     case 9:
     case 58:
+    case 69:
     case 3001:
     case 3002:
     case 3003:
@@ -758,6 +759,8 @@ static u8 key_bit_for_door(u16 special) {
 
 static u8 monster_start_hp(u16 thing_type) {
     switch (thing_type) {
+    case 69:   /* hell knight */
+        return 10;
     case 3004: /* former human */
         return 2;
     case 9:    /* shotgun guy */
@@ -843,6 +846,8 @@ static u16 monster_score_value(u16 thing_type) {
         return 400;
     case 3003: /* baron */
         return 1000;
+    case 69:   /* hell knight */
+        return 500;
     case 3005: /* cacodemon */
         return 700;
     case 3006: /* lost soul */
@@ -1363,6 +1368,8 @@ static void player_take_damage(u16 amount) {
 
 static u8 monster_ranged_damage(u16 thing_type) {
     switch (thing_type) {
+    case 69:   /* hell knight */
+        return 6;
     case 3004: /* former human */
         return 3;
     case 9:    /* shotgun guy */
@@ -1384,6 +1391,7 @@ static u16 monster_projectile_type(u16 thing_type) {
         return 9006;
     case 3005: /* cacodemon */
         return 9008;
+    case 69:   /* hell knight */
     case 3003: /* baron */
         return 9007;
     default:
