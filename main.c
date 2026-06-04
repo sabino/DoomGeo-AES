@@ -3093,13 +3093,17 @@ static void collect_nearby_pickups(void) {
     pcy = py >> 8;
     for (u16 pi = 0; pi < thing_pickup_count; pi++) {
         int i = thing_pickup_indices[pi];
+        short thing_x;
+        short thing_y;
         u16 type;
         if (enemy_dead[i]) continue;
-        if (iabs16((thing_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
-        if (iabs16((thing_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
+        thing_x = thing_x_q8[i];
+        thing_y = thing_y_q8[i];
+        if (iabs16((thing_x >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16((thing_y >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
         if (!runtime_thing_is_pickup(i)) continue;
         type = runtime_thing_type(i);
-        if (iabs16(px - thing_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - thing_y_q8[i]) <= PICKUP_RANGE_Q8) {
+        if (iabs16(px - thing_x) <= PICKUP_RANGE_Q8 && iabs16(py - thing_y) <= PICKUP_RANGE_Q8) {
             if (apply_pickup(type)) {
                 if (player_items < 999) player_items++;
                 enemy_dead[i] = 1;
@@ -3109,10 +3113,14 @@ static void collect_nearby_pickups(void) {
         }
     }
     for (u8 i = 0; i < 8; i++) {
+        short drop_x;
+        short drop_y;
         if (!dynamic_drop_active[i]) continue;
-        if (iabs16((dynamic_drop_x_q8[i] >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
-        if (iabs16((dynamic_drop_y_q8[i] >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
-        if (iabs16(px - dynamic_drop_x_q8[i]) <= PICKUP_RANGE_Q8 && iabs16(py - dynamic_drop_y_q8[i]) <= PICKUP_RANGE_Q8) {
+        drop_x = dynamic_drop_x_q8[i];
+        drop_y = dynamic_drop_y_q8[i];
+        if (iabs16((drop_x >> 8) - pcx) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16((drop_y >> 8) - pcy) > PICKUP_RANGE_CELLS) continue;
+        if (iabs16(px - drop_x) <= PICKUP_RANGE_Q8 && iabs16(py - drop_y) <= PICKUP_RANGE_Q8) {
             if (apply_pickup(dynamic_drop_type[i])) {
                 dynamic_drop_active[i] = 0;
                 invalidate_background_cache();

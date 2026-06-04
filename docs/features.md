@@ -205,7 +205,9 @@ readable.
 - Nearby pickup collection uses the same local map-cell prefilter before
   resolving thing type or exact q8 pickup distance. This keeps key, item,
   weapon, and dynamic-drop pickup behavior unchanged while avoiding most
-  per-frame all-thing pickup checks.
+  per-frame all-thing pickup checks. Static pickup and dynamic-drop scans cache
+  each candidate q8 coordinate once for both the coarse-cell and exact-radius
+  tests.
 - Per-frame thing timer maintenance is bounded to the shootable candidate list
   and then skips entries with no active flash, attack, explosion,
   death-animation, or delayed-drop timers before touching detailed state
