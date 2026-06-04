@@ -35,6 +35,10 @@ readable.
   spending one full vblank on plane uploads. This is a compromise, not true Doom
   span rendering; the cache is deliberately kept small so monster and pickup
   sprite tiles stay inside the visible Neo Geo C-ROM tile range.
+- Floor flats keep the WAD texture pattern but normalize green-dominant palette
+  entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
+  closer to Doom's sober floor tone and avoids stray green speckles being read
+  as a missing sprite or palette glitch.
 - Depth palettes and directional shading give walls/planes distance cues without
   runtime pixel drawing.
 

@@ -533,6 +533,21 @@ def decode_flat(wad, flat_name):
     return [list(data[y * 64 : (y + 1) * 64]) for y in range(64)]
 
 
+def normalize_floor_palette(palette):
+    normalized = []
+    for r, g, b in palette:
+        if g > r + 12 and g > b + 12:
+            lum = int(round(r * 0.30 + g * 0.59 + b * 0.11))
+            normalized.append((
+                min(255, int(lum * 1.06)),
+                min(255, int(lum * 0.98)),
+                min(255, int(lum * 0.78)),
+            ))
+        else:
+            normalized.append((r, g, b))
+    return normalized
+
+
 def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
     if not iwad:
         base = (40, 42, 48) if ceiling else (56, 48, 36)
@@ -544,6 +559,8 @@ def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
     palette = texture_palette(flat, playpal)
     if ceiling:
         palette = [(r * 3 // 4, g * 3 // 4, min(255, b * 5 // 4)) for r, g, b in palette]
+    else:
+        palette = normalize_floor_palette(palette)
     tiles = []
     phase_x = 64 // FLAT_COLS
     phase_y = 64 // FLAT_ROWS
