@@ -87,6 +87,11 @@ The comparison capture is generated locally with `tools/capture_compare.sh` from
 the same shareware `E1M1` WAD data. It intentionally shows the current renderer
 gap: the native start room is not yet visually matched by the Neo Geo wall and
 plane approximation even though the converted map and Player 1 start are loaded.
+Set `COMPARE_WAYPOINT` to capture additional known views: `e1m1-start`,
+`e1m2-start`, `e1m1-encounter`, `e1m1-scout`, or `e1m2-keydoor`. Non-start
+native waypoints are driven by approximate scripted input from the native Doom
+spawn, while the Neo Geo side uses the matching focused ROM target when one
+exists.
 
 ## Controls
 
@@ -167,6 +172,8 @@ python3 tools/doomgeo_build.py build --target asm-rom
 python3 tools/doomgeo_build.py pages --out dist/pages
 make smoke-screenshot
 DOOM_MAP=E1M1 tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
 ```
 
 You must provide your own Neo Geo BIOS for local emulation. The browser package

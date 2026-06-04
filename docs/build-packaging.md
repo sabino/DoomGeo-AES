@@ -72,6 +72,24 @@ that the converted player start can reach the converted exit from the current
 `build/doom_map_generated.h` and reports whether the route depends on generated
 door cells.
 
+For native Doom visual comparisons, run `tools/capture_compare.sh`. By default
+it captures the compiled map start view and writes native, Neo Geo, and
+side-by-side PNGs under `.tools/screens/`. Set `COMPARE_WAYPOINT` to capture a
+named view:
+
+```sh
+DOOM_MAP=E1M1 tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
+```
+
+Supported waypoint names are `start`, `e1m1-start`, `e1m2-start`,
+`e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Start waypoints use the same
+map spawn on both sides. Non-start native captures are approximate scripted
+movement from the native spawn; the Neo Geo side uses the matching focused ROM
+target when available, so these captures are useful visual registers but not
+pixel-exact camera matching.
+
 For a broader Episode 1 conversion baseline, run `make episode-route-report`.
 It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
 which maps currently have a generated start-to-exit route at the configured

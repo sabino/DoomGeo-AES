@@ -334,6 +334,12 @@ readable.
   monster placement.
 - `tools/smoke_e1m1_scout.sh` captures that scout viewpoint and a pistol-fire
   frame, extending the real-map evidence beyond the closer encounter ROM.
+- `tools/capture_compare.sh` can now capture named native-vs-NeoGeo comparison
+  waypoints under `.tools/screens/`: `start`, `e1m1-start`, `e1m2-start`,
+  `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. The start waypoints use
+  native and Neo Geo map spawns; non-start native views are approximate scripted
+  movement from the native spawn while the Neo Geo side uses the corresponding
+  focused verification ROM target when available.
 - `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
   completion ROM. It starts two converted cells left of the real generated
   E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,

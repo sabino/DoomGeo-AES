@@ -6,6 +6,7 @@ cd "$ROOT"
 
 MAP="${DOOM_MAP:-E1M1}"
 DOOM_SKILL="${DOOM_SKILL:-4}"
+WAYPOINT="${COMPARE_WAYPOINT:-start}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
@@ -17,6 +18,9 @@ FREEDOOM_WAD="${FREEDOOM_DIR}/freedoom1.wad"
 DOOM_IWAD="${DOOM_IWAD:-.tools/assets/doom1.wad.zip}"
 native_pid=""
 make_pid=""
+neo_make_target="gngeo"
+neo_press_start="1"
+waypoint_note=""
 
 mkdir -p "$SCREENDIR" "$LOGDIR"
 
@@ -78,6 +82,9 @@ kill_old_runners() {
 }
 
 cleanup_spawned() {
+    if [ -n "$make_pid" ]; then
+        kill -- "-${make_pid}" >/dev/null 2>&1 || true
+    fi
     kill_old_runners
 }
 
@@ -110,6 +117,96 @@ capture_window() {
     return 1
 }
 
+hold_key() {
+    local wid="$1"
+    local key="$2"
+    local secs="$3"
+    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    xdotool keydown "$key"
+    sleep "$secs"
+    xdotool keyup "$key"
+    sleep 0.15
+}
+
+tap_key() {
+    local wid="$1"
+    local key="$2"
+    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    xdotool key "$key"
+    sleep 0.15
+}
+
+drive_native_waypoint() {
+    local pid="$1"
+    local title="$2"
+    local wid=""
+    case "$WAYPOINT" in
+        start|e1m1-start|e1m2-start)
+            return 0
+            ;;
+    esac
+    wid="$(window_for_pid_or_name "$pid" "$title")"
+    case "$WAYPOINT" in
+        e1m1-encounter)
+            waypoint_note="native waypoint is approximate: scripted movement from the E1M1 start"
+            hold_key "$wid" Up 1.0
+            hold_key "$wid" Right 0.35
+            ;;
+        e1m1-scout)
+            waypoint_note="native waypoint is approximate: scripted movement from the E1M1 start"
+            hold_key "$wid" Up 1.8
+            hold_key "$wid" Left 0.85
+            hold_key "$wid" Up 0.55
+            ;;
+        e1m2-keydoor)
+            waypoint_note="native waypoint is approximate: scripted movement from the E1M2 start"
+            hold_key "$wid" Up 1.2
+            hold_key "$wid" Left 0.45
+            hold_key "$wid" Up 0.8
+            tap_key "$wid" space
+            ;;
+        *)
+            echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
+            exit 1
+            ;;
+    esac
+}
+
+configure_waypoint() {
+    case "$WAYPOINT" in
+        start)
+            ;;
+        e1m1-start)
+            MAP="E1M1"
+            ;;
+        e1m2-start)
+            MAP="E1M2"
+            ;;
+        e1m1-encounter)
+            MAP="E1M1"
+            neo_make_target="encounter-test-gngeo"
+            neo_press_start="0"
+            ;;
+        e1m1-scout)
+            MAP="E1M1"
+            neo_make_target="scout-test-gngeo"
+            neo_press_start="0"
+            ;;
+        e1m2-keydoor)
+            MAP="E1M2"
+            neo_make_target="key-door-test-gngeo"
+            neo_press_start="0"
+            ;;
+        *)
+            echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
+            echo "supported: start, e1m1-start, e1m2-start, e1m1-encounter, e1m1-scout, e1m2-keydoor" >&2
+            exit 1
+            ;;
+    esac
+}
+
+configure_waypoint
+
 episode="${MAP:1:1}"
 level="${MAP:3:1}"
 if [[ ! "$MAP" =~ ^E[0-9]M[0-9]$ ]]; then
@@ -140,9 +237,9 @@ fi
 
 native_bin="$(doom_runner)"
 native_title="$(doom_window_title "$native_bin")"
-native_png="${SCREENDIR}/compare-${MAP}-${STAMP}-native.png"
-neogeo_png="${SCREENDIR}/compare-${MAP}-${STAMP}-neogeo.png"
-side_png="${SCREENDIR}/compare-${MAP}-${STAMP}-side-by-side.png"
+native_png="${SCREENDIR}/compare-${MAP}-${WAYPOINT}-${STAMP}-native.png"
+neogeo_png="${SCREENDIR}/compare-${MAP}-${WAYPOINT}-${STAMP}-neogeo.png"
+side_png="${SCREENDIR}/compare-${MAP}-${WAYPOINT}-${STAMP}-side-by-side.png"
 
 kill_old_runners
 sleep 0.3
@@ -155,14 +252,14 @@ setsid env SDL_VIDEODRIVER=x11 SDL_AUDIODRIVER=dummy \
 native_pid=$!
 disown "$native_pid" 2>/dev/null || true
 sleep 1.2
+drive_native_waypoint "$native_pid" "$native_title"
 capture_window "$native_pid" "$native_title" "$native_png"
 
-setsid env SDL_VIDEODRIVER=x11 make gngeo > "${LOGDIR}/gngeo-compare.log" 2>&1 < /dev/null &
+setsid env SDL_VIDEODRIVER=x11 make "$neo_make_target" DOOM_MAP="$MAP" > "${LOGDIR}/gngeo-compare.log" 2>&1 < /dev/null &
 make_pid=$!
 disown "$make_pid" 2>/dev/null || true
-sleep 4.0
 neo_pid=""
-for _ in $(seq 1 40); do
+for _ in $(seq 1 3000); do
     neo_pid="$(pgrep -n -x ngdevkit-gngeo 2>/dev/null || true)"
     if [ -n "$neo_pid" ]; then
         break
@@ -171,16 +268,18 @@ for _ in $(seq 1 40); do
 done
 if [ -z "$neo_pid" ]; then
     echo "ngdevkit-gngeo process not found" >&2
+    tail -n 40 "${LOGDIR}/gngeo-compare.log" >&2 || true
     exit 1
 fi
 neo_wid="$(window_for_pid_or_name "$neo_pid" "" || true)"
 if [ -n "$neo_wid" ]; then
     xdotool windowactivate "$neo_wid" >/dev/null 2>&1 || true
-    sleep 0.2
-    xdotool keydown x
-    sleep 0.25
-    xdotool keyup x
-    sleep 1.5
+    if [ "$neo_press_start" = "1" ]; then
+        sleep 1.5
+        hold_key "$neo_wid" x 0.25
+        hold_key "$neo_wid" s 0.25
+        sleep 2.0
+    fi
 fi
 capture_window "$neo_pid" "" "$neogeo_png"
 
@@ -194,3 +293,6 @@ trap - EXIT
 echo "native: $native_png"
 echo "neogeo: $neogeo_png"
 echo "compare: $side_png"
+if [ -n "$waypoint_note" ]; then
+    echo "$waypoint_note"
+fi
