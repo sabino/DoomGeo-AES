@@ -22,6 +22,7 @@
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #define WALLH    GAME_H             /* projection scale: wall height @ dist 1 */
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
+#define DOOM_RENDER_LINES 1         /* visual ray hits use WAD-derived lines  */
 
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation. One world thing

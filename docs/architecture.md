@@ -8,8 +8,9 @@ the video chip scale vertical sprite strips.
 
 - The 68000 keeps the player, doors, pickups, monsters, projectiles, HUD state,
   and palette timers in normal RAM.
-- The wall renderer casts one fixed-point DDA ray per screen column and updates
-  sprite control blocks.
+- The wall renderer casts one fixed-point DDA ray per screen column, refines
+  visual hits against compact WAD-derived render lines near the hit cell, and
+  updates sprite control blocks.
 - Background planes, walls, weapon strips, visible things, and HUD each have
   reserved sprite ranges so the project can reason about the 96-sprites-per-
   scanline limit.
@@ -23,6 +24,8 @@ and emits generated C headers/sources under `build/`:
 
 - Coarse grid collision/render map.
 - Per-cell wall texture class and texture phase.
+- Compact visual render-line rows derived from solid Doom linedefs, stored in
+  generated map coordinates for runtime hit refinement.
 - Door/exit trigger tables.
 - Damage and secret bit grids.
 - Runtime thing list with supported Doom thing types.
@@ -71,13 +74,14 @@ The Neo Geo has no normal framebuffer and the 68000 cannot read C-ROM texture
 pixels. That makes classic Doom's column/span renderer a poor direct fit. The
 current runtime accepts several compromises:
 
-- Grid/coarse wall representation instead of arbitrary wall segments.
+- Grid/coarse collision representation with visual render-line refinement
+  instead of a full BSP/seg traversal.
 - One projected wall height per column instead of multiple clipped subsector
   spans.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The current runtime uses a fallback 20-column wall pass so eight 4-strip
-  world things can fit alongside the backdrop and weapon under the
+  The current runtime uses a 40-column wall pass with seven 4-strip world things
+  so walls, backdrop, weapon, and HUD stay inside the practical
   96-sprites-per-scanline limit.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says

@@ -20,12 +20,15 @@ readable.
 
 ## Rendering
 
-- 20 wall-column sprites cover the 320-pixel screen in 16-pixel strips.
-- This fallback renderer deliberately spends less sprite budget on wall detail
-  so monsters, pickups, projectiles, corpses, and weapon sprites remain visible
-  under the Neo Geo scanline limit.
-- Each frame casts fixed-point rays, computes projected wall height, and writes
-  Neo Geo sprite shrink/position data.
+- 40 wall-column sprites cover the 320-pixel screen in 8-pixel logical columns
+  backed by 16-pixel Neo Geo strips.
+- Each frame casts fixed-point DDA rays, computes projected wall height, refines
+  visual hits against compact WAD-derived render lines near the hit cell, and
+  writes Neo Geo sprite shrink/position data.
+- This renderer spends more sprite budget on wall fidelity than the older
+  20-column pass while holding seven visible world-thing slots for monsters,
+  pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline
+  limit.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
   tile strips. The current preferred wall texture is `STARTAN3`, with alternate
   atlases for common E1M1 walls and `BIGDOOR2` doors.
@@ -298,8 +301,8 @@ readable.
 - Visible monsters are clamped to a minimum projected sprite size before
   drawing. Normal live monsters and fallback-projected feedback now stay in at
   least the 0.75 baked strip tier, which keeps distant shooters readable under
-  the reduced 20-column wall pass instead of letting them collapse into
-  near-invisible sprite strips.
+  the current wall pass instead of letting them collapse into near-invisible
+  sprite strips.
 - Monster, pickup, barrel, and corpse sprites preserve the source WAD patch
   `leftoffset`/`topoffset` while being baked into Neo Geo strips. Runtime
   placement applies those origins to a floor/reference baseline, keeping things
@@ -319,10 +322,10 @@ readable.
   of falling back to the first baked enemy, which prevents wrong-looking
   monsters or corrupt placeholder sprites when a WAD lacks optional art.
 - Thing slots are advanced only after a sprite actually renders. Missing,
-  offscreen, or fully clipped sprites no longer consume one of the eight visible
+  offscreen, or fully clipped sprites no longer consume one of the seven visible
   world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
-- Thing selection keeps an oversized sorted candidate buffer behind those eight
+- Thing selection keeps an oversized sorted candidate buffer behind those seven
   visible slots. Edge-clipped or missing-art candidates can fail without
   starving later visible monsters in the same pass, which makes combat scenes
   less likely to contain an attacking-but-invisible enemy.

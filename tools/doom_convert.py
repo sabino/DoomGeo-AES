@@ -783,6 +783,46 @@ def runtime_doors(
     return doors
 
 
+def render_lines(
+    linedefs: list[LineDef],
+    sidedefs: list[SideDef],
+    sectors: list[Sector],
+    vertices: list[Vertex],
+    texture_widths: dict[str, int],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+    detail_cull: float,
+) -> list[tuple[int, int, int, int, int, int]]:
+    rows: list[tuple[int, int, int, int, int, int]] = []
+    min_solid_len = scale * detail_cull
+    default_texture_width = texture_widths.get("STARTAN3", 64)
+    for line in linedefs:
+        if not is_solid_linedef(line, sidedefs, sectors):
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        if math.hypot(b.x - a.x, b.y - a.y) < min_solid_len:
+            continue
+        x0, y0 = grid_coord(a.x, a.y, min_x, max_y, scale, margin)
+        x1, y1 = grid_coord(b.x, b.y, min_x, max_y, scale, margin)
+        texture_name = solid_line_texture(line, sidedefs)
+        texture_width = texture_widths.get(texture_name, default_texture_width)
+        texture_class = 8 if line.special in DOOR_SPECIALS else wall_texture_class(texture_name)
+        rows.append(
+            (
+                int(round(x0 * 256)),
+                int(round(y0 * 256)),
+                int(round(x1 * 256)),
+                int(round(y1 * 256)),
+                texture_class,
+                texture_phase_for_cell(solid_line_texture_x(line, sidedefs), texture_width, 0, 1),
+            )
+        )
+    return rows
+
+
 def emit_header(
     out_path: str,
     grid: list[list[int]],
@@ -799,6 +839,7 @@ def emit_header(
     things: list[tuple[int, int, int, int]],
     exits: list[tuple[int, int, int]],
     doors: list[tuple[int, int, int]],
+    render_line_rows: list[tuple[int, int, int, int, int, int]],
 ) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     angle_rad = math.radians(angle)
@@ -839,14 +880,20 @@ def emit_header(
         f.write(f"#define NG_RUNTIME_THING_COUNT {len(things)}\n\n")
         f.write(f"#define NG_RUNTIME_EXIT_COUNT {len(exits)}\n\n")
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
+        f.write(f"#define NG_RENDER_LINE_COUNT {len(render_line_rows)}\n\n")
         f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n")
         f.write("#define MAP_RUNTIME_OPEN_BYTES MAP_SECRET_BYTES\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
         f.write("typedef struct NgRuntimeExit { short x_q8; short y_q8; unsigned short special; } NgRuntimeExit;\n\n")
         f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
+        f.write("typedef struct NgRenderLine { short x1_q8; short y1_q8; short x2_q8; short y2_q8; unsigned char texture; unsigned char phase; } NgRenderLine;\n\n")
         if doors:
             f.write("extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT];\n\n")
         f.write("extern unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES];\n\n")
+        f.write("static const NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT] = {\n")
+        for x1, y1, x2, y2, texture, phase in render_line_rows:
+            f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase}}},\n")
+        f.write("};\n\n")
         f.write("static const unsigned char g_map[MAP_H][MAP_W] = {\n")
         for y, row in enumerate(grid):
             f.write("    {")
@@ -1145,6 +1192,7 @@ def convert(args: argparse.Namespace) -> None:
     converted_things = runtime_things(things, grid, min_x, max_y, scale, margin, sx, sy, player.angle, args.skill_mask)
     converted_exits = runtime_exits(linedefs, vertices, grid, min_x, max_y, scale, margin)
     converted_doors = runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin)
+    converted_render_lines = render_lines(linedefs, sidedefs, sectors, vertices, texture_widths, min_x, max_y, scale, margin, args.detail_cull)
     damage_grid = sector_damage_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
     secret_grid = sector_secret_grid(grid, linedefs, sidedefs, sectors, vertices, min_x, max_y, scale, margin)
 
@@ -1178,6 +1226,7 @@ def convert(args: argparse.Namespace) -> None:
         converted_things,
         converted_exits,
         converted_doors,
+        converted_render_lines,
     )
     if args.assets_header and args.assets_source:
         emit_assets(

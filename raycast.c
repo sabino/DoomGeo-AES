@@ -236,6 +236,85 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     return 1;
 }
 
+static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side) {
+#if DOOM_RENDER_LINES
+    int pos_x_q4 = (int)(posX >> (FBITS - 4));
+    int pos_y_q4 = (int)(posY >> (FBITS - 4));
+    int ray_x_q4 = (int)(rayX >> (FBITS - 4));
+    int ray_y_q4 = (int)(rayY >> (FBITS - 4));
+    int cell_min_x = cell_x << 4;
+    int cell_min_y = cell_y << 4;
+    int cell_max_x = cell_min_x + 16;
+    int cell_max_y = cell_min_y + 16;
+    int best_t_q8 = 0x7FFFFFFF;
+    int best_u_q8 = 0;
+    int best_line = -1;
+
+    for (int i = 0; i < NG_RENDER_LINE_COUNT; i++) {
+        int x1 = g_render_lines[i].x1_q8 >> 4;
+        int y1 = g_render_lines[i].y1_q8 >> 4;
+        int x2 = g_render_lines[i].x2_q8 >> 4;
+        int y2 = g_render_lines[i].y2_q8 >> 4;
+        int seg_x = x2 - x1;
+        int seg_y = y2 - y1;
+        int denom = ray_x_q4 * seg_y - ray_y_q4 * seg_x;
+        int min_x = x1 < x2 ? x1 : x2;
+        int max_x = x1 > x2 ? x1 : x2;
+        int min_y = y1 < y2 ? y1 : y2;
+        int max_y = y1 > y2 ? y1 : y2;
+        int rel_x;
+        int rel_y;
+        int num_t;
+        int num_u;
+        int t_q8;
+        int u_q8;
+
+        if (max_x < cell_min_x || min_x > cell_max_x || max_y < cell_min_y || min_y > cell_max_y) continue;
+        if (denom == 0) continue;
+        rel_x = x1 - pos_x_q4;
+        rel_y = y1 - pos_y_q4;
+        num_t = rel_x * seg_y - rel_y * seg_x;
+        num_u = rel_x * ray_y_q4 - rel_y * ray_x_q4;
+        if (denom < 0) {
+            denom = -denom;
+            num_t = -num_t;
+            num_u = -num_u;
+        }
+        if (num_t <= 0 || num_u < 0 || num_u > denom) continue;
+        t_q8 = (num_t << 8) / denom;
+        if (t_q8 < 24 || t_q8 >= best_t_q8) continue;
+        u_q8 = (num_u << 8) / denom;
+        best_t_q8 = t_q8;
+        best_u_q8 = u_q8;
+        best_line = i;
+    }
+
+    if (best_line >= 0) {
+        int seg_x = (g_render_lines[best_line].x2_q8 - g_render_lines[best_line].x1_q8);
+        int seg_y = (g_render_lines[best_line].y2_q8 - g_render_lines[best_line].y1_q8);
+        int abs_x = seg_x < 0 ? -seg_x : seg_x;
+        int abs_y = seg_y < 0 ? -seg_y : seg_y;
+        int tex_x = ((best_u_q8 * TILE_WALL_ATLAS_COLS) >> 8) & (TILE_WALL_ATLAS_COLS - 1);
+        tex_x = (tex_x + g_render_lines[best_line].phase) & (TILE_WALL_ATLAS_COLS - 1);
+        *dist = ((fix)best_t_q8) << (FBITS - 8);
+        *kind = g_render_lines[best_line].texture;
+        *tex = (u8)tex_x;
+        *side = (abs_x > abs_y) ? 1 : 0;
+        return 1;
+    }
+#else
+    (void)rayX;
+    (void)rayY;
+    (void)cell_x;
+    (void)cell_y;
+#endif
+    (void)dist;
+    (void)kind;
+    (void)tex;
+    (void)side;
+    return 0;
+}
+
 void rc_render(void) {
     if (!view_dirty) return;
     for (int x = 0; x < NUM_COLS; x++) {
@@ -270,7 +349,6 @@ void rc_render(void) {
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
         if (perp < FMIN) perp = FMIN;
-        distbuf[x] = perp;
 
         {
             fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
@@ -280,6 +358,8 @@ void rc_render(void) {
             tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
+        rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &perp, &kindbuf[x], &texbuf[x], &side);
+        distbuf[x] = perp;
 
         fix inv_perp = recip(perp);
         int h = projected_height_from_inv(inv_perp);     /* slice height px */

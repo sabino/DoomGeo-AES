@@ -7,8 +7,8 @@ after the current documentation pass.
 
 - Keep checking HUD number and ammo-counter alignment against fresh screenshots
   whenever status-bar assets or weapon placement change.
-- Keep the current safer near-wall clamp unless a better close-wall strategy is
-  proven visually.
+- Keep the current safer near-wall clamp unless the WAD render-line refinement
+  proves a better close-wall strategy visually.
 - Recheck weapon vertical placement after the HUD number pass so the gun and
   status face do not visually fight each other.
 - Keep checking shotgun fire and pump frames against combat smoke captures;
@@ -44,7 +44,12 @@ after the current documentation pass.
 - Tune the first cached perspective floor/ceiling pass: reduce noise, improve
   movement phase choices, and keep uploads inside the Neo Geo sprite/vblank
   budget.
-- Investigate a higher-fidelity wall path using the generated seg/node data.
+- Extend the current WAD render-line refinement into a true higher-fidelity
+  path using generated seg/node data.
+- Add sector-aware upper/lower wall spans, two-sided windows, and multiple
+  clipped spans; these are the main remaining reasons the native Doom E1M1
+  start view does not match exactly even though the same map and player start
+  are loaded.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or
