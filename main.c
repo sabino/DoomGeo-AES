@@ -276,6 +276,7 @@ static u8  key_message_visible = 0;
 static u8  missing_key_bits = 0;
 static u8  monster_ai_tick = 0;
 static u8  projectile_active = 0;
+static u8  projectile_from_player = 0;
 static u16 projectile_type = 0;
 static u8  projectile_timer = 0;
 static u8  projectile_damage = 0;
@@ -1245,7 +1246,6 @@ static void damage_shotgun_spread(void) {
 
 static void damage_bfg_visible_targets(void) {
     int primary = best_visible_enemy();
-    spawn_weapon_impact_for_target(primary);
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
@@ -1386,8 +1386,34 @@ static u8 spawn_monster_projectile(int thing, u16 type, u8 damage) {
     projectile_timer = (u8)steps;
     projectile_type = type;
     projectile_damage = damage;
+    projectile_from_player = 0;
     projectile_active = 1;
     return 1;
+}
+
+static u8 spawn_player_projectile(u16 type, u8 timer) {
+    int px, py, dir_x, dir_y, plane_x, plane_y;
+    if (projectile_active) return 0;
+    rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    projectile_x_q8 = (short)(px + ((dir_x * WORLD_Q8(192)) >> 8));
+    projectile_y_q8 = (short)(py + ((dir_y * WORLD_Q8(192)) >> 8));
+    projectile_dx_q8 = (short)((dir_x * WORLD_Q8(96)) >> 8);
+    projectile_dy_q8 = (short)((dir_y * WORLD_Q8(96)) >> 8);
+    projectile_timer = timer;
+    projectile_type = type;
+    projectile_damage = 0;
+    projectile_from_player = 1;
+    projectile_active = 1;
+    return 1;
+}
+
+static void detonate_player_projectile(void) {
+    spawn_impact_effect(projectile_x_q8, projectile_y_q8, 12);
+    if (projectile_type == 9007) damage_bfg_visible_targets();
+    projectile_active = 0;
+    projectile_from_player = 0;
+    hide_enemies();
 }
 
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer) {
@@ -1414,6 +1440,7 @@ static void update_projectile(void) {
     if (!projectile_active) return;
     if (!game_active()) {
         projectile_active = 0;
+        projectile_from_player = 0;
         return;
     }
     if (projectile_type == 9000 && projectile_damage == 0) {
@@ -1424,20 +1451,27 @@ static void update_projectile(void) {
     projectile_x_q8 = (short)(projectile_x_q8 + projectile_dx_q8);
     projectile_y_q8 = (short)(projectile_y_q8 + projectile_dy_q8);
     if (map_at(projectile_x_q8 >> 8, projectile_y_q8 >> 8)) {
+        if (projectile_from_player) {
+            detonate_player_projectile();
+            return;
+        }
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         projectile_active = 0;
         return;
     }
     visible = project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8);
     rc_player_q8(&px, &py);
-    if (iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
+    if (!projectile_from_player && iabs16(px - projectile_x_q8) <= WORLD_Q8(112) && iabs16(py - projectile_y_q8) <= WORLD_Q8(112)) {
         spawn_impact_effect(projectile_x_q8, projectile_y_q8, 8);
         if (visible) player_take_damage(projectile_damage);
         projectile_active = 0;
         return;
     }
     if (projectile_timer) projectile_timer--;
-    if (!projectile_timer) projectile_active = 0;
+    if (!projectile_timer) {
+        if (projectile_from_player) detonate_player_projectile();
+        else projectile_active = 0;
+    }
 }
 
 static u8 update_close_monster_melee(void) {
@@ -2938,7 +2972,10 @@ static void update_weapon(u8 pressed) {
                 fire_timer = 28;
                 trigger_weapon_flash();
                 alert_monsters_by_sound();
-                damage_bfg_visible_targets();
+                if (!spawn_player_projectile(9007, 26)) {
+                    spawn_weapon_impact_for_target(best_visible_enemy());
+                    damage_bfg_visible_targets();
+                }
             } else {
                 ammo_message_timer = 45;
             }
@@ -3296,6 +3333,7 @@ static void restart_level(void) {
     monster_path_valid = 0;
     monster_path_timer = 0;
     projectile_active = 0;
+    projectile_from_player = 0;
     projectile_type = 0;
     projectile_timer = 0;
     projectile_damage = 0;

@@ -65,7 +65,9 @@ readable.
   visible nearby targets.
 - Shotgun uses spread damage and can hit multiple visible targets.
 - Rocket launcher tracks rockets separately and applies compact splash damage.
-- BFG spends 40 cells and applies heavy damage to visible rendered targets.
+- BFG spends 40 cells, launches a visible forward projectile using the current
+  baked fireball sprite path, then detonates into heavy damage on visible
+  rendered targets.
 - Empty weapon fire shows an ammo message and can auto-select a weapon with
   usable ammo.
 - The C-button weapon cycle now prefers weapons that are both owned and ready
