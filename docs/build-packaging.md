@@ -77,6 +77,12 @@ For a real converted E1M1 monster visibility pass, run
 `make encounter-test-gngeo`, and captures both the initial focused encounter and
 one pistol-fire frame against an existing WAD-derived shotgun guy.
 
+For an invisible-attacker regression pass, run `tools/smoke_hidden_attack.sh`.
+It builds `make hidden-attack-test-rom`, launches `make hidden-attack-test-gngeo`,
+and captures both the initial frame and a delayed frame. The delayed frame should
+still show the same health value, proving hidden or offscreen monsters cannot
+damage the player without a readable world-sprite slot.
+
 For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
 `make death-test-rom`, launches `make death-test-gngeo`, and captures the staged
 shareware corpse sprites plus the dropped shotgun pickup above the status bar.

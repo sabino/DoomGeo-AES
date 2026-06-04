@@ -151,6 +151,13 @@ readable.
 - `tools/smoke_e1m1_encounter.sh` captures the initial focused E1M1 encounter
   frame and a fired frame under `.tools/screens/latest`, giving a regression
   check for real converted monster visibility in the normal E1M1 data.
+- `make hidden-attack-test-rom` and `make hidden-attack-test-gngeo` build a
+  readable-slot regression ROM. It places an awake shotgun guy outside the
+  readable view and freezes its movement, so the HUD health value must stay
+  unchanged unless hidden or offscreen enemies can still damage the player.
+- `tools/smoke_hidden_attack.sh` captures that ROM at boot and again after a
+  short wait. The delayed frame should show no readable monster and unchanged
+  health, proving combat pressure is tied to visible world-sprite slots.
 - `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
   combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
   chainsaw, and places a visible imp inside the corrected player melee range.

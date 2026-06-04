@@ -46,6 +46,10 @@ drawing pixels.
 | --- | --- |
 | ![Focused E1M1 verification ROM with a real converted shotgun guy visible from its WAD placement](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Focused E1M1 verification ROM after one pistol shot against the real converted shotgun guy](docs/screenshots/doomgeo-aes-e1m1-encounter-fired.png) |
 
+| Hidden-attack regression |
+| --- |
+| ![Hidden-attack regression ROM after a wait with unchanged health and no readable monster](docs/screenshots/doomgeo-aes-hidden-attack.png) |
+
 | Melee test ROM | Monster gallery ROM |
 | --- | --- |
 | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
