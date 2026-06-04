@@ -22,10 +22,9 @@ after the current documentation pass.
   by testing a registered/commercial WAD path.
 - Improve plasma/BFG fidelity: projectile visuals, BFG trace behavior, and
   visible pickup sprites when the source WAD provides them.
-- Complete enemy sprite coverage beyond the current A/B rotation groups plus
-  front-facing attack/pain/death frames: mirrored back angles, full death
-  rotations, richer attack/pain angles, and more faithful thing placement still
-  need work.
+- Complete enemy sprite coverage beyond the current A/B eight-way walk rotation
+  groups plus front-facing attack/pain/death frames: full death rotations,
+  richer attack/pain angles, and more faithful thing placement still need work.
 - Continue tuning line-of-sight, wall-depth fallback, and encounter placement
   now that monster tiles fit inside the visible C-ROM tile range. Normal builds
   now preserve converted WAD monster placement; use

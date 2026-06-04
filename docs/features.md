@@ -130,8 +130,11 @@ readable.
   simplified movement/attack behavior until their dedicated rules are ported.
 - Supported Doom, registered, and Doom II monsters now bake A/B walk frames
   across the available Doom angle groups when the source WAD contains those
-  sprite lumps. Runtime sprite selection tracks a coarse monster-facing vector
-  so visible enemies are no longer locked to a single front-facing frame.
+  sprite lumps. Doom combined mirror lumps such as `TROOA2A8` are expanded
+  offline into both normal and mirrored Neo Geo sprite strips, and runtime
+  selection can choose all eight Doom rotation buckets from the coarse
+  monster-facing vector instead of collapsing enemies onto the front/one-side
+  frames.
 - The same monsters also bake front-facing attack frames where the WAD provides
   them. A short runtime attack timer swaps the visible sprite to those frames
   when a monster fires, throws a projectile, or bites.

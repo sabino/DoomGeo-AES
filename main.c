@@ -999,10 +999,10 @@ static u8 monster_view_angle_bucket(int thing_index) {
     cross = face_x * to_y - face_y * to_x;
     abs_cross = iabs16(cross);
     if (dot > abs_cross * 2) return 1;
-    if (dot > 0) return 2;
-    if (-dot < abs_cross) return 3;
+    if (dot > 0) return cross >= 0 ? 2 : 8;
+    if (-dot < abs_cross) return cross >= 0 ? 3 : 7;
     if (dot < -(abs_cross * 2)) return 5;
-    return 4;
+    return cross >= 0 ? 4 : 6;
 }
 
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index) {

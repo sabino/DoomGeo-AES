@@ -945,7 +945,7 @@ def hud_small_digit_tiles(iwad, zip_member):
     return tiles, palette, "+".join(sources)
 
 
-def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
+def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x=False):
     if not iwad:
         return [], [], [], start_tile
 
@@ -982,6 +982,8 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile):
                         if dx >= dst_w:
                             continue
                         sx = min(src_w - 1, int(dx / scale))
+                        if flip_x:
+                            sx = src_w - 1 - sx
                         tile[y][x] = quantize_color(patch[sy][sx], playpal, palette)
                 tiles.append(tile)
         next_tile += strips * rows
@@ -1003,7 +1005,12 @@ def parse_monster_sprites(spec):
         if angle < 0:
             suffix = frame[4:]
             angle = next((int(ch) for ch in suffix if ch.isdigit()), 0)
-        result.append((int(thing_type), angle, frame))
+        result.append((int(thing_type), angle, frame, False))
+        suffix = frame[4:]
+        if len(suffix) >= 4 and suffix[0] == suffix[2] and suffix[1].isdigit() and suffix[3].isdigit():
+            mirror_angle = int(suffix[3])
+            if mirror_angle != angle:
+                result.append((int(thing_type), mirror_angle, frame, True))
     return result
 
 
@@ -1013,15 +1020,15 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     metas = []
     palettes = []
     next_tile = SPRITE_CACHE_BASE
-    for thing_type, angle, frame in specs:
+    for thing_type, angle, frame, flip_x in specs:
         first_scale = len(metas)
-        frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile)
+        frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x)
         if not frame_meta:
             continue
         tiles.extend(frame_tiles)
         metas.extend(frame_meta)
         palettes.append(palette)
-        defs.append((thing_type, angle, first_scale, len(frame_meta), frame))
+        defs.append((thing_type, angle, first_scale, len(frame_meta), frame + ("-mirror" if flip_x else "")))
     return tiles, defs, metas, palettes
 
 

@@ -32,10 +32,11 @@ def main() -> int:
     _tiles, defs, _metas, _palettes = gen_gfx.monster_sprite_tiles(
         args.iwad, args.zip_member, specs, [1.0]
     )
-    found = {frame for _thing_type, _angle, _first_scale, _scale_count, frame in defs}
-    missing = [frame for _thing_type, _angle, frame in specs if frame not in found]
+    found = {frame.replace("-mirror", "") for _thing_type, _angle, _first_scale, _scale_count, frame in defs}
+    found_defs = sum(1 for _thing_type, _angle, frame, _flip_x in specs if frame in found)
+    missing = [frame for _thing_type, _angle, frame, _flip_x in specs if frame not in found]
 
-    print(f"checked={len(specs)} found={len(found)} missing={len(missing)}")
+    print(f"checked={len(specs)} found={found_defs} missing={len(missing)}")
     if found:
         print("found=" + ",".join(sorted(found)))
     if missing:
