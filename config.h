@@ -12,8 +12,38 @@
 /* ---- column resolution ----------------------------------------------
  * NUM_COLS wall columns, each COLW pixels wide. COLW must divide SCRW.
  * Sprite horizontal width = HSHRINK+1, so HSHRINK = COLW-1.
+ *
+ * The tiers follow the Doom8088-style detail trade. Clarity spends the sprite
+ * budget on walls first because navigation readability is the main bottleneck.
  */
-#define NUM_COLS 40                 /* 8px wall strips: closer to original NGRayEx smoothness */
+#if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
+#define DOOM_DETAIL_CLARITY 1
+#endif
+
+#if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
+#error "Select exactly one Doom detail tier"
+#endif
+#if defined(DOOM_DETAIL_QUALITY) && (defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
+#error "Select exactly one Doom detail tier"
+#endif
+#if defined(DOOM_DETAIL_BALANCED) && defined(DOOM_DETAIL_SPEED)
+#error "Select exactly one Doom detail tier"
+#endif
+
+#if defined(DOOM_DETAIL_CLARITY)
+#define NUM_COLS 64                 /* 5px wall strips: readable navigation */
+#elif defined(DOOM_DETAIL_BALANCED)
+#define NUM_COLS 32                 /* 10px wall strips: frees eight sprites */
+#elif defined(DOOM_DETAIL_SPEED)
+#define NUM_COLS 20                 /* 16px wall strips: fastest stable tier */
+#else
+#define NUM_COLS 40                 /* 8px wall strips: closest to original NGRayEx smoothness */
+#endif
+
+#if (SCRW % NUM_COLS) != 0
+#error "NUM_COLS must divide SCRW"
+#endif
+
 #define COLW     (SCRW / NUM_COLS)
 #define HSHRINK  (COLW - 1)        
  
@@ -35,12 +65,21 @@
 #define BG_WIN    (GAME_H / 16)     
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 /*
- * Runtime sprite budget on active playfield scanlines:
- *   20 backdrop + 40 wall columns + 28 thing strips + 7 weapon strips = 95.
- * Neo Geo evaluates 96 sprites per scanline, so this leaves enough headroom
- * for several visible Doom things while keeping the weapon in front.
+ * Runtime sprite budget on active playfield scanlines depends on DOOM_DETAIL.
+ * The default clarity tier uses 20 backdrop + 64 wall columns + 4 thing strips
+ * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
+ * tier keeps the weapon in front while staying inside the practical budget.
  */
+#if defined(DOOM_DETAIL_CLARITY)
+#define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 thing + 7 weapon = 95 */
+#elif defined(DOOM_DETAIL_BALANCED)
+#define ENEMY_VISIBLE_COUNT 9
+#elif defined(DOOM_DETAIL_SPEED)
+#define ENEMY_VISIBLE_COUNT 11
+#else
 #define ENEMY_VISIBLE_COUNT 7
+#endif
+
 #define ENEMY_STRIPS 4
 #define ENEMY_BASE   (WALL_BASE + NUM_COLS)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
@@ -50,6 +89,15 @@
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   8
 #define WEAPON_Y_OFFSET 0
+#define DOOM_PLAYFIELD_SPRITE_COUNT (BG_COUNT + NUM_COLS + ENEMY_COUNT + WEAPON_COUNT)
+#define DOOM_PLAYFIELD_SCANLINE_LIMIT 95
+#if DOOM_PLAYFIELD_SPRITE_COUNT > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#error "Active playfield sprites exceed the Neo Geo scanline budget"
+#endif
+#if (WEAPON_BASE + WEAPON_COUNT - 1) > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#error "Weapon sprites must stay inside the first 95 active playfield sprites"
+#endif
+
 #define HUD_BASE  (WEAPON_BASE + WEAPON_COUNT)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
@@ -69,7 +117,11 @@
 #define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
 #define TILE_WALL_ATLAS_BASE 3
+#if defined(DOOM_DETAIL_CLARITY)
+#define TILE_WALL_ATLAS_COLS 32     /* denser texture phase sampling for close walls */
+#else
 #define TILE_WALL_ATLAS_COLS 16
+#endif
 #define TILE_WALL_ATLAS_ROWS WALL_WIN
 #define TILE_WALL_ATLAS_TILES (TILE_WALL_ATLAS_COLS * TILE_WALL_ATLAS_ROWS)
 #define TILE_WALL_ALT_COUNT 7
@@ -78,7 +130,11 @@
 #define TILE_FLAT_COLS 16
 #define TILE_FLAT_ROWS 16
 #define TILE_FLAT_TILES (TILE_FLAT_COLS * TILE_FLAT_ROWS)
+#if defined(DOOM_DETAIL_CLARITY)
+#define TILE_PLANE_PERSPECTIVE_DIRS 4
+#else
 #define TILE_PLANE_PERSPECTIVE_DIRS 16
+#endif
 #define TILE_PLANE_PERSPECTIVE_PHASES 1
 #define TILE_PLANE_PERSPECTIVE_ROWS BG_SPLIT
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT

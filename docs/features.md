@@ -20,8 +20,9 @@ readable.
 
 ## Rendering
 
-- 40 wall-column sprites cover the 320-pixel screen in 8-pixel logical columns
-  backed by 16-pixel Neo Geo strips.
+- The default `DOOM_DETAIL=clarity` renderer uses 64 wall-column sprites over
+  the 320-pixel playfield, giving 5-pixel logical columns backed by 16-pixel
+  Neo Geo strips. This is the readability-first mode for normal play.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
@@ -36,27 +37,35 @@ readable.
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- This renderer spends more sprite budget on wall fidelity than the older
-  20-column pass while holding seven visible world-thing slots for monsters,
-  pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline
-  limit.
+- The default renderer spends almost the entire active playfield sprite budget
+  on wall fidelity: 20 backdrop strips, 64 wall columns, one 4-strip world
+  thing, and seven weapon strips fit exactly within the first 95 active sprites.
+  Alternate build tiers are available when a test scene needs more simultaneous
+  visible things: `DOOM_DETAIL=quality` uses 40 wall columns and seven world
+  things, `balanced` uses 32 columns and nine things, and `speed` uses 20
+  columns and eleven things.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
-  tile strips. The current preferred wall texture is `STARTAN3`, with alternate
-  atlases for common E1M1 walls and `BIGDOOR2` doors.
+  tile strips. In clarity mode the wall, alternate-wall, and door atlases use
+  32 texture-phase columns for closer-range readability; the other detail tiers
+  keep the older 16-column atlases. The current preferred wall texture is
+  `STARTAN3`, with alternate atlases for common E1M1 walls and `BIGDOOR2`
+  doors.
 - Floor and ceiling use compact pre-baked perspective tile caches selected by
-  player direction and coarse position. The runtime wraps those tile columns
-  incrementally over several frames so movement reads less static without
-  spending one full vblank on plane uploads. The direction bucket is cached and
-  recalculated only when the view vector changes, so straight movement keeps the
-  cheaper scroll update path. Plane column uploads compute ceiling/floor
-  direction bases once per updater pass, add the wrapped column inside the
-  upload loop, and step row addresses by the generated cache width instead of
-  rebuilding the full perspective index for every tile. The background path
-  also asks the raycaster only for the facing vector and wraps coarse scroll with
-  bounded subtracts before deciding whether to upload columns. This is a
-  compromise, not true Doom span rendering; the cache is deliberately kept small
-  so monster and pickup sprite tiles stay inside the visible Neo Geo C-ROM tile
-  range.
+  player direction and coarse position. Clarity mode uses four direction buckets
+  to free C-ROM and sprite-tile headroom for the denser wall atlases; the other
+  detail tiers keep the older 16-direction plane cache. The runtime wraps those
+  tile columns incrementally over several frames so movement reads less static
+  without spending one full vblank on plane uploads. The direction bucket is
+  cached and recalculated only when the view vector changes, so straight
+  movement keeps the cheaper scroll update path. Plane column uploads compute
+  ceiling/floor direction bases once per updater pass, add the wrapped column
+  inside the upload loop, and step row addresses by the generated cache width
+  instead of rebuilding the full perspective index for every tile. The
+  background path also asks the raycaster only for the facing vector and wraps
+  coarse scroll with bounded subtracts before deciding whether to upload
+  columns. This is a compromise, not true Doom span rendering; the cache is
+  deliberately kept small so monster and pickup sprite tiles stay inside the
+  visible Neo Geo C-ROM tile range.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
@@ -164,15 +173,18 @@ readable.
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
   older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- The converter emits compact runtime class/info bytes for every supported
+  thing, so monster, threat, pickup, corpse, shootable, and render eligibility
+  tests can use generated metadata instead of repeated type-switch scans.
 - Before projection and line-of-sight checks, thing selection now applies a
   conservative player-facing prefilter that rejects behind-camera and extremely
   distant candidates. This keeps normal E1M1 visible things intact while
   avoiding expensive projection work for objects that cannot contribute to the
-  seven visible world-sprite slots.
+  configured visible world-sprite slots.
 - Ranged-attack warmup now tracks only the previous and current readable
   world-sprite slots. That replaces another per-frame scan across all converted
-  runtime things with a bounded pass over the seven visible slots plus the
-  previous seven-slot list.
+  runtime things with a bounded pass over the configured visible slots plus the
+  previous-slot list.
 - Combat damage and ranged attack paths reuse resolved runtime thing types
   after cheap coordinate, cooldown, and readability checks, reducing repeated
   per-frame classification work during active fights without changing damage,
@@ -445,11 +457,11 @@ readable.
   of falling back to the first baked enemy, which prevents wrong-looking
   monsters or corrupt placeholder sprites when a WAD lacks optional art.
 - Thing slots are advanced only after a sprite actually renders. Missing,
-  offscreen, or fully clipped sprites no longer consume one of the seven visible
-  world-sprite slots, so the renderer keeps scanning for the next visible
+  offscreen, or fully clipped sprites no longer consume one of the configured
+  visible world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
-- Thing selection keeps an oversized sorted candidate buffer behind those seven
-  visible slots. Edge-clipped or missing-art candidates can fail without
+- Thing selection keeps an oversized sorted candidate buffer behind those
+  configured visible slots. Edge-clipped or missing-art candidates can fail without
   starving later visible monsters in the same pass, which makes combat scenes
   less likely to contain an attacking-but-invisible enemy.
 - Visible thing selection uses separate passes for projectiles, live monsters,

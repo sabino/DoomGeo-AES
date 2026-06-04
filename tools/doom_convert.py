@@ -540,12 +540,49 @@ PICKUP_TYPES = {
     2047,  # cell charge
     2048,  # ammo box
     2049,  # box of shells
-    2035,  # explosive barrel
 }
 
-RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES
+BARREL_TYPES = {2035}
+RUNTIME_THING_TYPES = MONSTER_TYPES | PICKUP_TYPES | BARREL_TYPES
 EXIT_SPECIALS = {11, 51, 52, 124, 197, 198, 243, 244}
 DOOR_SPECIALS = {1, 26, 27, 28, 31, 32, 33, 34, 46, 61, 63, 76, 86, 90, 103, 117, 118}
+
+THING_CLASS_NONE = 0
+THING_CLASS_MONSTER = 1
+THING_CLASS_THREAT = 2
+THING_CLASS_PICKUP = 3
+THING_CLASS_CORPSE = 4
+
+THING_INFO_MONSTER = 0x01
+THING_INFO_THREAT = 0x02
+THING_INFO_PICKUP = 0x04
+THING_INFO_CORPSE = 0x08
+THING_INFO_SHOOTABLE = 0x10
+THING_INFO_RENDER = 0x20
+
+
+def runtime_thing_class(thing_type: int) -> int:
+    if thing_type in MONSTER_TYPES:
+        return THING_CLASS_MONSTER
+    if thing_type in BARREL_TYPES:
+        return THING_CLASS_THREAT
+    if thing_type in PICKUP_TYPES:
+        return THING_CLASS_PICKUP
+    return THING_CLASS_NONE
+
+
+def runtime_thing_info(thing_type: int) -> int:
+    thing_class = runtime_thing_class(thing_type)
+    flags = 0
+    if thing_class == THING_CLASS_MONSTER:
+        flags |= THING_INFO_MONSTER | THING_INFO_THREAT | THING_INFO_SHOOTABLE | THING_INFO_RENDER
+    elif thing_class == THING_CLASS_THREAT:
+        flags |= THING_INFO_THREAT | THING_INFO_SHOOTABLE | THING_INFO_RENDER
+    elif thing_class == THING_CLASS_PICKUP:
+        flags |= THING_INFO_PICKUP | THING_INFO_RENDER
+    elif thing_class == THING_CLASS_CORPSE:
+        flags |= THING_INFO_CORPSE | THING_INFO_RENDER
+    return flags
 
 def line_of_sight_grid(grid: list[list[int]], ax: float, ay: float, bx: float, by: float) -> bool:
     steps = max(1, int(math.hypot(bx - ax, by - ay) * 8))
@@ -691,11 +728,11 @@ def runtime_things(
     start_y: float,
     angle: int,
     skill_mask: int,
-) -> list[tuple[int, int, int, int]]:
+) -> list[tuple[int, int, int, int, int, int]]:
     angle_rad = math.radians(angle)
     dir_x = math.cos(angle_rad)
     dir_y = -math.sin(angle_rad)
-    rows: list[tuple[float, int, int, int, int]] = []
+    rows: list[tuple[float, int, int, int, int, int, int]] = []
     for thing in things:
         if thing.type not in RUNTIME_THING_TYPES:
             continue
@@ -723,9 +760,19 @@ def runtime_things(
         dist = math.hypot(dx, dy)
         los_bonus = -8.0 if forward > 0.25 and line_of_sight_grid(grid, start_x, start_y, gx, gy) else 0.0
         score = dist + lateral * 0.35 + (0.0 if forward > 0 else 8.0) + los_bonus
-        rows.append((score, int(round(gx * 256)), int(round(gy * 256)), thing.type, thing.flags))
+        rows.append(
+            (
+                score,
+                int(round(gx * 256)),
+                int(round(gy * 256)),
+                thing.type,
+                thing.flags,
+                runtime_thing_class(thing.type),
+                runtime_thing_info(thing.type),
+            )
+        )
     rows.sort(key=lambda row: row[0])
-    return [(x, y, typ, flags) for _score, x, y, typ, flags in rows]
+    return [(x, y, typ, flags, thing_class, info) for _score, x, y, typ, flags, thing_class, info in rows]
 
 
 def runtime_exits(
@@ -905,6 +952,13 @@ def emit_header(
         f.write(f"#define NG_RUNTIME_DOOR_COUNT {len(doors)}\n\n")
         f.write(f"#define NG_RENDER_LINE_COUNT {len(render_line_rows)}\n\n")
         f.write(f"#define NG_RENDER_CELL_REF_COUNT {len(render_cell_refs)}\n\n")
+        f.write("#define NG_RUNTIME_THING_INFO_GENERATED 1\n")
+        f.write(f"#define NG_THING_INFO_MONSTER 0x{THING_INFO_MONSTER:02x}\n")
+        f.write(f"#define NG_THING_INFO_THREAT 0x{THING_INFO_THREAT:02x}\n")
+        f.write(f"#define NG_THING_INFO_PICKUP 0x{THING_INFO_PICKUP:02x}\n")
+        f.write(f"#define NG_THING_INFO_CORPSE 0x{THING_INFO_CORPSE:02x}\n")
+        f.write(f"#define NG_THING_INFO_SHOOTABLE 0x{THING_INFO_SHOOTABLE:02x}\n")
+        f.write(f"#define NG_THING_INFO_RENDER 0x{THING_INFO_RENDER:02x}\n\n")
         f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n")
         f.write("#define MAP_RUNTIME_OPEN_BYTES MAP_SECRET_BYTES\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
@@ -967,8 +1021,20 @@ def emit_header(
             f.write("},\n")
         f.write("};\n\n")
         f.write("static const NgRuntimeThing g_runtime_things[NG_RUNTIME_THING_COUNT] = {\n")
-        for x_q8, y_q8, typ, flags in things:
+        for x_q8, y_q8, typ, flags, _thing_class, _info in things:
             f.write(f"    {{{x_q8},{y_q8},{typ},0x{flags & 0xffff:04x}}},\n")
+        f.write("};\n\n")
+        f.write("static const unsigned char g_runtime_thing_class[NG_RUNTIME_THING_COUNT] = {\n")
+        for i in range(0, len(things), 24):
+            f.write("    ")
+            f.write(",".join(str(thing_class) for *_rest, thing_class, _info in things[i : i + 24]))
+            f.write(",\n")
+        f.write("};\n\n")
+        f.write("static const unsigned char g_runtime_thing_info[NG_RUNTIME_THING_COUNT] = {\n")
+        for i in range(0, len(things), 24):
+            f.write("    ")
+            f.write(",".join(f"0x{info:02x}" for *_rest, _thing_class, info in things[i : i + 24]))
+            f.write(",\n")
         f.write("};\n\n")
         f.write("static const NgRuntimeExit g_runtime_exits[NG_RUNTIME_EXIT_COUNT] = {\n")
         for x_q8, y_q8, special in exits:

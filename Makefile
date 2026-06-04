@@ -43,6 +43,7 @@ DOOM_MAP_WIDTH?=76
 DOOM_MAP_HEIGHT?=54
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
+DOOM_DETAIL?=clarity
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
@@ -51,6 +52,19 @@ GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
 CUSTOM_GENERATE_TARGETS+=doom-assets
+
+ifeq ($(DOOM_DETAIL),clarity)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_CLARITY=1
+else ifeq ($(DOOM_DETAIL),quality)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_QUALITY=1
+else ifeq ($(DOOM_DETAIL),balanced)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_BALANCED=1
+else ifeq ($(DOOM_DETAIL),speed)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_SPEED=1
+else
+$(error DOOM_DETAIL must be clarity, quality, balanced, or speed)
+endif
+override CFLAGS += $(DOOM_DETAIL_DEFINE)
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
@@ -100,7 +114,7 @@ $(FACE_TEST_ASSET_ROM):
 	mkdir -p $@
 
 $(FACE_TEST_GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(FACE_TEST_ASSET_ROM)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
 	touch $@
 
 $(FACE_TEST_PROM): $(FACE_TEST_ELF) | $(FACE_TEST_ROM)
@@ -232,7 +246,7 @@ melee-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/melee-test-rom $(GAMEROM)
 
 monster-gallery-rom:
-	$(MAKE) cart BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
 	cp $(ROM)/neogeo.zip build/monster-gallery-rom/neogeo.zip
 
 monster-gallery-gngeo:
@@ -240,7 +254,7 @@ monster-gallery-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/monster-gallery-rom $(GAMEROM)
 
 arsenal-test-rom:
-	$(MAKE) cart BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
 	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip
 
 arsenal-test-gngeo:
@@ -248,7 +262,7 @@ arsenal-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
 
 death-test-rom:
-	$(MAKE) cart BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
 	cp $(ROM)/neogeo.zip build/death-test-rom/neogeo.zip
 
 death-test-gngeo:
@@ -256,7 +270,7 @@ death-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
 powerup-test-rom:
-	$(MAKE) cart BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 	cp $(ROM)/neogeo.zip build/powerup-test-rom/neogeo.zip
 
 powerup-test-gngeo:
@@ -366,7 +380,7 @@ $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
 
 $(GFX_ROM_DIR):

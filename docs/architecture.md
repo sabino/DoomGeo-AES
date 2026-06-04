@@ -33,6 +33,9 @@ and emits generated C headers/sources under `build/`:
 - Door/exit trigger tables.
 - Damage and secret bit grids.
 - Runtime thing list with supported Doom thing types.
+- Runtime thing class/info bytes for monster, threat, pickup, corpse,
+  shootable, and render predicates, so the 68000 can test generated metadata
+  instead of repeatedly classifying Doom type numbers.
 - Full compact arrays for vertices, linedefs, sidedefs, sectors, segs,
   subsectors, nodes, reject, and blockmap for future higher-fidelity work.
 
@@ -50,6 +53,10 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 
 - Doom wall textures are precomposed from `TEXTURE1`/`PNAMES`/patches into tile
   strip atlases.
+- The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
+  clarity mode emits 32-phase wall/door atlases and a four-direction plane
+  cache, while quality/balanced/speed keep the 16-phase wall atlases and
+  16-direction plane cache.
 - Doom flats are sampled into tile banks and perspective plane caches.
 - Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
@@ -84,9 +91,11 @@ current runtime accepts several compromises:
   spans.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The current runtime uses a 40-column wall pass with seven 4-strip world things
-  so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit.
+  The default clarity runtime uses a 64-column wall pass with one 4-strip world
+  thing so walls, backdrop, weapon, and HUD stay inside the practical
+  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` restores the older
+  40-column/seven-thing trade, while `balanced` and `speed` progressively spend
+  fewer sprites on walls and more on visible world things.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as

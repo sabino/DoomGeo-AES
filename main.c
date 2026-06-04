@@ -914,17 +914,29 @@ static void init_runtime_things(void) {
     thing_pickup_count = 0;
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u8 thing_class;
+        u8 thing_info;
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
+#if NG_RUNTIME_THING_INFO_GENERATED
+        thing_class = g_runtime_thing_class[i];
+        thing_info = g_runtime_thing_info[i];
+#else
         thing_class = thing_render_class(g_runtime_things[i].type);
+        thing_info = 0;
+        if (thing_class != THING_CLASS_NONE) thing_info |= NG_THING_INFO_RENDER;
+        if (thing_class == THING_CLASS_MONSTER) thing_info |= NG_THING_INFO_MONSTER | NG_THING_INFO_SHOOTABLE;
+        if (thing_class == THING_CLASS_THREAT) thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
+        if (thing_class == THING_CLASS_PICKUP) thing_info |= NG_THING_INFO_PICKUP;
+#endif
         thing_static_class[i] = thing_class;
-        if (thing_class != THING_CLASS_NONE) index_render_candidate((u16)i);
-        if (thing_class == THING_CLASS_MONSTER) {
+        if (thing_info & NG_THING_INFO_RENDER) index_render_candidate((u16)i);
+        if (thing_info & NG_THING_INFO_MONSTER) {
             index_monster_candidate((u16)i);
+        }
+        if (thing_info & NG_THING_INFO_SHOOTABLE) {
             index_shootable_candidate((u16)i);
-        } else if (thing_class == THING_CLASS_THREAT) {
-            index_shootable_candidate((u16)i);
-        } else if (thing_class == THING_CLASS_PICKUP) {
+        }
+        if (thing_info & NG_THING_INFO_PICKUP) {
             index_pickup_candidate((u16)i);
         }
     }
@@ -4059,7 +4071,7 @@ static void disable_sprites(void) {
  * columns so the planes move with the camera without runtime floor casting.
  */
 static u8 plane_direction_bucket(int dir_x, int dir_y) {
-    static const short dirs[TILE_PLANE_PERSPECTIVE_DIRS][2] = {
+    static const short dirs[16][2] = {
         { 256,    0}, { 237,   98}, { 181,  181}, {  98,  237},
         {   0,  256}, { -98,  237}, {-181,  181}, {-237,   98},
         {-256,    0}, {-237,  -98}, {-181, -181}, { -98, -237},
@@ -4067,14 +4079,14 @@ static u8 plane_direction_bucket(int dir_x, int dir_y) {
     };
     long best_dot = -2147483647L;
     u8 best = 0;
-    for (u8 i = 0; i < TILE_PLANE_PERSPECTIVE_DIRS; i++) {
+    for (u8 i = 0; i < 16; i++) {
         long dot = (long)dir_x * dirs[i][0] + (long)dir_y * dirs[i][1];
         if (dot > best_dot) {
             best_dot = dot;
             best = i;
         }
     }
-    return best;
+    return (u8)(((u16)best * TILE_PLANE_PERSPECTIVE_DIRS) >> 4);
 }
 
 static u8 wrap_background_scroll(int scroll) {
@@ -4749,29 +4761,45 @@ static u8 thing_render_bucket(u16 thing_type) {
 static u8 runtime_thing_is_monster(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_monster(thing_type_override[thing_index]);
+#if NG_RUNTIME_THING_INFO_GENERATED
+    return (g_runtime_thing_info[thing_index] & NG_THING_INFO_MONSTER) != 0;
+#else
     return thing_static_class[thing_index] == THING_CLASS_MONSTER;
+#endif
 }
 
 static u8 runtime_thing_is_pickup(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_pickup(thing_type_override[thing_index]);
+#if NG_RUNTIME_THING_INFO_GENERATED
+    return (g_runtime_thing_info[thing_index] & NG_THING_INFO_PICKUP) != 0;
+#else
     return thing_static_class[thing_index] == THING_CLASS_PICKUP;
+#endif
 }
 
 static u8 runtime_thing_is_threat(int thing_index) {
     u8 thing_class;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_runtime_threat(thing_type_override[thing_index]);
+#if NG_RUNTIME_THING_INFO_GENERATED
+    return (g_runtime_thing_info[thing_index] & NG_THING_INFO_THREAT) != 0;
+#else
     thing_class = thing_static_class[thing_index];
     return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
+#endif
 }
 
 static u8 runtime_thing_is_shootable(int thing_index) {
     u8 thing_class;
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
     if (thing_type_override[thing_index]) return thing_is_shootable(thing_type_override[thing_index]);
+#if NG_RUNTIME_THING_INFO_GENERATED
+    return (g_runtime_thing_info[thing_index] & NG_THING_INFO_SHOOTABLE) != 0;
+#else
     thing_class = thing_static_class[thing_index];
     return thing_class == THING_CLASS_MONSTER || thing_class == THING_CLASS_THREAT;
+#endif
 }
 
 static u8 runtime_thing_render_bucket(int thing_index, u16 *thing_type) {
