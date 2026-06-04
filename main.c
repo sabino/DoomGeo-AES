@@ -420,6 +420,7 @@ static u8  enemy_hit_flash[NG_RUNTIME_THING_COUNT];
 static u8  enemy_awake[NG_RUNTIME_THING_COUNT];
 static u8  enemy_attack_cooldown[NG_RUNTIME_THING_COUNT];
 static u8  enemy_attack_anim[NG_RUNTIME_THING_COUNT];
+static u8  enemy_ranged_readable_ticks[NG_RUNTIME_THING_COUNT];
 static u8  enemy_hidden_timer[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_x[NG_RUNTIME_THING_COUNT];
 static signed char monster_face_y[NG_RUNTIME_THING_COUNT];
@@ -1920,6 +1921,7 @@ static u8 update_close_monster_melee(void) {
 }
 
 static void update_monster_damage(void) {
+    enum { RANGED_READABLE_WARMUP = 6 };
     if (hurt_timer) {
         hurt_timer--;
         return;
@@ -1935,6 +1937,7 @@ static void update_monster_damage(void) {
         if (enemy_hit_flash[thing]) continue;
         if (enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_can_ranged_attack(slot)) continue;
+        if (enemy_ranged_readable_ticks[thing] < RANGED_READABLE_WARMUP) continue;
         ranged_damage = monster_ranged_damage(runtime_thing_type(thing));
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
             && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
@@ -4224,6 +4227,25 @@ static int render_visible_impact(int found) {
     return found;
 }
 
+static void update_enemy_ranged_readiness(void) {
+    for (u16 thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+        u8 readable = 0;
+        if (!enemy_dead[thing] && thing_is_monster(runtime_thing_type(thing))) {
+            for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+                if (enemies[slot].thing_index == thing && enemy_slot_can_ranged_attack(slot)) {
+                    readable = 1;
+                    break;
+                }
+            }
+        }
+        if (readable) {
+            if (enemy_ranged_readable_ticks[thing] < 255) enemy_ranged_readable_ticks[thing]++;
+        } else {
+            enemy_ranged_readable_ticks[thing] = 0;
+        }
+    }
+}
+
 static void update_enemy(void) {
     int found = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) enemies[slot].thing_index = -1;
@@ -4236,6 +4258,7 @@ static void update_enemy(void) {
     found = select_visible_things(found, 5);
     found = render_visible_impact(found);
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
+    update_enemy_ranged_readiness();
 }
 
 static void restart_level(void) {
@@ -4348,6 +4371,7 @@ static void restart_level(void) {
         enemy_awake[i] = 0;
         enemy_attack_cooldown[i] = 0;
         enemy_attack_anim[i] = 0;
+        enemy_ranged_readable_ticks[i] = 0;
         enemy_hidden_timer[i] = 0;
         monster_face_x[i] = 0;
         monster_face_y[i] = 1;

@@ -210,6 +210,10 @@ readable.
   targeting: enough of the sprite must be clipped inside the screen, tall
   enough to read, and near the forward view before it can fire. Edge slices can
   still be drawn and shot, but they no longer start hitscan/projectile attacks.
+- Ranged attacks also require several consecutive readable frames. Briefly
+  clipping past a monster or seeing a one-frame projection is not enough for an
+  instant hit; the enemy must remain readable before hitscan/projectile fire
+  can begin.
   Monsters drawn through the coarse line-of-sight projection fallback are
   allowed to remain visible, but their ranged attacks are held until the sprite
   is large enough to read clearly.
