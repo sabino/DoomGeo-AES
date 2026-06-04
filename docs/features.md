@@ -179,9 +179,11 @@ readable.
   and attack gating tied to sprites the player can actually see.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
-  into corpse frames or drops where implemented. Hell Knights and cacodemons now
-  keep visible corpse/death feedback when their registered/commercial sprite
-  lumps are available.
+  into corpse frames or drops where implemented. Shareware former humans,
+  shotgun guys, imps, demons/spectres, and Barons now include the extra late
+  death frame before the final corpse, so kills read closer to Doom's original
+  animation cadence. Hell Knights and cacodemons keep visible corpse/death
+  feedback when their registered/commercial sprite lumps are available.
 - Former humans and shotgun guys now spawn separate dynamic clip/shotgun drops,
   so their corpse remains visible while the dropped pickup can still be
   collected. These dynamic drops do not increase the map item-completion

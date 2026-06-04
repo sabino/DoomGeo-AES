@@ -670,7 +670,7 @@ static u8 thing_is_runtime_threat(u16 thing_type) {
 
 static u8 thing_is_corpse(u16 thing_type) {
     return (thing_type >= 9001 && thing_type <= 9005) || thing_type == 9009
-        || (thing_type >= 9010 && thing_type <= 9031);
+        || (thing_type >= 9010 && thing_type <= 9036);
 }
 
 static u8 thing_is_shootable(u16 thing_type) {
@@ -869,6 +869,7 @@ static u16 monster_death_anim_type(u16 thing_type) {
 
 static u16 death_anim_next_stage_type(u16 thing_type) {
     if (thing_type >= 9010 && thing_type <= 9019) return (u16)(thing_type + 5);
+    if (thing_type >= 9020 && thing_type <= 9024) return (u16)(9032 + (thing_type - 9020));
     if (thing_type == 9025) return 9026;
     if (thing_type == 9026) return 9027;
     if (thing_type == 9029) return 9030;
@@ -1381,7 +1382,7 @@ static void update_enemy_hit_flash(void) {
         }
         if (death_anim_timer[i]) {
             death_anim_timer[i]--;
-            if (death_anim_timer[i] == 12 || death_anim_timer[i] == 6) {
+            if (death_anim_timer[i] == 15 || death_anim_timer[i] == 10 || death_anim_timer[i] == 5) {
                 u16 next_type = death_anim_next_stage_type(thing_type_override[i]);
                 if (next_type) {
                     thing_type_override[i] = next_type;
