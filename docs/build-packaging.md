@@ -83,6 +83,10 @@ SMOKE_OUTPUT=.tools/screens/latest/powerup-test.png \
 make smoke-screenshot
 ```
 
+`tools/smoke_capture.sh` serializes emulator launches with a lock under
+`.tools/locks/` so parallel screenshot refreshes do not capture the wrong GnGeo
+window.
+
 Map conversion honors Doom THING skill flags through `DOOM_SKILL_MASK`.
 The default is `4`, which keeps the hard/Ultra-Violence population used by the
 current E1M1 prototype. Use `DOOM_SKILL_MASK=1` for easy placement or

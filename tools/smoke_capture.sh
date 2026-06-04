@@ -13,6 +13,8 @@ OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
 MAKE_BIN="${MAKE:-make}"
+LOCKDIR="${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}"
+LOCK_ACQUIRED=0
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -45,7 +47,21 @@ require_cmd xwininfo
 require_cmd xwd
 require_cmd convert
 
-mkdir -p "$(dirname "$OUT")" "$(dirname "$LOG")"
+mkdir -p "$(dirname "$OUT")" "$(dirname "$LOG")" "$(dirname "$LOCKDIR")"
+
+for _ in $(seq 1 300); do
+    if mkdir "$LOCKDIR" 2>/dev/null; then
+        LOCK_ACQUIRED=1
+        trap 'rm -rf "$LOCKDIR"' EXIT INT TERM
+        break
+    fi
+    sleep 0.2
+done
+
+if [ "$LOCK_ACQUIRED" != 1 ]; then
+    echo "could not acquire smoke capture lock: $LOCKDIR" >&2
+    exit 1
+fi
 
 "$MAKE_BIN" "$BUILD_TARGET"
 kill_old_gngeo
