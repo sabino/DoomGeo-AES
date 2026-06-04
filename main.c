@@ -1968,13 +1968,15 @@ static void update_projectile(void) {
 static u8 update_close_monster_melee(void) {
     int px, py;
     rc_player_q8(&px, &py);
-    for (u16 thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int sx, h, dist_q8;
         u16 type;
+        int thing = enemies[slot].thing_index;
+        if (thing < 0) continue;
         type = runtime_thing_type(thing);
         if (enemy_dead[thing] || !thing_is_monster(type)) continue;
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
-        if (!thing_has_readable_slot(thing)) continue;
+        if (!enemy_slot_can_attack(slot)) continue;
         if (iabs16(px - thing_x_q8[thing]) < WORLD_Q8(288) && iabs16(py - thing_y_q8[thing]) < WORLD_Q8(288)
             && project_point_q8(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)
             && sx > 8 && sx < SCRW - 8

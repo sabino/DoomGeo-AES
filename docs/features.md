@@ -158,6 +158,10 @@ readable.
   world-sprite slots. That replaces another per-frame scan across all converted
   runtime things with a bounded pass over the seven visible slots plus the
   previous seven-slot list.
+- Close monster melee now uses the same bounded readable-slot list instead of
+  scanning every converted runtime thing. It still requires close world
+  distance, projection, screen position, and line-of-sight before applying
+  damage.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
