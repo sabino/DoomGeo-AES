@@ -496,6 +496,8 @@ static u8 monster_path_timer = 0;
 static int enemy_palette_def[ENEMY_VISIBLE_COUNT] = {-1};
 static int enemy_tile_key[ENEMY_VISIBLE_COUNT] = {-1};
 static u8 enemy_slot_flash[ENEMY_VISIBLE_COUNT];
+static short ranged_readable_prev[ENEMY_VISIBLE_COUNT];
+static u8 ranged_readable_prev_count = 0;
 static volatile u16 player_health = 100;
 static volatile u16 player_armor = 0;
 static u8 player_armor_class = 0;
@@ -4130,7 +4132,9 @@ static void reset_enemy_slot_cache(void) {
         enemy_palette_def[slot] = -1;
         enemy_tile_key[slot] = -1;
         enemy_slot_flash[slot] = 0;
+        ranged_readable_prev[slot] = -1;
     }
+    ranged_readable_prev_count = 0;
 }
 
 static void hide_enemies(void) {
@@ -4404,21 +4408,33 @@ static int render_visible_impact(int found) {
 }
 
 static void update_enemy_ranged_readiness(void) {
-    for (u16 thing = 0; thing < NG_RUNTIME_THING_COUNT; thing++) {
-        u8 readable = 0;
-        if (!enemy_dead[thing] && thing_is_monster(runtime_thing_type(thing))) {
-            for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-                if (enemies[slot].thing_index == thing && enemy_slot_can_ranged_attack(slot)) {
-                    readable = 1;
-                    break;
-                }
+    short current[ENEMY_VISIBLE_COUNT];
+    u8 current_count = 0;
+
+    for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
+        int thing = enemies[slot].thing_index;
+        if (thing < 0) continue;
+        if (enemy_dead[thing] || !thing_is_monster(runtime_thing_type(thing))) continue;
+        if (!enemy_slot_can_ranged_attack(slot)) continue;
+        current[current_count++] = (short)thing;
+        if (enemy_ranged_readable_ticks[thing] < 255) enemy_ranged_readable_ticks[thing]++;
+    }
+
+    for (u8 i = 0; i < ranged_readable_prev_count; i++) {
+        short thing = ranged_readable_prev[i];
+        u8 still_readable = 0;
+        for (u8 j = 0; j < current_count; j++) {
+            if (current[j] == thing) {
+                still_readable = 1;
+                break;
             }
         }
-        if (readable) {
-            if (enemy_ranged_readable_ticks[thing] < 255) enemy_ranged_readable_ticks[thing]++;
-        } else {
-            enemy_ranged_readable_ticks[thing] = 0;
-        }
+        if (!still_readable && thing >= 0 && thing < NG_RUNTIME_THING_COUNT) enemy_ranged_readable_ticks[thing] = 0;
+    }
+
+    ranged_readable_prev_count = current_count;
+    for (u8 i = 0; i < current_count; i++) {
+        ranged_readable_prev[i] = current[i];
     }
 }
 

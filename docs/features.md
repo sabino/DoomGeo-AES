@@ -149,6 +149,10 @@ readable.
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
   older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- Ranged-attack warmup now tracks only the previous and current readable
+  world-sprite slots. That replaces another per-frame scan across all converted
+  runtime things with a bounded pass over the seven visible slots plus the
+  previous seven-slot list.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
@@ -292,7 +296,8 @@ readable.
 - Ranged attacks also require several consecutive readable frames. Briefly
   clipping past a monster or seeing a one-frame projection is not enough for an
   instant hit; the enemy must remain readable before hitscan/projectile fire
-  can begin.
+  can begin. The warmup counter is updated from the readable slot list instead
+  of rescanning every converted thing each frame.
   Monsters drawn through the coarse line-of-sight projection fallback are
   allowed to remain visible as feedback, but they cannot melee, shoot, or take
   direct weapon hits until normal wall-depth projection proves a readable slot.
