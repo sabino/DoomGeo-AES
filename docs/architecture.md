@@ -46,6 +46,8 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - Doom flats are sampled into tile banks and perspective plane caches.
 - Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
+- HUD keycards are baked from the WAD keycard patches into their own compact
+  tile/palette set instead of reusing pickup or enemy palettes at runtime.
 - Weapon/fire frames and sprite scale levels are generated offline so the 68000
   does not compose Doom patches during play.
 - Monster sprite definitions include a compact Doom angle bucket. The runtime

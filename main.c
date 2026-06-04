@@ -3048,38 +3048,29 @@ static u16 weapon_status_bits(void) {
     return (u16)(bits | (current_weapon << 8));
 }
 
-static int key_sprite_def_for_type(u16 thing_type) {
-    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
-        if (g_enemy_sprite_defs[i].thing_type == thing_type) return i;
-    }
-    return -1;
-}
-
-static void load_hud_key_palette(u16 key, int def_idx) {
-    for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
-        u8 r = g_enemy_palette_rgb[def_idx][i][0];
-        u8 g = g_enemy_palette_rgb[def_idx][i][1];
-        u8 b = g_enemy_palette_rgb[def_idx][i][2];
+static void load_hud_key_palette(u16 key) {
+    for (int i = 0; i < HUD_KEY_PALETTE_COLORS; i++) {
+        u8 r = g_hud_key_palette_rgb[i][0];
+        u8 g = g_hud_key_palette_rgb[i][1];
+        u8 b = g_hud_key_palette_rgb[i][2];
         pal_set((u16)(PAL_HUD_KEY_BASE + key), (u16)(i + 1), RGB(r, g, b));
     }
 }
 
 static void render_hud_keys(void) {
     static const u8 key_bits[HUD_KEY_COUNT] = {1, 2, 4};
-    static const u16 key_thing_types[HUD_KEY_COUNT] = {5, 13, 6};
     static const u8 key_row[HUD_KEY_COUNT] = {24, 25, 26};
     static const u8 key_col = 30;
 
     for (u16 key = 0; key < HUD_KEY_COUNT; key++) {
         u16 spr = (u16)(HUD_KEY_BASE + key);
-        int def_idx = key_sprite_def_for_type(key_thing_types[key]);
         scb2(spr, 0x0F, 0x00);
         scb3(spr, SCRH + 32, 0, 1);
         scb4(spr, 0);
         fix_poke(key_col, key_row[key], 0, FIX_BLANK);
-        if (!(player_keys & key_bits[key]) || def_idx < 0) continue;
+        if (!(player_keys & key_bits[key])) continue;
 
-        load_hud_key_palette(key, def_idx);
+        load_hud_key_palette(key);
         scb1_tile(spr, 0, (u16)(TILE_HUD_KEYCARD_BASE + key), (u16)(PAL_HUD_KEY_BASE + key));
         scb2(spr, 0x07, 0x7F);
         scb3(spr, (int)(key_row[key] * 8), 0, 1);
