@@ -2179,11 +2179,8 @@ static void update_projectile(void) {
     }
 }
 
-static u8 update_close_monster_melee(void) {
-    int px, py;
-    rc_player_q8(&px, &py);
+static u8 update_close_monster_melee(int px, int py) {
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
-        int sx, h, dist_q8;
         u16 type;
         int thing = enemies[slot].thing_index;
         if (thing < 0) continue;
@@ -2192,8 +2189,6 @@ static u8 update_close_monster_melee(void) {
         if (enemy_hit_flash[thing] || enemy_attack_cooldown[thing]) continue;
         if (!enemy_slot_can_attack(slot)) continue;
         if (iabs16(px - thing_x_q8[thing]) < WORLD_Q8(288) && iabs16(py - thing_y_q8[thing]) < WORLD_Q8(288)
-            && project_point_q8(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)
-            && sx > 8 && sx < SCRW - 8
             && line_of_sight_q8(thing_x_q8[thing], thing_y_q8[thing], (short)px, (short)py)) {
             player_take_damage(4);
             enemy_awake[thing] = 1;
@@ -2208,12 +2203,14 @@ static u8 update_close_monster_melee(void) {
 
 static void update_monster_damage(void) {
     enum { RANGED_READABLE_WARMUP = 6 };
+    int px, py;
     if (hurt_timer) {
         hurt_timer--;
         return;
     }
     if (!game_active()) return;
-    if (update_close_monster_melee()) return;
+    rc_player_q8(&px, &py);
+    if (update_close_monster_melee(px, py)) return;
 
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
@@ -2228,7 +2225,7 @@ static void update_monster_damage(void) {
         if (!thing_is_monster(type)) continue;
         ranged_damage = monster_ranged_damage(type);
         if (ranged_damage && enemies[slot].dist_q8 < 1700 && enemies[slot].screen_h > 18
-            && player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) {
+            && line_of_sight_q8((short)px, (short)py, thing_x_q8[thing], thing_y_q8[thing])) {
             u16 projectile = monster_projectile_type(type);
             if (power_invis_timer && ((monster_ai_tick + thing) & 1)) {
                 enemy_attack_cooldown[thing] = 24;

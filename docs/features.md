@@ -176,6 +176,10 @@ readable.
   after cheap coordinate, cooldown, and readability checks, reducing repeated
   per-frame classification work during active fights without changing damage,
   drops, or score behavior.
+- Monster damage reads the player position once per frame, reuses the current
+  visible-slot projection for close melee checks, and uses that same cached
+  player point for ranged line-of-sight checks instead of re-projecting visible
+  monsters during the damage pass.
 - Sound-alert and monster-AI passes reject dead, already-awake, flashing, and
   unreadable-slot entries before distance math or type classification, keeping
   periodic E1M1 monster work focused on things that can actually wake or move.
