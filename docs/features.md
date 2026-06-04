@@ -31,10 +31,11 @@ readable.
   render-line table for every wall column. Hit cells with no render-line refs
   now return immediately to the base DDA result before doing q4 refinement
   setup.
-- The renderer caches each column's ray vector for the current angle/FOV and
-  rebuilds that cache only when the view direction changes. Movement-only
-  frames reuse those rays before running DDA, avoiding two fixed-point
-  multiplies per wall column.
+- The renderer caches each column's ray vector, DDA reciprocal deltas, and step
+  signs for the current angle/FOV, rebuilding that cache only when the view
+  direction changes. Movement-only frames reuse those values before running
+  DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
+  column.
 - This renderer spends more sprite budget on wall fidelity than the older
   20-column pass while holding seven visible world-thing slots for monsters,
   pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline

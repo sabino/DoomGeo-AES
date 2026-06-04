@@ -54,6 +54,10 @@ static fix invDet;               /* inverse camera matrix determinant       */
 static fix cameraXbuf[NUM_COLS]; /* constant camera x in [-1,+1] per column */
 static fix rayXbuf[NUM_COLS];    /* cached ray directions for current view  */
 static fix rayYbuf[NUM_COLS];
+static fix rayDdXbuf[NUM_COLS];  /* DDA delta distances for cached rays     */
+static fix rayDdYbuf[NUM_COLS];
+static signed char rayStepXbuf[NUM_COLS];
+static signed char rayStepYbuf[NUM_COLS];
 static u8  rays_dirty = 1;
 
 static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
@@ -95,8 +99,14 @@ static void update_ray_cache(void) {
     if (!rays_dirty) return;
     for (int c = 0; c < NUM_COLS; c++) {
         fix cameraX = cameraXbuf[c];
-        rayXbuf[c] = dirX + fmul(planeX, cameraX);
-        rayYbuf[c] = dirY + fmul(planeY, cameraX);
+        fix rayX = dirX + fmul(planeX, cameraX);
+        fix rayY = dirY + fmul(planeY, cameraX);
+        rayXbuf[c] = rayX;
+        rayYbuf[c] = rayY;
+        rayDdXbuf[c] = recip(rayX);
+        rayDdYbuf[c] = recip(rayY);
+        rayStepXbuf[c] = rayX < 0 ? -1 : 1;
+        rayStepYbuf[c] = rayY < 0 ? -1 : 1;
     }
     rays_dirty = 0;
 }
@@ -329,22 +339,25 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
 void rc_render(void) {
     if (!view_dirty) return;
     update_ray_cache();
+    int baseMapX = posX >> FBITS;
+    int baseMapY = posY >> FBITS;
     for (int x = 0; x < NUM_COLS; x++) {
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
 
-        int mapX = posX >> FBITS;
-        int mapY = posY >> FBITS;
+        int mapX = baseMapX;
+        int mapY = baseMapY;
 
-        fix ddX = recip(rayX);
-        fix ddY = recip(rayY);
+        fix ddX = rayDdXbuf[x];
+        fix ddY = rayDdYbuf[x];
 
-        int stepX, stepY;
+        int stepX = rayStepXbuf[x];
+        int stepY = rayStepYbuf[x];
         fix sideX, sideY;
-        if (rayX < 0) { stepX = -1; sideX = fmul(posX - (mapX << FBITS), ddX); }
-        else          { stepX =  1; sideX = fmul(((mapX + 1) << FBITS) - posX, ddX); }
-        if (rayY < 0) { stepY = -1; sideY = fmul(posY - (mapY << FBITS), ddY); }
-        else          { stepY =  1; sideY = fmul(((mapY + 1) << FBITS) - posY, ddY); }
+        if (stepX < 0) sideX = fmul(posX - (mapX << FBITS), ddX);
+        else           sideX = fmul(((mapX + 1) << FBITS) - posX, ddX);
+        if (stepY < 0) sideY = fmul(posY - (mapY << FBITS), ddY);
+        else           sideY = fmul(((mapY + 1) << FBITS) - posY, ddY);
 
         int side = 0;                       /* 0 = hit on X grid line (N/S)  */
         unsigned char hit_cell = 1;
