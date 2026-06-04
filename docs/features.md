@@ -210,6 +210,8 @@ readable.
   player, starts with a short light-amplification palette tint so timed-powerup
   feedback can be inspected in screenshots, and leaves the normal cart path
   unchanged.
+- `tools/smoke_powerup.sh` captures that ROM and verifies powerup-colored
+  pickup evidence, the visible imp, and the expected status bar.
 - The E1M2 key-test conversion currently includes one red keycard and a six-cell
   red locked-door group, matching the intended isolated keycard test path.
 - Weapon pickups include shotgun, chaingun, rocket launcher, chainsaw, plasma

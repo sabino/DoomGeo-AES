@@ -133,8 +133,10 @@ make arsenal-test-rom
 make arsenal-test-gngeo
 make death-test-rom
 make death-test-gngeo
+tools/smoke_death_drop.sh
 make powerup-test-rom
 make powerup-test-gngeo
+tools/smoke_powerup.sh
 make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27

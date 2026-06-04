@@ -143,11 +143,13 @@ make smoke-screenshot
 ```
 
 ```sh
-SMOKE_BUILD_TARGET=powerup-test-rom \
-SMOKE_RUN_TARGET=powerup-test-gngeo \
-SMOKE_OUTPUT=.tools/screens/latest/powerup-test.png \
-make smoke-screenshot
+tools/smoke_powerup.sh
 ```
+
+The powerup helper builds and launches the isolated powerup ROM, captures the
+visible pickup/imp setup, then runs `tools/check_powerup_screens.py` to reject
+frames without powerup-colored pickups, the visible imp, and status-bar
+evidence.
 
 `tools/smoke_capture.sh` serializes emulator launches with an owner-tracked lock
 under `.tools/locks/` so parallel screenshot refreshes do not capture the wrong
