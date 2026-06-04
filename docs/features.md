@@ -164,6 +164,9 @@ readable.
 - `tools/smoke_hidden_attack.sh` captures that ROM at boot and again after a
   short wait. The delayed frame should show no readable monster and unchanged
   health, proving combat pressure is tied to visible world-sprite slots.
+- `tools/smoke_enemy_visibility.sh` runs the combat, real-map encounter, and
+  hidden-attack screenshot passes together so renderer or AI changes can
+  refresh the full visible-enemy evidence set with one command.
 - `make melee-test-rom` and `make melee-test-gngeo` build an isolated close-
   combat verification ROM. It compiles with `DOOM_MELEE_TEST`, equips the
   chainsaw, and places a visible imp inside the corrected player melee range.

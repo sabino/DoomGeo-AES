@@ -83,6 +83,11 @@ and captures both the initial frame and a delayed frame. The delayed frame shoul
 still show the same health value, proving hidden or offscreen monsters cannot
 damage the player without a readable world-sprite slot.
 
+For a combined enemy visibility pass, run `tools/smoke_enemy_visibility.sh`.
+It chains the combat interaction, real E1M1 encounter, and hidden-attack
+regressions into one command, refreshing the screenshots that prove visible
+targeting, real converted monster projection, and no hidden damage.
+
 For a corpse/drop rendering pass, run `tools/smoke_death_drop.sh`. It builds
 `make death-test-rom`, launches `make death-test-gngeo`, and captures the staged
 shareware corpse sprites plus the dropped shotgun pickup above the status bar.
