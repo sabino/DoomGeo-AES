@@ -1787,7 +1787,7 @@ static u8 visible_monster_slots(void) {
     u8 count = 0;
     for (u16 slot = 0; slot < ENEMY_VISIBLE_COUNT; slot++) {
         int thing = enemies[slot].thing_index;
-        if (thing >= 0 && thing_is_monster(runtime_thing_type(thing)) && enemies[slot].screen_w > 0 && enemies[slot].screen_h > 0) count++;
+        if (thing >= 0 && thing_is_monster(runtime_thing_type(thing)) && enemy_slot_is_readable(slot)) count++;
     }
     return count;
 }
@@ -3282,7 +3282,7 @@ static void set_enemy_tiles(u16 slot, const DoomSpriteScale *meta) {
     }
 }
 
-static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
+static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, int h, int dist_q8, u8 flash) {
     int idx;
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index);
     const DoomEnemySpriteDef *def;
@@ -3290,7 +3290,7 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
 
     if (def_idx < 0) {
         hide_enemy_slot(slot);
-        return;
+        return 0;
     }
     def = &g_enemy_sprite_defs[def_idx];
 
@@ -3353,13 +3353,15 @@ static void render_type_slot(u16 slot, int thing_index, u16 thing_type, int sx, 
             enemies[slot].thing_index = -1;
             enemies[slot].screen_w = 0;
             enemies[slot].screen_h = 0;
+            return 0;
         }
     }
+    return 1;
 }
 
-static void render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
+static u8 render_thing_slot(u16 slot, int thing_index, int sx, int h, int dist_q8) {
     u8 flash = (thing_index >= 0 && enemy_hit_flash[thing_index]) ? 1 : 0;
-    render_type_slot(slot, thing_index, runtime_thing_type(thing_index), sx, h, dist_q8, flash);
+    return render_type_slot(slot, thing_index, runtime_thing_type(thing_index), sx, h, dist_q8, flash);
 }
 
 typedef struct ThingCandidate {
@@ -3460,12 +3462,13 @@ static int select_visible_things(int found, u8 pass) {
     }
 
     for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
+        u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
-            render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0);
+            rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].sx, candidates[i].h, candidates[i].dist_q8, 0);
         } else {
-            render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
+            rendered = render_thing_slot((u16)found, candidates[i].thing_index, candidates[i].sx, candidates[i].h, candidates[i].dist_q8);
         }
-        found++;
+        if (rendered) found++;
     }
     return found;
 }
@@ -3474,8 +3477,8 @@ static int render_visible_projectile(int found) {
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!project_point_q8(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) return found;
-    render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0);
-    return found + 1;
+    if (render_type_slot((u16)found, -1, projectile_type, sx, h, dist_q8, 0)) return found + 1;
+    return found;
 }
 
 static void render_visible_impact(u16 slot) {

@@ -16,7 +16,7 @@ drawing pixels.
 | Area | Status |
 | --- | --- |
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
-| Rendering | Fallback 20-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and eight visible world-thing slots kept under the Neo Geo scanline limit. |
+| Rendering | Fallback 20-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and eight visible world-thing slots kept under the Neo Geo scanline limit. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use placeholder psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the real art. |
 | Gameplay | Pickups, keys, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom` boots an isolated enemy-combat verification ROM. |

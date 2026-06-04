@@ -136,6 +136,13 @@ readable.
 - Runtime sprite lookup now refuses to draw missing sprite definitions instead
   of falling back to the first baked enemy, which prevents wrong-looking
   monsters or corrupt placeholder sprites when a WAD lacks optional art.
+- Thing slots are advanced only after a sprite actually renders. Missing,
+  offscreen, or fully clipped sprites no longer consume one of the eight visible
+  world-sprite slots, so the renderer keeps scanning for the next visible
+  monster, pickup, projectile, corpse, or drop.
+- Monster visibility tests now count readable on-screen slots, not merely
+  projected-but-edge-clipped sprite metadata. This keeps hidden-monster reveal
+  and attack gating tied to sprites the player can actually see.
 - Barrels explode and can apply radius damage.
 - Killed monsters show a short three-step Doom death sequence before settling
   into corpse frames or drops where implemented. Hell Knights and cacodemons now
