@@ -94,6 +94,8 @@ DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"
 
+tools/check_key_door_screens.py --dir "$OUT_DIR"
+
 echo "$INITIAL_OUT"
 echo "$MISSING_OUT"
 echo "$PICKED_OUT"

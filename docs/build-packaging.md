@@ -120,7 +120,10 @@ make smoke-screenshot
 For the full key-door interaction path, use `tools/smoke_key_door.sh`. It
 captures the initial focused E1M2 scene, the missing-red-key message, the
 post-pickup HUD state, the opened-door frame, and one extra frame after walking
-through the opened doorway.
+through the opened doorway. The helper finishes with
+`tools/check_key_door_screens.py`, which rejects missing captures, missing
+KEY/keycard message evidence, a door that still looks closed in the opened
+frame, or a through-door frame that does not show the player past the door.
 
 ```sh
 SMOKE_BUILD_TARGET=arsenal-test-rom \

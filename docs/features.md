@@ -148,7 +148,9 @@ readable.
   front of the player so pickup and locked-door behavior can be tested quickly.
 - `tools/smoke_key_door.sh` automates that focused ROM through missing-key,
   key pickup, and successful door-open stages, producing comparison screenshots
-  under `.tools/screens/latest`.
+  under `.tools/screens/latest`. It now runs a focused PNG checker that verifies
+  key-message evidence, post-pickup HUD state, the opened-door visual state, and
+  a frame after walking through the opened doorway.
 - `make combat-test-rom` and `make combat-test-gngeo` build an isolated E1M1
   enemy-combat verification ROM. It compiles with `DOOM_COMBAT_TEST`, places a
   visible imp in front of the player, and equips the shotgun while leaving the

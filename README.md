@@ -34,9 +34,9 @@ drawing pixels.
 | --- | --- |
 | ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) | ![E1M2 keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
 
-| Focused key-door test ROM | Missing-key message | Key-door opened |
-| --- | --- | --- |
-| ![Focused E1M2 red keycard and locked-door verification ROM](docs/screenshots/doomgeo-aes-key-door-test.png) | ![Locked E1M2 red door showing the compact KEY plus keycard message](docs/screenshots/doomgeo-aes-key-door-missing-key.png) | ![E1M2 red door opened after collecting the red keycard](docs/screenshots/doomgeo-aes-key-door-opened.png) |
+| Focused key-door test ROM | Missing-key message | Key-door opened | Through doorway |
+| --- | --- | --- | --- |
+| ![Focused E1M2 red keycard and locked-door verification ROM](docs/screenshots/doomgeo-aes-key-door-test.png) | ![Locked E1M2 red door showing the compact KEY plus keycard message](docs/screenshots/doomgeo-aes-key-door-missing-key.png) | ![E1M2 red door opened after collecting the red keycard](docs/screenshots/doomgeo-aes-key-door-opened.png) | ![E1M2 key-door smoke after walking through the opened doorway](docs/screenshots/doomgeo-aes-key-door-through.png) |
 
 | Combat test ROM | Shotgun fire frame |
 | --- | --- |
