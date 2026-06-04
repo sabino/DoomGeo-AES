@@ -139,9 +139,10 @@ tools/smoke_weapon_shortcuts.sh
 ```
 
 The helper builds and launches the arsenal verification ROM, captures a
-baseline frame, sends the configured GnGeo C+Down shortcut, and captures the
-result under `.tools/screens/latest/`. It leaves GnGeo open on
-`SMOKE_WORKSPACE` for visual inspection.
+baseline frame, sends the configured GnGeo C+Down shortcut, then holds C before
+pressing Right to prove both shortcut key orders. It captures the frames under
+`.tools/screens/latest/` and leaves GnGeo open on `SMOKE_WORKSPACE` for visual
+inspection.
 
 Map conversion honors Doom THING skill flags through `DOOM_SKILL_MASK`.
 The default is `4`, which keeps the hard/Ultra-Violence population used by the

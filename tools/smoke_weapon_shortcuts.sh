@@ -10,8 +10,10 @@ WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 BEFORE_OUT="${OUT_DIR}/weapon-shortcut-before.png"
 AFTER_OUT="${OUT_DIR}/weapon-shortcut-cdown.png"
+HELD_OUT="${OUT_DIR}/weapon-shortcut-held-c-right.png"
 BEFORE_XWD="${BEFORE_OUT%.png}.xwd"
 AFTER_XWD="${AFTER_OUT%.png}.xwd"
+HELD_XWD="${HELD_OUT%.png}.xwd"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -68,5 +70,20 @@ sleep 0.8
 xwd -silent -id "$wid" -out "$AFTER_XWD"
 convert "$AFTER_XWD" "$AFTER_OUT"
 
+# Keep C held first, then press a direction. This catches the documented
+# "hold C + D-pad" flow instead of only the opposite keydown ordering.
+DISPLAY="$DISPLAY_VALUE" xdotool keydown a
+sleep 0.15
+DISPLAY="$DISPLAY_VALUE" xdotool keydown Right
+sleep 0.25
+DISPLAY="$DISPLAY_VALUE" xdotool keyup Right
+sleep 0.1
+DISPLAY="$DISPLAY_VALUE" xdotool keyup a
+sleep 0.8
+
+xwd -silent -id "$wid" -out "$HELD_XWD"
+convert "$HELD_XWD" "$HELD_OUT"
+
 echo "$BEFORE_OUT"
 echo "$AFTER_OUT"
+echo "$HELD_OUT"

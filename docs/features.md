@@ -104,7 +104,8 @@ readable.
   close/basic weapons (chainsaw, fist, pistol). If a direct heavy shortcut is
   unavailable, it falls back through the heavy weapon group. Movement directions
   are masked during these combos so weapon selection does not shove the player
-  around.
+  around. Shortcuts work both when the direction is already held before C and
+  when C is held first before pressing a direction.
 - Weapon pickups and manual weapon changes briefly flash the selected Doom slot
   number in the center fix-layer message area, giving immediate feedback for C
   cycling and C+D-pad shortcuts without opening the minimap.

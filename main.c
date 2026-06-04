@@ -419,6 +419,7 @@ static u8  fire_timer = 0;
 static u8  fire_prev = 0;
 static u8  door_prev = 0;
 static u8  map_prev = 0;
+static u8  shortcut_prev = 0;
 static u8  restart_prev = 0;
 static u8  hurt_timer = 0;
 static u8  floor_damage_timer = 0;
@@ -4407,6 +4408,7 @@ static void restart_level(void) {
     fire_prev = 0;
     door_prev = 0;
     map_prev = 0;
+    shortcut_prev = 0;
     restart_prev = 0;
     hurt_timer = 0;
     floor_damage_timer = 0;
@@ -4644,25 +4646,31 @@ int main(void) {
         update_status_numbers(pressed);
         update_center_message();
 
-        /* C cycles weapons. C+D-pad jumps to weapon shortcuts; A+C keeps
-         * the slower minimap toggle out of normal weapon flow. */
+        /* C cycles weapons. Holding C and pressing a direction jumps directly
+         * to weapon shortcuts; A+C keeps the minimap out of normal weapon flow. */
         {
             enum { A = 0x10, C = 0x40, UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08 };
             const u8 dpad = UP | DOWN | LEFT | RIGHT;
             u8 c_now = pressed & C;
-            if (c_now && !map_prev) {
-                if (pressed & A) {
-                    if (map_on) start_minimap_clear();
-                    else {
-                        map_on = 1;
-                        start_minimap_redraw();
-                    }
-                    force_fix_hud_redraw();
-                } else if (pressed & dpad) {
-                    select_weapon_shortcut((u8)(pressed & dpad));
-                } else {
-                    toggle_weapon();
+            u8 shortcut_now = (u8)(pressed & dpad);
+            if (c_now && (pressed & A) && !map_prev) {
+                if (map_on) start_minimap_clear();
+                else {
+                    map_on = 1;
+                    start_minimap_redraw();
                 }
+                force_fix_hud_redraw();
+            } else if (c_now && !(pressed & A) && shortcut_now) {
+                if (!map_prev || shortcut_now != shortcut_prev) {
+                    select_weapon_shortcut(shortcut_now);
+                }
+            } else if (c_now && !map_prev) {
+                toggle_weapon();
+            }
+            if (!c_now || (pressed & A)) {
+                shortcut_prev = 0;
+            } else {
+                shortcut_prev = shortcut_now;
             }
             map_prev = c_now;
         }

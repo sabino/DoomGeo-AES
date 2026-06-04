@@ -54,9 +54,13 @@ drawing pixels.
 | --- | --- |
 | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
 
-| Arsenal test ROM | Death/drop test ROM |
+| Arsenal test ROM | Held-C weapon shortcut |
 | --- | --- |
-| ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+| ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
+
+| Death/drop test ROM |
+| --- |
+| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
 
 | Powerup test ROM |
 | --- |
@@ -75,7 +79,7 @@ drawing pixels.
 | Hold A + Left/Right | Strafe |
 | B | Fire weapon |
 | C | Cycle to next ready weapon |
-| Hold C + D-pad | Fast weapon shortcuts: Up shotgun, Right chaingun, Down rocket, Down+Right plasma, Down+Left BFG, Left close/basic |
+| Hold C + D-pad | Fast weapon shortcuts: Up shotgun, Right chaingun, Down rocket, Down+Right plasma, Down+Left BFG, Left close/basic. Direction-first and C-first chords both work. |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart level |
