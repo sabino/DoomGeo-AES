@@ -76,7 +76,12 @@ drawing pixels.
 
 | Native Doom comparison |
 | --- |
-| ![Native Doom beside the Neo Geo prototype](docs/screenshots/doomgeo-aes-native-comparison.png) |
+| ![Native Doom E1M1 Player 1 start beside the Neo Geo prototype at the converted E1M1 Player 1 start](docs/screenshots/doomgeo-aes-native-comparison.png) |
+
+The comparison capture is generated locally with `tools/capture_compare.sh` from
+the same shareware `E1M1` WAD data. It intentionally shows the current renderer
+gap: the native start room is not yet visually matched by the Neo Geo wall and
+plane approximation even though the converted map and Player 1 start are loaded.
 
 ## Controls
 
