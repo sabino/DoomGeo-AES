@@ -75,9 +75,9 @@ readable.
 - Implemented runtime weapons: fist, pistol, shotgun, chaingun, rocket
   launcher, plasma rifle, BFG, and chainsaw.
 - The shareware WAD does not contain the original `PLSG`/`BFGG` weapon patches
-  or `CELL`/`CELP` pickup sprites. Shareware builds therefore keep placeholder
-  psprite frames for plasma/BFG, while registered/commercial WAD builds can
-  bake the real art through the same C-ROM path.
+  or `CELL`/`CELP` pickup sprites. Shareware builds therefore bake synthetic
+  fallback psprite frames for plasma/BFG, while registered/commercial WAD builds
+  can bake the exact art through the same C-ROM path.
 - Pistol/chaingun use compact hitscan-style targeting.
 - Plasma rifle spends cells rapidly and launches the baked small fireball strip
   as a visible forward projectile. A direct projectile hit applies compact

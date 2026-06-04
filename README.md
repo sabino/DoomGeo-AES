@@ -18,7 +18,7 @@ drawing pixels.
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
 | Rendering | Fallback 20-column wall raycaster, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and eight visible world-thing slots kept under the Neo Geo scanline limit. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
-| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use placeholder psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the real art. |
+| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use synthetic fallback psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the exact art. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Audio | Null sound path only. YM2610/Z80 sound and music conversion are not implemented yet. |
@@ -62,9 +62,9 @@ drawing pixels.
 | --- | --- |
 | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
 
-| Arsenal test ROM | Held-C weapon shortcut |
-| --- | --- |
-| ![Arsenal verification ROM with all weapons, keycards, ammo, and armor visible in the HUD](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
+| Arsenal test ROM | BFG fallback weapon | Held-C weapon shortcut |
+| --- | --- | --- |
+| ![Arsenal verification ROM with all weapons, keycards, ammo, armor, and the synthetic shareware plasma fallback visible](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Arsenal verification ROM after selecting BFG with the synthetic shareware BFG fallback visible](docs/screenshots/doomgeo-aes-bfg-fallback.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
 
 | Death/drop test ROM |
 | --- |

@@ -823,6 +823,114 @@ def hud_face_tiles(iwad, zip_member, face_names, palette, face_tune_grid=False):
     return tiles, "+".join(face_names)
 
 
+def closest_playpal_index(playpal, rgb):
+    r, g, b = rgb
+    return min(
+        range(len(playpal)),
+        key=lambda i: (
+            (playpal[i][0] - r) ** 2
+            + (playpal[i][1] - g) ** 2
+            + (playpal[i][2] - b) ** 2
+        ),
+    )
+
+
+def synthetic_weapon_color_set(playpal):
+    return {
+        "black": closest_playpal_index(playpal, (8, 8, 8)),
+        "dark": closest_playpal_index(playpal, (42, 42, 42)),
+        "mid": closest_playpal_index(playpal, (96, 96, 90)),
+        "light": closest_playpal_index(playpal, (168, 160, 145)),
+        "white": closest_playpal_index(playpal, (230, 224, 196)),
+        "green_dark": closest_playpal_index(playpal, (10, 82, 25)),
+        "green": closest_playpal_index(playpal, (30, 180, 58)),
+        "green_hot": closest_playpal_index(playpal, (120, 255, 115)),
+        "yellow": closest_playpal_index(playpal, (255, 220, 90)),
+    }
+
+
+def synthetic_weapon_patch(part_name, playpal):
+    name = part_name.upper()
+    colors = synthetic_weapon_color_set(playpal)
+
+    def blank(width, height):
+        return [[-1] * width for _ in range(height)]
+
+    def rect(patch, x0, y0, x1, y1, color):
+        for y in range(max(0, y0), min(len(patch), y1)):
+            row = patch[y]
+            for x in range(max(0, x0), min(len(row), x1)):
+                row[x] = color
+
+    def ellipse(patch, cx, cy, rx, ry, color):
+        if rx <= 0 or ry <= 0:
+            return
+        for y in range(max(0, cy - ry), min(len(patch), cy + ry + 1)):
+            row = patch[y]
+            for x in range(max(0, cx - rx), min(len(row), cx + rx + 1)):
+                dx = x - cx
+                dy = y - cy
+                if dx * dx * ry * ry + dy * dy * rx * rx <= rx * rx * ry * ry:
+                    row[x] = color
+
+    def line_diag(patch, x0, y0, length, slope, width, color):
+        for i in range(length):
+            x = x0 + i
+            y = y0 + (i * slope) // 16
+            rect(patch, x, y, x + width, y + width, color)
+
+    if name.startswith("PLSF"):
+        patch = blank(42, 34)
+        ellipse(patch, 21, 16, 18, 11, colors["green"])
+        ellipse(patch, 21, 16, 10, 6, colors["green_hot"])
+        rect(patch, 5, 15, 37, 19, colors["yellow"])
+        rect(patch, 19, 3, 23, 31, colors["yellow"])
+        return patch, -139, -70
+
+    if name.startswith("BFGF"):
+        patch = blank(58, 42)
+        ellipse(patch, 29, 20, 26, 15, colors["green"])
+        ellipse(patch, 29, 20, 15, 8, colors["green_hot"])
+        rect(patch, 4, 18, 54, 24, colors["yellow"])
+        rect(patch, 26, 4, 32, 38, colors["yellow"])
+        return patch, -131, -72
+
+    if name.startswith("PLSG"):
+        patch = blank(78, 70)
+        alt = "B" in name
+        rect(patch, 24, 10, 54, 42, colors["dark"])
+        rect(patch, 29, 14, 49, 37, colors["mid"])
+        rect(patch, 34, 16, 44, 34, colors["green_dark"])
+        rect(patch, 37, 18, 47 if alt else 43, 32, colors["green"])
+        rect(patch, 16, 42, 62, 58, colors["dark"])
+        rect(patch, 21, 46, 57, 54, colors["mid"])
+        rect(patch, 30, 55, 48, 68, colors["black"])
+        rect(patch, 34, 58, 44, 69, colors["dark"])
+        line_diag(patch, 8, 47, 24, -5, 5, colors["light"])
+        line_diag(patch, 46, 40, 24, 5, 5, colors["light"])
+        rect(patch, 31, 9, 47, 13, colors["light"])
+        rect(patch, 35, 17, 43, 20, colors["green_hot"])
+        return patch, -121, -112
+
+    if name.startswith("BFGG"):
+        patch = blank(98, 78)
+        alt = "B" in name
+        rect(patch, 14, 22, 84, 58, colors["dark"])
+        rect(patch, 22, 17, 76, 47, colors["mid"])
+        rect(patch, 31, 21, 67, 43, colors["light"])
+        rect(patch, 38, 24, 60, 40, colors["green_dark"])
+        rect(patch, 42, 27, 64 if alt else 56, 37, colors["green"])
+        rect(patch, 8, 34, 26, 64, colors["black"])
+        rect(patch, 72, 34, 90, 64, colors["black"])
+        rect(patch, 20, 58, 78, 73, colors["dark"])
+        rect(patch, 30, 63, 68, 76, colors["black"])
+        ellipse(patch, 49, 32, 12, 7, colors["green_hot"] if alt else colors["green"])
+        rect(patch, 30, 17, 68, 21, colors["white"])
+        return patch, -113, -116
+
+    return None
+
+
 def weapon_tiles(iwad, zip_member, patch_names):
     if not iwad:
         palette = [(16, 16, 16), (48, 48, 48), (96, 96, 96)] * 5
@@ -837,6 +945,11 @@ def weapon_tiles(iwad, zip_member, patch_names):
             part_name = part_name.strip()
             lump_ids = wad.by_name.get(part_name)
             if not lump_ids:
+                synthetic = synthetic_weapon_patch(part_name, playpal)
+                if synthetic:
+                    patch, left, top = synthetic
+                    frame_patches.append((f"{part_name}:synthetic-shareware-fallback", patch, left, top))
+                    continue
                 fallback_ids = wad.by_name.get("PISGA0")
                 if not fallback_ids:
                     raise ValueError(f"weapon patch {part_name!r} not found in WAD and PISGA0 fallback is unavailable")

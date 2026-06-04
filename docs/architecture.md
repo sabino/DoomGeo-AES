@@ -58,9 +58,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   fall back to the older front-facing attack/pain buckets and finally to walk
   frames without allocating extra world-sprite slots.
 - Registered/commercial-only psprite lumps that are missing from shareware are
-  replaced with pistol placeholder frames at build time, so the same runtime
-  weapon table can be tested with shareware and then rebuilt with exact
-  registered/commercial WAD art.
+  replaced with synthetic fallback frames at build time, so the same runtime
+  weapon table can be tested with visibly distinct shareware plasma/BFG weapons
+  and then rebuilt with exact registered/commercial WAD art.
 - The perspective plane cache is intentionally compact. Earlier multi-phase
   plane caches pushed monster tiles past the practical C-ROM tile index range,
   making enemies invisible even though their sprite slots were active.
