@@ -543,6 +543,8 @@ static short projectile_x_q8 = 0;
 static short projectile_y_q8 = 0;
 static short projectile_dx_q8 = 0;
 static short projectile_dy_q8 = 0;
+static short projectile_hit_range_q8 = 0;
+static u8  projectile_hit_coarse_cells = 0;
 static u8  impact_active = 0;
 static u8  impact_timer = 0;
 static short impact_x_q8 = 0;
@@ -2057,13 +2059,19 @@ static u8 spawn_monster_projectile(int thing, u16 type, u8 damage, int px, int p
     projectile_damage = damage;
     projectile_from_player = 0;
     projectile_source_thing = thing;
+    projectile_hit_range_q8 = 0;
+    projectile_hit_coarse_cells = 0;
     projectile_active = 1;
     return 1;
 }
 
 static u8 spawn_player_projectile(u16 type, u8 timer) {
     int px, py, dir_x, dir_y, plane_x, plane_y;
+    short hit_range_q8 = 0;
     if (projectile_active) return 0;
+    if (type == 9006) hit_range_q8 = WORLD_Q8(112);
+    else if (type == 9007) hit_range_q8 = WORLD_Q8(160);
+    else if (type == 9008) hit_range_q8 = WORLD_Q8(144);
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     projectile_x_q8 = (short)(px + ((dir_x * WORLD_Q8(192)) >> 8));
@@ -2075,6 +2083,8 @@ static u8 spawn_player_projectile(u16 type, u8 timer) {
     projectile_damage = 0;
     projectile_from_player = 1;
     projectile_source_thing = -1;
+    projectile_hit_range_q8 = hit_range_q8;
+    projectile_hit_coarse_cells = (u8)((hit_range_q8 + 255) >> 8);
     projectile_active = 1;
     return 1;
 }
@@ -2086,20 +2096,18 @@ static void clear_projectile(void) {
     projectile_type = 0;
     projectile_timer = 0;
     projectile_damage = 0;
+    projectile_hit_range_q8 = 0;
+    projectile_hit_coarse_cells = 0;
 }
 
 static int player_projectile_hit_shootable(void) {
-    short hit_range_q8;
     int projectile_cell_x;
     int projectile_cell_y;
-    int coarse_cells;
-    if (projectile_type == 9006) hit_range_q8 = WORLD_Q8(112);
-    else if (projectile_type == 9007) hit_range_q8 = WORLD_Q8(160);
-    else if (projectile_type == 9008) hit_range_q8 = WORLD_Q8(144);
-    else return -1;
+    short hit_range_q8 = projectile_hit_range_q8;
+    u8 coarse_cells = projectile_hit_coarse_cells;
+    if (!hit_range_q8) return -1;
     projectile_cell_x = projectile_x_q8 >> 8;
     projectile_cell_y = projectile_y_q8 >> 8;
-    coarse_cells = (hit_range_q8 + 255) >> 8;
     for (u16 si = 0; si < thing_shootable_count; si++) {
         u16 i = thing_shootable_indices[si];
         if (iabs16((thing_x_q8[i] >> 8) - projectile_cell_x) > coarse_cells) continue;
@@ -4991,6 +4999,8 @@ static void restart_level(void) {
     projectile_y_q8 = 0;
     projectile_dx_q8 = 0;
     projectile_dy_q8 = 0;
+    projectile_hit_range_q8 = 0;
+    projectile_hit_coarse_cells = 0;
     impact_active = 0;
     impact_timer = 0;
     impact_x_q8 = 0;

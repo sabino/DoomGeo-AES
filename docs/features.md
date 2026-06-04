@@ -190,7 +190,9 @@ readable.
 - Player projectile hit tests and monster movement occupancy now use coarse
   map-cell rejection before exact q8 distance and type checks. This preserves
   the exact hit/separation thresholds while avoiding most all-thing work for
-  objects outside the local collision area.
+  objects outside the local collision area. Player projectile hit range and
+  coarse-cell span are derived once at spawn time and reused for every active
+  projectile frame.
 - Projectile updates split player-owned target scans from monster-owned player
   collision checks, avoiding the opposite ownership path each active projectile
   frame. Monster projectile spawn also reuses the player point already loaded
