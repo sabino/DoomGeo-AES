@@ -72,10 +72,10 @@ readable.
   close doors and panels retain more horizontal texture detail after hardware
   shrink.
 - Floor and ceiling default to compact pre-baked perspective tile caches selected
-  by player direction and coarse position. The runtime wraps those columns
-  incrementally over several frames so the planes move with the camera without
-  runtime floor casting. `DOOM_FLAT_PLANES=1` switches back to static solid
-  planes for debugging.
+  by player direction and camera-lateral coarse position. The runtime wraps
+  those columns incrementally over several frames so strafing moves the planes
+  while forward walking avoids unrelated column swimming. `DOOM_FLAT_PLANES=1`
+  switches back to static solid planes for debugging.
 - The converter also emits a compact per-cell sector floor visual class and
   light band derived from `SECTORS` floor flat names, specials, and light
   levels. The runtime uses those generated cells to tint floor/ceiling palettes
@@ -579,6 +579,11 @@ readable.
   four frames. The overrun budget still backs off when a frame reaches vblank
   late, and `DOOM_WALL_UPLOAD_COLUMNS` / `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`
   let movement benches test alternate budgets without hand-editing `CFLAGS`.
+- The cached floor/ceiling updater now refreshes four of its 20 backdrop columns
+  per normal frame and two after a late frame, so turn/strafe plane changes
+  settle in about half the old time. `DOOM_BG_SCROLL_COLUMNS` and
+  `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement
+  bench path.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement

@@ -132,6 +132,10 @@ vblank had already started; `00` means no measured late frames in that window.
 Set `SMOKE_MAKE_ARGS` to pass isolated build variables through the same path,
 for example `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
 ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`. When a
+movement run needs renderer-budget experiments, the same variable can carry
+`DOOM_WALL_UPLOAD_COLUMNS`, `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`,
+`DOOM_BG_SCROLL_COLUMNS`, or `DOOM_BG_SCROLL_OVERRUN_COLUMNS` without editing
+source.
 custom `ROM=...` directory is used, the smoke helper copies the local
 `neogeo.zip` BIOS package there before launching GnGeo.
 

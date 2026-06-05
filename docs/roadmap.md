@@ -39,9 +39,10 @@ after the current documentation pass.
 
 ## Rendering Fidelity
 
-- Tune the first cached perspective floor/ceiling pass: reduce noise, improve
-  movement phase choices, and keep uploads inside the Neo Geo sprite/vblank
-  budget.
+- Continue tuning the cached perspective floor/ceiling pass: the first
+  camera-lateral phase and faster column budget reduced obvious forward-motion
+  swimming, but true forward texture phase still needs either additional baked
+  phase tiles or a different Neo Geo-friendly approximation.
 - Extend the current WAD render-line refinement into a true higher-fidelity
   path using the generated grid/q8 BSP vertex/node data. The converter now emits
   and verifies that data; the runtime still needs the front-to-back visible-seg

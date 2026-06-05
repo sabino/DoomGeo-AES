@@ -79,6 +79,12 @@ endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_OVERRUN=$(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)
 endif
+ifneq ($(strip $(DOOM_BG_SCROLL_COLUMNS)),)
+override CFLAGS += -DBG_SCROLL_COLUMNS_PER_FRAME=$(DOOM_BG_SCROLL_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_BG_SCROLL_OVERRUN_COLUMNS)),)
+override CFLAGS += -DBG_SCROLL_COLUMNS_OVERRUN=$(DOOM_BG_SCROLL_OVERRUN_COLUMNS)
+endif
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)

@@ -72,10 +72,13 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
 - Doom flats are sampled into tile banks and perspective plane caches at build
   time. Normal runtime floor identity remains a palette-level cue over those
-  cached planes. The player cell and a few wall-stopped forward view samples choose a
-  representative visible sector class, so hazards/liquids can read before
-  contact without introducing runtime floor casting. Liquid classes add a slow
-  palette pulse over the same floor gradients instead of animating flat pixels.
+  cached planes. Runtime column phase is driven from the camera plane rather
+  than raw map X/Y, which keeps forward walking from forcing unrelated backdrop
+  column shifts while still giving strafing a cheap lateral phase cue. The
+  player cell and a few wall-stopped forward view samples choose a representative
+  visible sector class, so hazards/liquids can read before contact without
+  introducing runtime floor casting. Liquid classes add a slow palette pulse
+  over the same floor gradients instead of animating flat pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue
@@ -140,6 +143,10 @@ current runtime accepts several compromises:
   16 of its 32 wall columns per frame during normal movement, so texture changes
   settle in roughly two frames; the overrun path clamps the budget back down
   when `wait_vblank_status()` reports late frames.
+- The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
+  budget. Balanced defaults update four of 20 backdrop columns per normal frame
+  and two after a late frame, keeping plane catch-up bounded without turning the
+  planes into a runtime span renderer.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as
