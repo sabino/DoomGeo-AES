@@ -142,6 +142,8 @@ def convert_map(args: argparse.Namespace, map_name: str, header: Path, source: P
             str(args.width),
             "--height",
             str(args.height),
+            "--detail-cull",
+            str(args.detail_cull),
             "--out",
             str(header),
             "--map-source",
@@ -150,7 +152,8 @@ def convert_map(args: argparse.Namespace, map_name: str, header: Path, source: P
             str(header.with_name("doom_assets_generated.h")),
             "--assets-source",
             str(header.with_name("doom_assets_generated.c")),
-        ],
+        ]
+        + (["--readability-cleanup"] if args.readability_cleanup else []),
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -164,6 +167,8 @@ def main() -> int:
     parser.add_argument("--maps", default=",".join(DEFAULT_MAPS))
     parser.add_argument("--width", type=int, default=96)
     parser.add_argument("--height", type=int, default=72)
+    parser.add_argument("--detail-cull", type=float, default=0.20)
+    parser.add_argument("--readability-cleanup", action="store_true")
     parser.add_argument("--skill-mask", type=int, default=4)
     parser.add_argument("--build-dir", default="build/episode-route")
     parser.add_argument("--strict", action="store_true", help="Fail if any map does not have a generated route")

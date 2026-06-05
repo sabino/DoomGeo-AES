@@ -56,7 +56,8 @@ after the current documentation pass.
   are still a main reason the native Doom E1M1 start view does not match exactly
   even though the same map and player start are loaded.
 - Keep checking native-vs-NeoGeo waypoints after converter changes. The centered
-  `96x72` map improves coordinate fidelity, but current E1M1/E1M2 start
+  `96x72` map plus scale-aware simplification improves coordinate fidelity and
+  removes some false full-height map noise, but current E1M1/E1M2 start
   comparisons still show large visual differences from native Doom.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.

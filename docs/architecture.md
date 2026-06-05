@@ -51,6 +51,12 @@ and emits generated C headers/sources under `build/`:
 - Centered WAD-to-grid bounds. The default conversion is `96x72`, and generated
   starts/things preserve sub-cell WAD positions where possible instead of
   drifting to one anchored corner of the converted grid.
+- Scale-aware map simplification. The normal build keeps the `96x72` coordinate
+  frame but culls very short solid linedefs and opens isolated coarse-grid wall
+  specks, because those details read as false full-height columns in the Neo Geo
+  sprite-strip renderer. `DOOM_MAP_DETAIL_CULL` and
+  `DOOM_MAP_READABILITY_CLEANUP` can be overridden for exact-conversion
+  experiments.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

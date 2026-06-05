@@ -14,10 +14,14 @@ readable.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
 - Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
-  `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
-  mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
-  or `2` for medium placement. The default grid is now centered at `96x72`,
-  which gives the converter more room to preserve original WAD placement.
+  `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`,
+  `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
+  default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
+  `1` for easy or `2` for medium placement. The default grid remains centered
+  at `96x72`, which gives the converter room to preserve original WAD
+  placement, but the default map pass now removes tiny solid-line noise and
+  isolated wall specks that become false full-height obstacles in the
+  sprite-strip raycaster.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.

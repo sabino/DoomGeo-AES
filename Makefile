@@ -41,6 +41,8 @@ DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
 DOOM_MAP_WIDTH?=96
 DOOM_MAP_HEIGHT?=72
+DOOM_MAP_DETAIL_CULL?=2.0
+DOOM_MAP_READABILITY_CLEANUP?=1
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=quality
@@ -55,6 +57,7 @@ DOOM_MAP_OBJECT=$(BUILDDIR)/doom_map_generated.o
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
+DOOM_MAP_CLEANUP_ARGS=$(if $(filter 1 yes true,$(DOOM_MAP_READABILITY_CLEANUP)),--readability-cleanup,)
 GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
@@ -390,10 +393,10 @@ route-check: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE)
 	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER) --source $(DOOM_MAP_SOURCE)
 
 episode-route-report: $(DOOM_IWAD)
-	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK)
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --skill-mask $(DOOM_SKILL_MASK)
 
 episode-route-check: $(DOOM_IWAD)
-	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK) --strict
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --skill-mask $(DOOM_SKILL_MASK) --strict
 
 bsp-asset-check: doom-assets
 	$(PYTHON) tools/check_bsp_assets.py --map-header $(DOOM_MAP_HEADER) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
@@ -409,7 +412,7 @@ $(DOOM_SHAREWARE_ZIP):
 	curl -L --fail --output $@ $(DOOM_SHAREWARE_URL)
 
 $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE): Makefile tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 
