@@ -290,9 +290,39 @@ def grid_coord(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int
     return gx, gy
 
 
+def grid_x_coord(x: int, min_x: int, scale: float, margin: int) -> float:
+    return margin + (x - min_x) / scale
+
+
+def grid_y_coord(y: int, max_y: int, scale: float, margin: int) -> float:
+    return margin + (max_y - y) / scale
+
+
 def grid_point(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[int, int]:
     gx, gy = grid_coord(x, y, min_x, max_y, scale, margin)
     return int(round(gx)), int(round(gy))
+
+
+def grid_q8(x: int, y: int, min_x: int, max_y: int, scale: float, margin: int) -> tuple[int, int]:
+    gx, gy = grid_coord(x, y, min_x, max_y, scale, margin)
+    return int(round(gx * 256)), int(round(gy * 256))
+
+
+def node_grid_q8(node: Node, min_x: int, max_y: int, scale: float, margin: int) -> tuple[int, int, int, int, list[int]]:
+    x_q8, y_q8 = grid_q8(node.x, node.y, min_x, max_y, scale, margin)
+    end_x_q8, end_y_q8 = grid_q8(node.x + node.dx, node.y + node.dy, min_x, max_y, scale, margin)
+    bbox_q8: list[int] = []
+    for side in range(2):
+        top, bottom, left, right = node.bbox[side * 4 : side * 4 + 4]
+        bbox_q8.extend(
+            [
+                int(round(grid_y_coord(top, max_y, scale, margin) * 256)),
+                int(round(grid_y_coord(bottom, max_y, scale, margin) * 256)),
+                int(round(grid_x_coord(left, min_x, scale, margin) * 256)),
+                int(round(grid_x_coord(right, min_x, scale, margin) * 256)),
+            ]
+        )
+    return x_q8, y_q8, end_x_q8 - x_q8, end_y_q8 - y_q8, bbox_q8
 
 
 def raster_line(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> None:
@@ -1381,6 +1411,10 @@ def emit_assets(
     things: list[Thing],
     reject: bytes,
     blockmap: list[int],
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
 ) -> None:
     os.makedirs(os.path.dirname(header_path), exist_ok=True)
     tex_ids = texture_ids(sidedefs, sectors)
@@ -1406,6 +1440,8 @@ def emit_assets(
         f.write("typedef struct NgSeg { int16_t v1; int16_t v2; int16_t angle; int16_t linedef; int16_t side; int16_t offset; } NgSeg;\n")
         f.write("typedef struct NgSubsector { uint16_t numsegs; uint16_t firstseg; } NgSubsector;\n")
         f.write("typedef struct NgNode { int16_t x; int16_t y; int16_t dx; int16_t dy; int16_t bbox[8]; uint16_t child[2]; } NgNode;\n")
+        f.write("typedef struct NgBspVertex { int16_t x_q8; int16_t y_q8; } NgBspVertex;\n")
+        f.write("typedef struct NgBspNode { int16_t x_q8; int16_t y_q8; int16_t dx_q8; int16_t dy_q8; int16_t bbox_q8[8]; uint16_t child[2]; } NgBspNode;\n")
         f.write("typedef struct NgThing { int16_t x; int16_t y; uint16_t angle; uint16_t type; uint16_t flags; } NgThing;\n\n")
         f.write(f"#define NG_VERTEX_COUNT {len(vertices)}\n")
         f.write(f"#define NG_LINE_COUNT {len(linedefs)}\n")
@@ -1414,6 +1450,8 @@ def emit_assets(
         f.write(f"#define NG_SEG_COUNT {len(segs)}\n")
         f.write(f"#define NG_SUBSECTOR_COUNT {len(subsectors)}\n")
         f.write(f"#define NG_NODE_COUNT {len(nodes)}\n")
+        f.write("#define NG_BSP_VERTEX_COUNT NG_VERTEX_COUNT\n")
+        f.write("#define NG_BSP_NODE_COUNT NG_NODE_COUNT\n")
         f.write(f"#define NG_THING_COUNT {len(things)}\n")
         f.write(f"#define NG_REJECT_SIZE {len(reject)}\n")
         f.write(f"#define NG_BLOCKMAP_WORD_COUNT {len(blockmap)}\n")
@@ -1425,6 +1463,8 @@ def emit_assets(
         f.write("extern const NgSeg g_ng_segs[NG_SEG_COUNT];\n")
         f.write("extern const NgSubsector g_ng_subsectors[NG_SUBSECTOR_COUNT];\n")
         f.write("extern const NgNode g_ng_nodes[NG_NODE_COUNT];\n")
+        f.write("extern const NgBspVertex g_ng_bsp_vertices[NG_BSP_VERTEX_COUNT];\n")
+        f.write("extern const NgBspNode g_ng_bsp_nodes[NG_BSP_NODE_COUNT];\n")
         f.write("extern const NgThing g_ng_things[NG_THING_COUNT];\n")
         f.write("extern const uint8_t g_ng_reject[NG_REJECT_SIZE];\n")
         f.write("extern const int16_t g_ng_blockmap[NG_BLOCKMAP_WORD_COUNT];\n\n")
@@ -1475,6 +1515,24 @@ def emit_assets(
                 for node in nodes
             ],
             "NG_NODE_COUNT",
+        )
+        write_array(
+            f,
+            "NgBspVertex",
+            "g_ng_bsp_vertices",
+            [f"{{{x_q8},{y_q8}}}" for x_q8, y_q8 in (grid_q8(v.x, v.y, min_x, max_y, scale, margin) for v in vertices)],
+            "NG_BSP_VERTEX_COUNT",
+        )
+        write_array(
+            f,
+            "NgBspNode",
+            "g_ng_bsp_nodes",
+            [
+                f"{{{x_q8},{y_q8},{dx_q8},{dy_q8},{{{','.join(str(v) for v in bbox_q8)}}},{{{node.child0},{node.child1}}}}}"
+                for node in nodes
+                for x_q8, y_q8, dx_q8, dy_q8, bbox_q8 in [node_grid_q8(node, min_x, max_y, scale, margin)]
+            ],
+            "NG_BSP_NODE_COUNT",
         )
         write_array(f, "NgThing", "g_ng_things", [f"{{{thing.x},{thing.y},{thing.angle},{thing.type},{thing.flags}}}" for thing in things], "NG_THING_COUNT")
         write_scalar_array(f, "uint8_t", "g_ng_reject", [f"0x{b:02x}" for b in reject], "NG_REJECT_SIZE", 16)
@@ -1627,6 +1685,10 @@ def convert(args: argparse.Namespace) -> None:
             things,
             reject,
             blockmap,
+            min_x,
+            max_y,
+            scale,
+            margin,
         )
     print(
         f"{args.map.upper()}: {len(vertices)} vertices, {solid_count}/{len(linedefs)} solid lines "

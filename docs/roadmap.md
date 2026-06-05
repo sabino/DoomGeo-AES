@@ -43,7 +43,9 @@ after the current documentation pass.
   movement phase choices, and keep uploads inside the Neo Geo sprite/vblank
   budget.
 - Extend the current WAD render-line refinement into a true higher-fidelity
-  path using generated seg/node data.
+  path using the generated grid/q8 BSP vertex/node data. The converter now emits
+  and verifies that data; the runtime still needs the front-to-back visible-seg
+  owner pass that feeds the existing sprite-strip buffers.
 - Extend the new one-span two-sided wall approximation into real multiple
   clipped spans for windows, ledges, and upper/lower sector transitions; these
   are still a main reason the native Doom E1M1 start view does not match exactly

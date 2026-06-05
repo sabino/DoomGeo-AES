@@ -61,6 +61,16 @@
 #endif
 #endif
 
+#ifndef WALL_TILE_UPLOAD_COLUMNS_PER_FRAME
+#if defined(DOOM_DETAIL_CLARITY)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 16
+#elif defined(DOOM_DETAIL_QUALITY)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 12
+#else
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 8
+#endif
+#endif
+
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation. One world thing
  * sits behind the gun, so centered enemies are still visible but the weapon

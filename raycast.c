@@ -80,6 +80,8 @@ static u16 wall_alt_tiles[TILE_WALL_ALT_COUNT][TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
+static u8  wall_upload_scan = 0;
+static u8  wall_first_upload = 1;
 
 static inline int projected_height_from_inv(fix inv_dist) {
     int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
@@ -541,37 +543,56 @@ void rc_blit(void) {
         }
     }
 
-    /* directional shading */
-    for (int c = 0; c < NUM_COLS; c++) {
-        if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]) {
-            u16 spr = WALL_BASE + c;
-            u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
-            if (palbuf[c] != curpal[c]) {
-                u16 attr = (u16)(palbuf[c] << 8);
-                vram_addr(VRAM_SCB1 + spr * 64);
-                vram_mod(1);
-                for (int t = 0; t < WALL_WIN; t++) {
-                    vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
-                    vram_w(attr);
-                }
-                curpal[c] = palbuf[c];
-            } else {
-                vram_addr(VRAM_SCB1 + spr * 64);
-                vram_mod(2);
-                for (int t = 0; t < WALL_WIN; t++) vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
+    /* Texture/palette strip writes are much more expensive than SCB2/SCB3
+     * geometry. Spread them across frames so input response is not held
+     * hostage by rewriting every 15-tile wall column while turning. */
+    {
+        u8 budget = wall_first_upload ? NUM_COLS : WALL_TILE_UPLOAD_COLUMNS_PER_FRAME;
+        u8 remaining = 0;
+        u8 start = wall_upload_scan;
+        for (int i = 0; i < NUM_COLS; i++) {
+            int c = start + i;
+            u8 texture_changed;
+            u16 spr;
+            if (c >= NUM_COLS) c -= NUM_COLS;
+            spr = WALL_BASE + c;
+            texture_changed = (u8)(texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]);
+            if (!texture_changed && palbuf[c] == curpal[c]) continue;
+            if (!budget) {
+                remaining = 1;
+                break;
             }
-            curtex[c] = texbuf[c];
-            curkind[c] = kindbuf[c];
-            curclose[c] = closebuf[c];
-            continue;
+            budget--;
+            wall_upload_scan = (u8)(c + 1);
+            if (wall_upload_scan >= NUM_COLS) wall_upload_scan = 0;
+            if (texture_changed) {
+                u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
+                if (palbuf[c] != curpal[c]) {
+                    u16 attr = (u16)(palbuf[c] << 8);
+                    vram_addr(VRAM_SCB1 + spr * 64);
+                    vram_mod(1);
+                    for (int t = 0; t < WALL_WIN; t++) {
+                        vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
+                        vram_w(attr);
+                    }
+                    curpal[c] = palbuf[c];
+                } else {
+                    vram_addr(VRAM_SCB1 + spr * 64);
+                    vram_mod(2);
+                    for (int t = 0; t < WALL_WIN; t++) vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
+                }
+                curtex[c] = texbuf[c];
+                curkind[c] = kindbuf[c];
+                curclose[c] = closebuf[c];
+                continue;
+            }
+            vram_addr(VRAM_SCB1 + spr * 64 + 1);
+            vram_mod(2);
+            u16 attr = (u16)(palbuf[c] << 8);
+            for (int t = 0; t < WALL_WIN; t++) vram_w(attr);
+            curpal[c] = palbuf[c];
         }
-        if (palbuf[c] == curpal[c]) continue;
-        u16 spr = WALL_BASE + c;
-        vram_addr(VRAM_SCB1 + spr * 64 + 1);
-        vram_mod(2);                            
-        u16 attr = (u16)(palbuf[c] << 8);
-        for (int t = 0; t < WALL_WIN; t++) vram_w(attr);
-        curpal[c] = palbuf[c];
+        wall_upload_dirty = remaining;
+        if (!remaining) wall_first_upload = 0;
     }
-    wall_upload_dirty = 0;
 }

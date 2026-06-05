@@ -364,7 +364,10 @@ episode-route-report: $(DOOM_IWAD)
 episode-route-check: $(DOOM_IWAD)
 	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK) --strict
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check
+bsp-asset-check: doom-assets
+	$(PYTHON) tools/check_bsp_assets.py --map-header $(DOOM_MAP_HEADER) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

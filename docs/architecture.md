@@ -42,6 +42,11 @@ and emits generated C headers/sources under `build/`:
   instead of repeatedly classifying Doom type numbers.
 - Full compact arrays for vertices, linedefs, sidedefs, sectors, segs,
   subsectors, nodes, reject, and blockmap for future higher-fidelity work.
+- BSP vertices and nodes transformed into the raycaster's grid/q8 coordinate
+  space, so a future visible-seg renderer can traverse Doom nodes without doing
+  WAD-to-grid coordinate conversion on the 68000. `make bsp-asset-check`
+  verifies the generated counts, bounds, partition vectors, and child indices
+  for the selected map.
 
 The ROM does not load a WAD at runtime.
 
@@ -123,6 +128,15 @@ current runtime accepts several compromises:
   directly and skip solid-line refinement; open-cell WAD render-line spans stay
   enabled for windows, lower walls, upper walls, and doors. The quality/clarity
   tiers keep solid-line refinement for closer native-Doom still comparisons.
+- The converter now emits grid/q8 BSP node and vertex arrays beside the raw WAD
+  geometry, but the active renderer has not yet switched to front-to-back
+  visible-seg ownership. That is the next step toward replacing first-grid-wall
+  ray ownership with Doom-like seg ownership while still filling the existing
+  Neo Geo sprite-strip buffers.
+- Wall strip geometry updates every dirty frame, but texture/palette SCB1
+  rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
+  controller response and wall height motion from stalling behind a full
+  15-tile rewrite of every wall column while turning.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as
