@@ -21,11 +21,9 @@ after the current documentation pass.
 - Keep hardware-checking the direct C+D-pad and diagonal weapon shortcuts with
   `tools/smoke_weapon_shortcuts.sh`, then tune the mapping if diagonals are
   awkward on the target controls.
-- Replace the current synthetic shareware plasma/BFG fallback psprites with
-  exact art by testing a registered/commercial WAD path.
-- Improve BFG/plasma fidelity: BFG trace behavior, better projectile art when a
-  registered/commercial WAD provides exact assets, and visible pickup sprites
-  when the source WAD provides them.
+- Improve BFG/plasma fidelity under IWADs that actually provide those psprites:
+  BFG trace behavior, projectile tuning, and visible pickup sprites when the
+  source WAD provides them.
 - Complete enemy sprite coverage beyond the current A/B eight-way walk rotation
   groups plus partial rotated attack/pain coverage: full death rotations,
   registered/Doom II reaction rotations, and more faithful thing placement

@@ -63,12 +63,14 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
   clarity mode emits 32-phase wall/door atlases and a four-direction plane
   cache, while quality/balanced/speed keep the 16-phase wall atlases and
-  16-direction plane cache.
-- Doom flats are sampled into tile banks and perspective plane caches.
-- Runtime floor identity remains a palette-level cue over those pre-baked
-  caches. The player cell and a few wall-stopped forward view samples choose a
+  16-direction plane cache. The runtime defaults to the cached perspective plane
+  upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
+- Doom flats are sampled into tile banks and perspective plane caches at build
+  time. Normal runtime floor identity remains a palette-level cue over those
+  cached planes. The player cell and a few wall-stopped forward view samples choose a
   representative visible sector class, so hazards/liquids can read before
-  contact without introducing runtime floor casting.
+  contact without introducing runtime floor casting. Liquid classes add a slow
+  palette pulse over the same floor gradients instead of animating flat pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue
@@ -89,10 +91,10 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   WAD provides rotated reaction art. Runtime timers prefer those buckets, then
   fall back to the older front-facing attack/pain buckets and finally to walk
   frames without allocating extra world-sprite slots.
-- Registered/commercial-only psprite lumps that are missing from shareware are
-  replaced with synthetic fallback frames at build time, so the same runtime
-  weapon table can be tested with visibly distinct shareware plasma/BFG weapons
-  and then rebuilt with exact registered/commercial WAD art.
+- Weapon psprites use real WAD patches only. Builds emit a `WEAPON_ASSET_MASK`
+  from the selected IWAD and the runtime refuses to grant/select weapons whose
+  psprite art is missing. The default shareware build masks missing plasma/BFG;
+  explicit Freedoom builds provide the full redistributable weapon-art path.
 - The perspective plane cache is intentionally compact. Earlier multi-phase
   plane caches pushed monster tiles past the practical C-ROM tile index range,
   making enemies invisible even though their sprite slots were active.
@@ -111,11 +113,11 @@ current runtime accepts several compromises:
   cannot draw a near lower/upper span and a far wall in the same column.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The default clarity runtime uses a 64-column wall pass with one 4-strip world
-  thing so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` restores the older
-  40-column/seven-thing trade, while `balanced` and `speed` progressively spend
-  fewer sprites on walls and more on visible world things.
+  The default quality runtime uses a 40-column wall pass with seven visible
+  world things so walls, backdrop, weapon, and HUD stay inside the practical
+  96-sprites-per-scanline limit. `DOOM_DETAIL=clarity` keeps the heavier
+  64-column visual comparison path, while `balanced` and `speed` progressively
+  spend fewer sprites on walls and more on visible world things.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as

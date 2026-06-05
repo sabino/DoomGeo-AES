@@ -26,9 +26,10 @@ readable.
 
 ## Rendering
 
-- The default `DOOM_DETAIL=clarity` renderer uses 64 wall-column sprites over
-  the 320-pixel playfield, giving 5-pixel logical columns backed by 16-pixel
-  Neo Geo strips. This is the readability-first mode for normal play.
+- The default `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
+  the 320-pixel playfield, giving 8-pixel logical columns backed by 16-pixel
+  Neo Geo strips. This is the playable-response mode for normal builds; the
+  heavier 64-column `clarity` tier remains available for visual comparison.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
@@ -48,13 +49,12 @@ readable.
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- The default renderer spends almost the entire active playfield sprite budget
-  on wall fidelity: 20 backdrop strips, 64 wall columns, one 4-strip world
-  thing, and seven weapon strips fit exactly within the first 95 active sprites.
-  Alternate build tiers are available when a test scene needs more simultaneous
-  visible things: `DOOM_DETAIL=quality` uses 40 wall columns and seven world
-  things, `balanced` uses 32 columns and nine things, and `speed` uses 20
-  columns and eleven things.
+- The default renderer now leaves more active playfield sprite headroom for
+  world things: 20 backdrop strips, 40 wall columns, seven 4-strip world things,
+  and seven weapon strips fit inside the first 95 active sprites. Alternate
+  build tiers are available for different tradeoffs: `DOOM_DETAIL=clarity` uses
+  64 wall columns and one world thing, `balanced` uses 32 columns and nine
+  things, and `speed` uses 20 columns and eleven things.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
   tile strips. In clarity mode the wall, alternate-wall, and door atlases use
   32 texture-phase columns for closer-range readability; the other detail tiers
@@ -66,22 +66,11 @@ readable.
   Neo Geo tile. The runtime still draws one sprite strip per wall column, but
   close doors and panels retain more horizontal texture detail after hardware
   shrink.
-- Floor and ceiling use compact pre-baked perspective tile caches selected by
-  player direction and coarse position. Clarity mode uses four direction buckets
-  to free C-ROM and sprite-tile headroom for the denser wall atlases; the other
-  detail tiers keep the older 16-direction plane cache. The runtime wraps those
-  tile columns incrementally over several frames so movement reads less static
-  without spending one full vblank on plane uploads. The direction bucket is
-  cached and recalculated only when the view vector changes, so straight
-  movement keeps the cheaper scroll update path. Plane column uploads compute
-  ceiling/floor direction bases once per updater pass, add the wrapped column
-  inside the upload loop, and step row addresses by the generated cache width
-  instead of rebuilding the full perspective index for every tile. The
-  background path also asks the raycaster only for the facing vector and wraps
-  coarse scroll with bounded subtracts before deciding whether to upload
-  columns. This is a compromise, not true Doom span rendering; the cache is
-  deliberately kept small so monster and pickup sprite tiles stay inside the
-  visible Neo Geo C-ROM tile range.
+- Floor and ceiling default to compact pre-baked perspective tile caches selected
+  by player direction and coarse position. The runtime wraps those columns
+  incrementally over several frames so the planes move with the camera without
+  runtime floor casting. `DOOM_FLAT_PLANES=1` switches back to static solid
+  planes for debugging.
 - The converter also emits a compact per-cell sector floor visual class and
   light band derived from `SECTORS` floor flat names, specials, and light
   levels. The runtime uses those generated cells to tint floor/ceiling palettes
@@ -90,9 +79,13 @@ readable.
   WAD parsing or extra floor-casting work.
 - The floor palette selector also samples a few wall-stopped view rays ahead of
   the player and lets visible higher-priority sector classes bias the active
-  plane tint. Nukage, slime, lava, blood, and water therefore read with a
+  flat-plane tint. Nukage, slime, lava, blood, and water therefore read with a
   restrained preview tint before the player steps into them, while the renderer
-  still uses one Neo Geo-friendly pre-baked plane cache.
+  still avoids runtime floor casting.
+- Water, blood, and hazardous liquid classes also apply a slow four-phase
+  palette pulse to the already-baked floor gradients. This is a low-cost
+  substitute for Doom's animated flats that keeps liquid sectors visibly active
+  without runtime pixel drawing or extra floor sprites.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
@@ -142,10 +135,10 @@ readable.
 
 - Implemented runtime weapons: fist, pistol, shotgun, chaingun, rocket
   launcher, plasma rifle, BFG, and chainsaw.
-- The shareware WAD does not contain the original `PLSG`/`BFGG` weapon patches
-  or `CELL`/`CELP` pickup sprites. Shareware builds therefore bake synthetic
-  fallback psprite frames for plasma/BFG, while registered/commercial WAD builds
-  can bake the exact art through the same C-ROM path.
+- Weapon psprites are gated by generated WAD asset coverage. The default
+  shareware build masks missing plasma/BFG psprites instead of drawing
+  placeholder guns; explicit Freedoom builds exercise the full redistributable
+  plasma/BFG path.
 - Pistol/chaingun use compact hitscan-style targeting.
 - Plasma rifle spends cells rapidly and launches the baked small fireball strip
   as a visible forward projectile. A direct projectile hit applies compact

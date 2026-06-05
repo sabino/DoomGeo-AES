@@ -16,9 +16,9 @@ drawing pixels.
 | Area | Status |
 | --- | --- |
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
-| Rendering | Default clarity-mode 64-column wall raycaster with WAD-derived render-line hit refinement, denser Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and a one-slot visible world-thing budget kept under the Neo Geo scanline limit. `DOOM_DETAIL=quality` restores the older 40-column/seven-thing trade. Failed/missing sprite draws no longer consume visible thing slots. |
+| Rendering | Default 40-column wall raycaster tuned for playable movement response, with WAD-derived render-line hit refinement, Doom wall/door atlases, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=clarity` enables the heavier 64-column visual comparison mode, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
-| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use synthetic fallback psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the exact art. |
+| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths when the selected IWAD supplies the matching psprite art. The default shareware build masks unavailable plasma/BFG psprites instead of drawing fake placeholders; explicit Freedoom builds exercise the full redistributable weapon-art path. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Flow | Normal ROMs boot to a fix-layer block-letter intro/menu and start E1M1 with B or D. Focused verification ROMs skip the intro so smoke captures still launch directly into their scenario. |
@@ -67,9 +67,9 @@ drawing pixels.
 | --- | --- |
 | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
 
-| Arsenal test ROM | BFG fallback weapon | Held-C weapon shortcut |
-| --- | --- | --- |
-| ![Arsenal verification ROM with all weapons, keycards, ammo, armor, and the synthetic shareware plasma fallback visible](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Arsenal verification ROM after selecting BFG with the synthetic shareware BFG fallback visible](docs/screenshots/doomgeo-aes-bfg-fallback.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
+| Arsenal test ROM | Held-C weapon shortcut |
+| --- | --- |
+| ![Arsenal verification ROM with available WAD-backed weapons, keycards, ammo, and armor](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
 
 | Death/drop test ROM |
 | --- |
@@ -122,6 +122,9 @@ The default GnGeo keyboard mapping is:
 ## Build And Run
 
 Tools and downloaded WAD data are kept under `.tools/`, which is ignored by git.
+The default build uses the Doom 1 shareware WAD zip. To compare against an owned
+Doom 1 IWAD, pass `DOOM_IWAD=/path/to/DOOM.WAD`; to test the full
+redistributable weapon-art path explicitly, pass `DOOM_IWAD=$(FREEDOOM_ZIP)`.
 
 ```sh
 python3 tools/doomgeo_build.py install
@@ -133,7 +136,8 @@ SDL_VIDEODRIVER=x11 make gngeo
 Useful variants:
 
 ```sh
-make cart                         # default DOOM_DETAIL=clarity
+make cart                         # default DOOM_DETAIL=quality
+make cart DOOM_DETAIL=clarity     # 64 wall columns, four world thing strips
 make cart DOOM_DETAIL=quality     # 40 wall columns, seven world things
 make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
 make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things

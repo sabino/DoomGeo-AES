@@ -17,7 +17,7 @@
  * budget on walls first because navigation readability is the main bottleneck.
  */
 #if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
-#define DOOM_DETAIL_CLARITY 1
+#define DOOM_DETAIL_QUALITY 1
 #endif
 
 #if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
@@ -140,6 +140,9 @@
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT
 #define TILE_PLANE_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
 #define BG_SCROLL_COLUMNS_PER_FRAME 2
+#ifndef DOOM_FLAT_PLANES
+#define DOOM_FLAT_PLANES 0          /* pre-baked moving floor/ceiling cache */
+#endif
 #define TILE_CEILING_FLAT_BASE (TILE_DOOR_ATLAS_BASE + TILE_WALL_ATLAS_TILES)
 #define TILE_FLOOR_FLAT_BASE (TILE_CEILING_FLAT_BASE + TILE_FLAT_TILES)
 #define TILE_HUD_BASE (TILE_FLOOR_FLAT_BASE + TILE_FLAT_TILES)
@@ -216,8 +219,8 @@
 #define PAL_DEPTH_BASE 8            /* lit: 8..13, dark: 14..19              */
 
 /* ---- movement feel --------------------------------------------------- */
-#define MOVE_SPEED 0.12             
-#define ROT_COS    0.99863        
-#define ROT_SIN    0.05234        
+#define MOVE_SPEED 0.16
+#define ROT_COS    0.99619
+#define ROT_SIN    0.08716
 
 #endif /* CONFIG_H */

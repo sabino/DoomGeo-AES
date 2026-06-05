@@ -35,6 +35,8 @@ static u8 palette_effect = 0;
 static u8 power_palette_kind = 0;
 static u8 sector_floor_visual_kind = 0xFF;
 static u8 sector_light_band = 0xFF;
+static u8 sector_liquid_phase = 0;
+static u8 sector_liquid_tick = 0;
 static u8 face_pain_timer = 0;
 static u8 face_evil_timer = 0;
 static u8 face_turn_timer = 0;
@@ -73,26 +75,32 @@ static u8 sector_light_scale(u8 light) {
     }
 }
 
-static u8 sector_floor_tint(u8 value, u8 kind, u8 component) {
+static u8 sector_floor_pulse(u8 kind) {
+    static const u8 pulse[] = {0, 2, 4, 2};
+    if (kind == 0 || kind == 0xFF) return 0;
+    return (kind >= 4) ? (u8)(pulse[sector_liquid_phase & 3] >> 1) : pulse[sector_liquid_phase & 3];
+}
+
+static u8 sector_floor_tint(u8 value, u8 kind, u8 component, u8 pulse) {
     int out = value;
     switch (kind) {
     case 1: /* water */
-        out = (component == 2) ? value + 7 : value * 3 / 4;
+        out = (component == 2) ? value + 7 + pulse : value * 3 / 4;
         break;
     case 2: /* nukage/slime/lava/hazard */
-        out = (component == 1) ? value + 9 : value * 2 / 3;
+        out = (component == 1) ? value + 9 + pulse : value * 2 / 3;
         break;
     case 3: /* blood */
-        out = (component == 0) ? value + 8 : value * 2 / 3;
+        out = (component == 0) ? value + 8 + pulse : value * 2 / 3;
         break;
     case 4: /* water visible ahead */
-        out = (component == 2) ? value + 2 : value;
+        out = (component == 2) ? value + 2 + pulse : value;
         break;
     case 5: /* hazard visible ahead */
-        out = (component == 1) ? value + 2 : value;
+        out = (component == 1) ? value + 2 + pulse : value;
         break;
     case 6: /* blood visible ahead */
-        out = (component == 0) ? value + 2 : value;
+        out = (component == 0) ? value + 2 + pulse : value;
         break;
     default:
         break;
@@ -102,6 +110,7 @@ static u8 sector_floor_tint(u8 value, u8 kind, u8 component) {
 
 static void set_sector_flat_palette(u8 kind, u8 light) {
     u16 light_scale = sector_light_scale(light);
+    u8 pulse = sector_floor_pulse(kind);
     for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
         u8 r = shade_channel(g_ceiling_palette_rgb[i][0], light_scale);
         u8 g = shade_channel(g_ceiling_palette_rgb[i][1], light_scale);
@@ -112,9 +121,9 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
         u8 r = shade_channel(g_floor_palette_rgb[i][0], light_scale);
         u8 g = shade_channel(g_floor_palette_rgb[i][1], light_scale);
         u8 b = shade_channel(g_floor_palette_rgb[i][2], light_scale);
-        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(sector_floor_tint(r, kind, 0),
-                                             sector_floor_tint(g, kind, 1),
-                                             sector_floor_tint(b, kind, 2)));
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(sector_floor_tint(r, kind, 0, pulse),
+                                             sector_floor_tint(g, kind, 1, pulse),
+                                             sector_floor_tint(b, kind, 2, pulse)));
     }
 
     for (u16 row = 0; row < BG_SPLIT; row++) {
@@ -131,9 +140,9 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
             u8 g = shade_channel(g_floor_palette_rgb[i][1], floor_scale);
             u8 b = shade_channel(g_floor_palette_rgb[i][2], floor_scale);
             pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)(i + 1),
-                    RGB(sector_floor_tint(r, kind, 0),
-                        sector_floor_tint(g, kind, 1),
-                        sector_floor_tint(b, kind, 2)));
+                    RGB(sector_floor_tint(r, kind, 0, pulse),
+                        sector_floor_tint(g, kind, 1, pulse),
+                        sector_floor_tint(b, kind, 2, pulse)));
         }
     }
 }
@@ -146,9 +155,9 @@ static void restore_flat_palettes(void) {
 
 static void set_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
     for (int b = 0; b < DEPTH_BANDS; b++) {
-        int fn = 256 - (b * 200) / (DEPTH_BANDS - 1);
+        int fn = 256 - (b * 136) / (DEPTH_BANDS - 1);
         for (int s = 0; s < 2; s++) {
-            int sf = s ? 140 : 256;
+            int sf = s ? 190 : 256;
             u16 pal = (u16)(base + s * DEPTH_BANDS + b);
             for (u16 i = 0; i < colors; i++) {
                 int r = rgb[i][0] * fn / 256 * sf / 256;
@@ -435,6 +444,10 @@ static u8 sector_floor_visual_priority(u8 kind) {
     }
 }
 
+static u8 sector_floor_visual_is_liquid(u8 kind) {
+    return kind >= 1 && kind <= 6;
+}
+
 static void consider_sector_palette_cell(int cell_x, int cell_y, u8 *best_kind, u8 *best_light, u8 *best_priority) {
     u8 kind;
     u8 priority;
@@ -467,6 +480,7 @@ static void update_sector_flat_palette(void) {
     u8 kind;
     u8 light;
     u8 priority;
+    u8 phase_dirty = 0;
     rc_player_q8(&px, &py);
     kind = map_cell_floor_visual(px >> 8, py >> 8);
     light = map_cell_light(px >> 8, py >> 8);
@@ -475,7 +489,20 @@ static void update_sector_flat_palette(void) {
     sample_sector_palette_ray(px, py, dir_x, dir_y, &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x + (plane_x >> 1), dir_y + (plane_y >> 1), &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x - (plane_x >> 1), dir_y - (plane_y >> 1), &kind, &light, &priority);
-    if (kind == sector_floor_visual_kind && light == sector_light_band) return;
+    if (sector_floor_visual_is_liquid(kind)) {
+        if (++sector_liquid_tick >= 12) {
+            sector_liquid_tick = 0;
+            sector_liquid_phase = (u8)((sector_liquid_phase + 1) & 3);
+            phase_dirty = 1;
+        }
+    } else {
+        sector_liquid_tick = 0;
+        if (sector_liquid_phase) {
+            sector_liquid_phase = 0;
+            phase_dirty = 1;
+        }
+    }
+    if (kind == sector_floor_visual_kind && light == sector_light_band && !phase_dirty) return;
     sector_floor_visual_kind = kind;
     sector_light_band = light;
     if (palette_effect == 0) restore_flat_palettes();
@@ -911,6 +938,14 @@ enum {
     WEAPON_TOTAL = 8
 };
 
+#ifndef WEAPON_ASSET_MASK
+#define WEAPON_ASSET_MASK 0xFF
+#endif
+
+static u8 weapon_asset_available(u8 weapon) {
+    return (WEAPON_ASSET_MASK & (1u << weapon)) != 0;
+}
+
 typedef struct EnemyDraw {
     int thing_index;
     int sprite_def;
@@ -1287,10 +1322,12 @@ static u8 pickup_is_collectible(u16 thing_type) {
     case 2003: /* rocket launcher */
         return !player_has_rocket_launcher || player_rockets < player_max_rockets;
     case 2004: /* plasma rifle */
+        if (!weapon_asset_available(WEAPON_PLASMA)) return player_cells < player_max_cells;
         return !player_has_plasma || player_cells < player_max_cells;
     case 2005: /* chainsaw */
         return !player_has_chainsaw;
     case 2006: /* BFG 9000 */
+        if (!weapon_asset_available(WEAPON_BFG)) return player_cells < player_max_cells;
         return !player_has_bfg || player_cells < player_max_cells;
     case 8:    /* backpack */
         return !player_has_backpack || player_ammo < player_max_bullets || player_shells < player_max_shells || player_rockets < player_max_rockets || player_cells < player_max_cells;
@@ -1393,6 +1430,7 @@ static u8 thing_is_shootable(u16 thing_type) {
 }
 
 static u8 player_has_weapon(u8 weapon) {
+    if (!weapon_asset_available(weapon)) return 0;
     switch (weapon) {
     case WEAPON_PISTOL:
         return 1;
@@ -1416,6 +1454,7 @@ static u8 player_has_weapon(u8 weapon) {
 }
 
 static u8 weapon_has_ammo(u8 weapon) {
+    if (!weapon_asset_available(weapon)) return 0;
     switch (weapon) {
     case WEAPON_PISTOL:
         return player_ammo > 0;
@@ -3149,8 +3188,8 @@ static void configure_arsenal_test(void) {
     player_has_shotgun = 1;
     player_has_chaingun = 1;
     player_has_rocket_launcher = 1;
-    player_has_plasma = 1;
-    player_has_bfg = 1;
+    player_has_plasma = weapon_asset_available(WEAPON_PLASMA);
+    player_has_bfg = weapon_asset_available(WEAPON_BFG);
     player_has_chainsaw = 1;
     player_has_backpack = 1;
     player_keys = 1 | 2 | 4;
@@ -3160,7 +3199,7 @@ static void configure_arsenal_test(void) {
     player_cells = player_max_cells;
     player_armor = 200;
     player_armor_class = 2;
-    current_weapon = WEAPON_PLASMA;
+    current_weapon = player_has_plasma ? WEAPON_PLASMA : WEAPON_ROCKET;
     weapon_frame = 0xFF;
     shown_ammo = 0xFFFF;
     shown_keys = 0xFF;
@@ -3286,6 +3325,12 @@ static u8 apply_pickup(u16 thing_type) {
         face_evil_timer = 70;
         break;
     case 2004: /* plasma rifle */
+        if (!weapon_asset_available(WEAPON_PLASMA)) {
+            if (!add_capped_u16(&player_cells, 40, player_max_cells)) return 0;
+            shown_ammo = 0xFFFF;
+            pickup_message_type = 3;
+            break;
+        }
         if (player_has_plasma && player_cells >= player_max_cells) return 0;
         player_has_plasma = 1;
         current_weapon = WEAPON_PLASMA;
@@ -3307,6 +3352,12 @@ static u8 apply_pickup(u16 thing_type) {
         face_evil_timer = 70;
         break;
     case 2006: /* BFG 9000 */
+        if (!weapon_asset_available(WEAPON_BFG)) {
+            if (!add_capped_u16(&player_cells, 40, player_max_cells)) return 0;
+            shown_ammo = 0xFFFF;
+            pickup_message_type = 3;
+            break;
+        }
         if (player_has_bfg && player_cells >= player_max_cells) return 0;
         player_has_bfg = 1;
         current_weapon = WEAPON_BFG;
@@ -4063,13 +4114,15 @@ static u16 weapon_ammo(void) {
 }
 
 static u16 weapon_status_bits(void) {
-    u16 bits = (1 << WEAPON_PISTOL) | (1 << WEAPON_FIST);
-    if (player_has_shotgun) bits |= (1 << WEAPON_SHOTGUN);
-    if (player_has_chaingun) bits |= (1 << WEAPON_CHAINGUN);
-    if (player_has_rocket_launcher) bits |= (1 << WEAPON_ROCKET);
-    if (player_has_plasma) bits |= (1 << WEAPON_PLASMA);
-    if (player_has_bfg) bits |= (1 << WEAPON_BFG);
-    if (player_has_chainsaw) bits |= (1 << WEAPON_CHAINSAW);
+    u16 bits = 0;
+    if (player_has_weapon(WEAPON_PISTOL)) bits |= (1 << WEAPON_PISTOL);
+    if (player_has_weapon(WEAPON_SHOTGUN)) bits |= (1 << WEAPON_SHOTGUN);
+    if (player_has_weapon(WEAPON_CHAINGUN)) bits |= (1 << WEAPON_CHAINGUN);
+    if (player_has_weapon(WEAPON_ROCKET)) bits |= (1 << WEAPON_ROCKET);
+    if (player_has_weapon(WEAPON_PLASMA)) bits |= (1 << WEAPON_PLASMA);
+    if (player_has_weapon(WEAPON_BFG)) bits |= (1 << WEAPON_BFG);
+    if (player_has_weapon(WEAPON_FIST)) bits |= (1 << WEAPON_FIST);
+    if (player_has_weapon(WEAPON_CHAINSAW)) bits |= (1 << WEAPON_CHAINSAW);
     return (u16)(bits | (current_weapon << 8));
 }
 
@@ -4479,6 +4532,9 @@ static void init_background(void) {
 }
 
 static void update_background_scroll(void) {
+#if DOOM_FLAT_PLANES
+    return;
+#else
     int px, py;
     int dir_x, dir_y;
     u8 direction;
@@ -4537,6 +4593,7 @@ static void update_background_scroll(void) {
         }
     }
     if (bg_update_col >= BG_COUNT) bg_scroll_key = bg_pending_key;
+#endif
 }
 
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
@@ -4767,6 +4824,7 @@ static void update_weapon_bob(u8 pressed) {
 static void update_weapon(u8 pressed) {
     enum { B = 0x20 };
     u8 b_now = pressed & B;
+    if (!weapon_asset_available(current_weapon)) switch_to_ready_weapon();
     if (b_now && fire_timer == 0) {
         if (!switch_to_ready_weapon()) {
             if (!fire_prev) ammo_message_timer = 45;
@@ -5456,6 +5514,8 @@ static void restart_level(void) {
     face_idle_variant = 0;
     sector_floor_visual_kind = 0xFF;
     sector_light_band = 0xFF;
+    sector_liquid_phase = 0;
+    sector_liquid_tick = 0;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;

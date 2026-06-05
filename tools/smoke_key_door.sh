@@ -89,7 +89,7 @@ sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
 DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
-sleep 2.0
+sleep 1.2
 DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"

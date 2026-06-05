@@ -55,9 +55,10 @@ wid="$(window_for_gngeo)"
 DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
 sleep 0.3
 
-# GnGeo maps Neo Geo C to the keyboard "a" key in config.mk. Down+C should
-# directly select the rocket launcher in the arsenal verification ROM. Hold the
-# chord long enough for GnGeo's input polling to sample it across a frame.
+# GnGeo maps Neo Geo C to the keyboard "a" key in config.mk. In shareware
+# builds the arsenal ROM starts on rocket because plasma/BFG psprites are
+# unavailable, so Down+C should stay on rocket. Hold the chord long enough for
+# GnGeo's input polling to sample it across a frame.
 DISPLAY="$DISPLAY_VALUE" xdotool keydown Down
 sleep 0.1
 DISPLAY="$DISPLAY_VALUE" xdotool keydown a
