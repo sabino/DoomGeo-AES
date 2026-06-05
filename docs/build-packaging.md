@@ -88,7 +88,10 @@ Supported waypoint names are `start`, `e1m1-start`, `e1m2-start`,
 `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Start waypoints use the same
 map spawn on both sides. By default, non-start route waypoints drive both native
 Doom and the Neo Geo ROM with the same timed input script from that map spawn,
-which makes the side-by-side more useful for judging equivalent route views.
+with native Doom holding its speed modifier during forward movement. This makes
+the side-by-side more useful for judging equivalent route views; set
+`COMPARE_NATIVE_MOVE_MODIFIER=` to disable the native speed modifier when
+checking walk-speed captures.
 Set `COMPARE_ROUTE_MODE=focused` to use the older focused Neo Geo verification
 ROMs for `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Focused captures
 wait briefly before grabbing the window and reject all-black frames, so

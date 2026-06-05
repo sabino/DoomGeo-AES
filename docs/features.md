@@ -39,6 +39,9 @@ readable.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
+- Wall projection uses a taller Doom-biased scale than the raw playfield height,
+  so converted rooms spend less of the view on floor/ceiling backdrop and more
+  on readable wall structure.
 - The render-line broadphase is done offline by the converter. The E1M1 build
   currently emits 456 visual render lines and 1310 cell references; the runtime
   checks only the compact line candidates indexed by the traversed/hit cell
@@ -375,7 +378,9 @@ readable.
   waypoints under `.tools/screens/`: `start`, `e1m1-start`, `e1m2-start`,
   `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. The start waypoints use
   native and Neo Geo map spawns; non-start route waypoints now drive both
-  engines with the same timed input script from the map spawn by default.
+  engines with the same timed input script from the map spawn by default, with
+  native Doom holding its speed modifier during forward movement.
+  `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
   `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
   visual registers when that is the useful evidence.
 - The wall atlas keeps seven alternate texture banks but now spends two of

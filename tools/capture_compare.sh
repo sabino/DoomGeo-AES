@@ -27,6 +27,7 @@ neo_press_start="1"
 neo_settle_secs="${COMPARE_NEO_SETTLE_SECS:-}"
 waypoint_note=""
 route_mode="${COMPARE_ROUTE_MODE:-scripted}"
+native_move_modifier="${COMPARE_NATIVE_MOVE_MODIFIER:-Shift_L}"
 
 mkdir -p "$SCREENDIR" "$LOGDIR" "$(dirname "$LOCKDIR")"
 
@@ -176,6 +177,24 @@ hold_key() {
     sleep 0.15
 }
 
+hold_move_key() {
+    local wid="$1"
+    local key="$2"
+    local secs="$3"
+    local modifier="${4:-}"
+    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    if [ -n "$modifier" ]; then
+        xdotool keydown "$modifier"
+    fi
+    xdotool keydown "$key"
+    sleep "$secs"
+    xdotool keyup "$key"
+    if [ -n "$modifier" ]; then
+        xdotool keyup "$modifier"
+    fi
+    sleep 0.15
+}
+
 tap_key() {
     local wid="$1"
     local key="$2"
@@ -187,23 +206,24 @@ tap_key() {
 drive_waypoint_script() {
     local wid="$1"
     local use_key="$2"
+    local move_modifier="${3:-}"
     case "$WAYPOINT" in
         start|e1m1-start|e1m2-start)
             return 0
             ;;
         e1m1-encounter)
-            hold_key "$wid" Up 1.0
+            hold_move_key "$wid" Up 1.0 "$move_modifier"
             hold_key "$wid" Right 0.35
             ;;
         e1m1-scout)
-            hold_key "$wid" Up 1.8
+            hold_move_key "$wid" Up 1.8 "$move_modifier"
             hold_key "$wid" Left 0.85
-            hold_key "$wid" Up 0.55
+            hold_move_key "$wid" Up 0.55 "$move_modifier"
             ;;
         e1m2-keydoor)
-            hold_key "$wid" Up 1.2
+            hold_move_key "$wid" Up 1.2 "$move_modifier"
             hold_key "$wid" Left 0.45
-            hold_key "$wid" Up 0.8
+            hold_move_key "$wid" Up 0.8 "$move_modifier"
             tap_key "$wid" "$use_key"
             ;;
         *)
@@ -223,7 +243,7 @@ drive_native_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "$title")"
-    drive_waypoint_script "$wid" space
+    drive_waypoint_script "$wid" space "$native_move_modifier"
 }
 
 drive_neo_waypoint() {
@@ -264,7 +284,7 @@ configure_waypoint() {
                 neo_make_target="episode-map-gngeo"
                 neo_make_args=("EPISODE_MAP=E1M1")
                 neo_press_start="1"
-                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines"
+                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines; native movement holds ${native_move_modifier:-no speed modifier}"
             fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
@@ -278,7 +298,7 @@ configure_waypoint() {
                 neo_make_target="episode-map-gngeo"
                 neo_make_args=("EPISODE_MAP=E1M1")
                 neo_press_start="1"
-                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines"
+                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines; native movement holds ${native_move_modifier:-no speed modifier}"
             fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
@@ -292,7 +312,7 @@ configure_waypoint() {
                 neo_make_target="episode-map-gngeo"
                 neo_make_args=("EPISODE_MAP=E1M2")
                 neo_press_start="1"
-                waypoint_note="route waypoint uses the same timed input script from the E1M2 start in both engines"
+                waypoint_note="route waypoint uses the same timed input script from the E1M2 start in both engines; native movement holds ${native_move_modifier:-no speed modifier}"
             fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
