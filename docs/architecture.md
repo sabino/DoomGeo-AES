@@ -65,6 +65,10 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   cache, while quality/balanced/speed keep the 16-phase wall atlases and
   16-direction plane cache.
 - Doom flats are sampled into tile banks and perspective plane caches.
+- Runtime floor identity remains a palette-level cue over those pre-baked
+  caches. The player cell and a few wall-stopped forward view samples choose a
+  representative visible sector class, so hazards/liquids can read before
+  contact without introducing runtime floor casting.
 - Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - HUD keycards are baked from the WAD keycard patches into their own compact

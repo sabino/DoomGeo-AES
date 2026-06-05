@@ -85,6 +85,15 @@ static u8 sector_floor_tint(u8 value, u8 kind, u8 component) {
     case 3: /* blood */
         out = (component == 0) ? value + 8 : value * 2 / 3;
         break;
+    case 4: /* water visible ahead */
+        out = (component == 2) ? value + 2 : value;
+        break;
+    case 5: /* hazard visible ahead */
+        out = (component == 1) ? value + 2 : value;
+        break;
+    case 6: /* blood visible ahead */
+        out = (component == 0) ? value + 2 : value;
+        break;
     default:
         break;
     }
@@ -408,15 +417,58 @@ static void restore_play_palettes(void) {
     restore_wall_depth_palettes();
 }
 
+static u8 sector_floor_visual_priority(u8 kind) {
+    switch (kind) {
+    case 2: return 4; /* damaging liquid/hazard must read before contact */
+    case 5: return 4; /* visible hazard preview */
+    case 3: return 3; /* blood */
+    case 6: return 3; /* visible blood preview */
+    case 1: return 2; /* water */
+    case 4: return 2; /* visible water preview */
+    default: return 1;
+    }
+}
+
+static void consider_sector_palette_cell(int cell_x, int cell_y, u8 *best_kind, u8 *best_light, u8 *best_priority) {
+    u8 kind;
+    u8 priority;
+    if (map_at(cell_x, cell_y)) return;
+    kind = map_cell_floor_visual(cell_x, cell_y);
+    if (!kind) return;
+    priority = sector_floor_visual_priority(kind);
+    if (priority <= *best_priority) return;
+    *best_kind = (u8)(kind + 3);
+    *best_light = map_cell_light(cell_x, cell_y);
+    *best_priority = priority;
+}
+
+static void sample_sector_palette_ray(int px_q8, int py_q8, int ray_x_q8, int ray_y_q8,
+                                      u8 *best_kind, u8 *best_light, u8 *best_priority) {
+    static const short distances_q8[] = {192, 448, 768, 1152, 1536, 1920};
+    for (u8 i = 0; i < (u8)(sizeof(distances_q8) / sizeof(distances_q8[0])); i++) {
+        int sample_x_q8 = px_q8 + (int)(((long)ray_x_q8 * distances_q8[i]) >> 8);
+        int sample_y_q8 = py_q8 + (int)(((long)ray_y_q8 * distances_q8[i]) >> 8);
+        int cell_x = sample_x_q8 >> 8;
+        int cell_y = sample_y_q8 >> 8;
+        if (map_at(cell_x, cell_y)) break;
+        consider_sector_palette_cell(cell_x, cell_y, best_kind, best_light, best_priority);
+    }
+}
+
 static void update_sector_flat_palette(void) {
     int px, py;
+    int dir_x, dir_y, plane_x, plane_y;
     u8 kind;
     u8 light;
+    u8 priority;
     rc_player_q8(&px, &py);
-    px >>= 8;
-    py >>= 8;
-    kind = map_cell_floor_visual(px, py);
-    light = map_cell_light(px, py);
+    kind = map_cell_floor_visual(px >> 8, py >> 8);
+    light = map_cell_light(px >> 8, py >> 8);
+    priority = sector_floor_visual_priority(kind);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    sample_sector_palette_ray(px, py, dir_x, dir_y, &kind, &light, &priority);
+    sample_sector_palette_ray(px, py, dir_x + (plane_x >> 1), dir_y + (plane_y >> 1), &kind, &light, &priority);
+    sample_sector_palette_ray(px, py, dir_x - (plane_x >> 1), dir_y - (plane_y >> 1), &kind, &light, &priority);
     if (kind == sector_floor_visual_kind && light == sector_light_band) return;
     sector_floor_visual_kind = kind;
     sector_light_band = light;

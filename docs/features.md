@@ -83,6 +83,11 @@ readable.
   when the player enters water-like, damaging nukage/slime/lava, blood, or
   darker/brighter sectors. This keeps sector identity visible without runtime
   WAD parsing or extra floor-casting work.
+- The floor palette selector also samples a few wall-stopped view rays ahead of
+  the player and lets visible higher-priority sector classes bias the active
+  plane tint. Nukage, slime, lava, blood, and water therefore read with a
+  restrained preview tint before the player steps into them, while the renderer
+  still uses one Neo Geo-friendly pre-baked plane cache.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
@@ -557,8 +562,9 @@ readable.
   multi-map loading remains a packaging/runtime-data milestone.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
   combat, unless the radiation-suit timer is active. The generated floor visual
-  class uses the same sector-special source for hazard tinting, so damaging
-  floors are easier to read before they hurt the player.
+  class uses the same sector-special source for hazard tinting, and the runtime
+  lookahead samples make visible damaging floors easier to read before they hurt
+  the player.
 - Secret cells can be discovered once and increment the secret count.
 - The minimap uses the Neo Geo fix layer and overlays walls, player, threats,
   pickups, closed doors, and exits.
