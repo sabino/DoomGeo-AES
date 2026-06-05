@@ -77,6 +77,8 @@ The native-vs-NeoGeo captures generated in this run were:
 - `.tools/screens/compare-E1M2-start-20260605-122305-side-by-side.png`
 - `.tools/screens/compare-E1M1-start-20260605-125433-side-by-side.png`
 - `.tools/screens/compare-E1M2-start-20260605-125514-side-by-side.png`
+- `.tools/screens/compare-E1M1-start-20260605-131438-side-by-side.png`
+- `.tools/screens/compare-E1M2-start-20260605-131512-side-by-side.png`
 
 Those comparisons still show major visual gaps versus native Doom. This patch
 improves coordinate fidelity, route stability, step/ledge blocking, and sprite
@@ -90,3 +92,6 @@ separate art/readability gap.
 The floor palette preview now also scans a small forward cone, so E1M1's
 start-window hazard/liquid area is immediately recognizable instead of reading
 as the same gray floor as the starting sector.
+The local floor follow-up keeps that E1M1 hazard cue mostly in the far floor
+rows, so the visible liquid band is easier to distinguish from the normal
+near-floor texture while E1M2's start view remains neutral.

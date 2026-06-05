@@ -70,6 +70,7 @@ static void set_shaded_palette(u16 pal, const u8 rgb[][3], u16 colors, u16 scale
 }
 
 static u8 clamp31(int value);
+static u8 sector_floor_visual_is_liquid(u8 kind);
 
 static u8 sector_light_scale(u8 light) {
     switch (light) {
@@ -122,6 +123,8 @@ static u8 sector_floor_tint(u8 value, u8 kind, u8 component, u8 pulse) {
 static void set_sector_flat_palette(u8 kind, u8 light) {
     u16 light_scale = sector_light_scale(light);
     u8 pulse = sector_floor_pulse(kind);
+    u8 base_kind = (kind <= 3) ? kind : 0;
+    u8 local_kind = sector_floor_visual_is_liquid(kind) ? kind : 0;
     for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
         u8 r = shade_channel(g_ceiling_palette_rgb[i][0], light_scale);
         u8 g = shade_channel(g_ceiling_palette_rgb[i][1], light_scale);
@@ -132,14 +135,16 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
         u8 r = shade_channel(g_floor_palette_rgb[i][0], light_scale);
         u8 g = shade_channel(g_floor_palette_rgb[i][1], light_scale);
         u8 b = shade_channel(g_floor_palette_rgb[i][2], light_scale);
-        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(sector_floor_tint(r, kind, 0, pulse),
-                                             sector_floor_tint(g, kind, 1, pulse),
-                                             sector_floor_tint(b, kind, 2, pulse)));
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(sector_floor_tint(r, base_kind, 0, pulse),
+                                             sector_floor_tint(g, base_kind, 1, pulse),
+                                             sector_floor_tint(b, base_kind, 2, pulse)));
     }
 
     for (u16 row = 0; row < BG_SPLIT; row++) {
         u16 ceiling_scale = (u16)((90 + row * 24) * light_scale / 128);
         u16 floor_scale = (u16)((150 + row * 42) * light_scale / 128);
+        u8 row_base_kind = base_kind;
+        if (kind >= 4 && row < (BG_SPLIT / 2)) row_base_kind = kind;
         for (u16 i = 0; i < CEILING_PALETTE_COLORS; i++) {
             u8 r = shade_channel(g_ceiling_palette_rgb[i][0], ceiling_scale);
             u8 g = shade_channel(g_ceiling_palette_rgb[i][1], ceiling_scale);
@@ -151,9 +156,13 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
             u8 g = shade_channel(g_floor_palette_rgb[i][1], floor_scale);
             u8 b = shade_channel(g_floor_palette_rgb[i][2], floor_scale);
             pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)(i + 1),
-                    RGB(sector_floor_tint(r, kind, 0, pulse),
-                        sector_floor_tint(g, kind, 1, pulse),
-                        sector_floor_tint(b, kind, 2, pulse)));
+                    RGB(sector_floor_tint(r, row_base_kind, 0, pulse),
+                        sector_floor_tint(g, row_base_kind, 1, pulse),
+                        sector_floor_tint(b, row_base_kind, 2, pulse)));
+            pal_set((u16)(PAL_FLOOR_LOCAL_GRAD_BASE + row), (u16)(i + 1),
+                    RGB(sector_floor_tint(r, local_kind, 0, pulse),
+                        sector_floor_tint(g, local_kind, 1, pulse),
+                        sector_floor_tint(b, local_kind, 2, pulse)));
         }
     }
 }
@@ -4736,6 +4745,29 @@ static u8 wrap_background_scroll(int scroll) {
     return (u8)scroll;
 }
 
+static u8 local_floor_palette_kind(int px_q8, int py_q8, int dir_x_q8, int dir_y_q8,
+                                   int plane_x_q8, int plane_y_q8, u16 col, u16 floor_row) {
+    static const short distances_q8[BG_SPLIT] = {3072, 2560, 2048, 1536, 1024, 640};
+    int camera_q8 = (int)((((long)col * 2 + 1) * 256) / BG_COUNT) - 256;
+    int ray_x_q8 = dir_x_q8 + (int)(((long)plane_x_q8 * camera_q8) >> 8);
+    int ray_y_q8 = dir_y_q8 + (int)(((long)plane_y_q8 * camera_q8) >> 8);
+    int sample_distance = distances_q8[floor_row < BG_SPLIT ? floor_row : BG_SPLIT - 1];
+    u8 peek_blocks = 0;
+    for (u8 step = 0; step < 3; step++) {
+        int distance = sample_distance + (int)step * 384;
+        int cell_x = (px_q8 + (int)(((long)ray_x_q8 * distance) >> 8)) >> 8;
+        int cell_y = (py_q8 + (int)(((long)ray_y_q8 * distance) >> 8)) >> 8;
+        u8 kind;
+        if (map_at(cell_x, cell_y)) {
+            if (++peek_blocks > 1) return 0;
+            continue;
+        }
+        kind = map_cell_floor_visual(cell_x, cell_y);
+        if (kind >= 1 && kind <= 3) return (u8)(kind + 3);
+    }
+    return 0;
+}
+
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
@@ -4764,6 +4796,7 @@ static void update_background_scroll(u8 frame_overrun) {
     u16 direction_tile_offset;
     u16 ceiling_direction_base;
     u16 floor_direction_base;
+    u32 floor_pose_key;
     u32 key;
     u8 columns_this_frame = frame_overrun ? BG_SCROLL_COLUMNS_OVERRUN : BG_SCROLL_COLUMNS_PER_FRAME;
 
@@ -4778,7 +4811,8 @@ static void update_background_scroll(u8 frame_overrun) {
     /* Horizontal column wrapping is driven by camera-lateral motion so walking
      * forward does not force unrelated floor/ceiling column shifts. */
     scroll_col = wrap_background_scroll((int)(((long)px * plane_x + (long)py * plane_y) >> 14));
-    key = (u32)direction | ((u32)scroll_col << 8);
+    floor_pose_key = ((u32)((px >> 9) & 0x3F) << 13) | ((u32)((py >> 9) & 0x3F) << 19);
+    key = (u32)direction | ((u32)scroll_col << 8) | floor_pose_key;
     if (key != bg_pending_key) {
         bg_pending_key = key;
         bg_update_col = 0;
@@ -4808,7 +4842,11 @@ static void update_background_scroll(u8 frame_overrun) {
                 tile = ceiling_tile;
                 ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
             } else {
-                pal = (u16)(PAL_FLOOR_GRAD_BASE + (row - BG_SPLIT));
+                u16 floor_row = (u16)(row - BG_SPLIT);
+                u8 local_kind = local_floor_palette_kind(px, py, dir_x, dir_y, plane_x, plane_y, col, floor_row);
+                pal = sector_floor_visual_is_liquid(local_kind)
+                    ? (u16)(PAL_FLOOR_LOCAL_GRAD_BASE + floor_row)
+                    : (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
                 tile = floor_tile;
                 floor_tile = (u16)(floor_tile + TILE_PLANE_PERSPECTIVE_COLS);
             }
