@@ -12,5 +12,6 @@ export SMOKE_OUTPUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest/movement-benc
 export SMOKE_LOG="${SMOKE_LOG:-.tools/logs/movement-bench-gngeo.log}"
 
 tools/stress_movement.sh
+tools/check_movement_screens.py --dir "$SMOKE_OUTPUT_DIR" --expect-fps
 
 echo "movement bench log: $SMOKE_LOG"

@@ -4531,8 +4531,9 @@ static void init_background(void) {
     invalidate_background_cache();
 }
 
-static void update_background_scroll(void) {
+static void update_background_scroll(u8 frame_overrun) {
 #if DOOM_FLAT_PLANES
+    (void)frame_overrun;
     return;
 #else
     int px, py;
@@ -4543,7 +4544,7 @@ static void update_background_scroll(void) {
     u16 ceiling_direction_base;
     u16 floor_direction_base;
     u32 key;
-    u8 columns_this_frame = BG_SCROLL_COLUMNS_PER_FRAME;
+    u8 columns_this_frame = frame_overrun ? BG_SCROLL_COLUMNS_OVERRUN : BG_SCROLL_COLUMNS_PER_FRAME;
 
     rc_player_q8(&px, &py);
     rc_dir_q8(&dir_x, &dir_y);
@@ -5634,12 +5635,15 @@ int main(void) {
             pressed = 0;
         }
         rc_render();                    /* DDA during active display          */
-        (void)wait_vblank_status();
-        watchdog_kick();
-        update_sector_flat_palette();
-        update_hurt_flash();
-        update_weapon_flash();
-        update_background_scroll();
+        {
+            u8 frame_overrun = wait_vblank_status();
+            rc_set_frame_overrun(frame_overrun);
+            watchdog_kick();
+            update_sector_flat_palette();
+            update_hurt_flash();
+            update_weapon_flash();
+            update_background_scroll(frame_overrun);
+        }
         rc_blit();                      /* push to VRAM during vblank         */
         update_impact_effect();
         if (level_complete) hide_enemies();

@@ -82,6 +82,7 @@ static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 static u8  wall_upload_scan = 0;
 static u8  wall_first_upload = 1;
+static u8  wall_frame_overrun = 0;
 
 static inline int projected_height_from_inv(fix inv_dist) {
     int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
@@ -503,6 +504,10 @@ void rc_render(void) {
     wall_upload_dirty = 1;
 }
 
+void rc_set_frame_overrun(u8 overrun) {
+    wall_frame_overrun = (u8)(overrun ? 1 : 0);
+}
+
 void rc_blit(void) {
     int scb2_changes = 0;
     int scb3_changes = 0;
@@ -550,6 +555,9 @@ void rc_blit(void) {
         u8 budget = wall_first_upload ? NUM_COLS : WALL_TILE_UPLOAD_COLUMNS_PER_FRAME;
         u8 remaining = 0;
         u8 start = wall_upload_scan;
+        if (wall_frame_overrun && !wall_first_upload && budget > WALL_TILE_UPLOAD_COLUMNS_OVERRUN) {
+            budget = WALL_TILE_UPLOAD_COLUMNS_OVERRUN;
+        }
         for (int i = 0; i < NUM_COLS; i++) {
             int c = start + i;
             u8 texture_changed;

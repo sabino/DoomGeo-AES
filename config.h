@@ -71,6 +71,16 @@
 #endif
 #endif
 
+#ifndef WALL_TILE_UPLOAD_COLUMNS_OVERRUN
+#if defined(DOOM_DETAIL_CLARITY)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 8
+#elif defined(DOOM_DETAIL_QUALITY)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 6
+#else
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 4
+#endif
+#endif
+
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation. One world thing
  * sits behind the gun, so centered enemies are still visible but the weapon
@@ -157,6 +167,7 @@
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT
 #define TILE_PLANE_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
 #define BG_SCROLL_COLUMNS_PER_FRAME 2
+#define BG_SCROLL_COLUMNS_OVERRUN 1
 #ifndef DOOM_FLAT_PLANES
 #define DOOM_FLAT_PLANES 0          /* pre-baked moving floor/ceiling cache */
 #endif

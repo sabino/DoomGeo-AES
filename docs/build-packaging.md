@@ -119,7 +119,9 @@ It starts the normal ROM, holds forward, turn, and strafe inputs, and captures
 the resulting poses. Run `tools/bench_movement.sh` for the same path with
 GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
 `.tools/screens/latest/movement-bench/` and the emulator log is written to
-`.tools/logs/movement-bench-gngeo.log`.
+`.tools/logs/movement-bench-gngeo.log`. The bench finishes with
+`tools/check_movement_screens.py`, which rejects missing, blank, static, or
+obviously wrong movement captures before treating the run as useful evidence.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
