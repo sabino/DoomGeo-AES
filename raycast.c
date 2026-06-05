@@ -483,15 +483,20 @@ void rc_render(void) {
         if (tex_x >= TILE_WALL_ATLAS_COLS) tex_x = TILE_WALL_ATLAS_COLS - 1;
         tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
         texbuf[x] = (u8)tex_x;
+        u8 solid_height = 0;
 #if DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT
         if (g_render_cell_count[mapY][mapX]) {
             u8 solid_span = 0;
             u8 solid_span_height = 0;
 #if DOOM_SOLID_LINE_REFINEMENT
-            rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height);
+            if (rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height)) {
+                solid_height = solid_span_height;
+            }
 #else
             if (near_refinement_cells && perp <= ((fix)near_refinement_cells << FBITS)) {
-                rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height);
+                if (rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &solid_span, &solid_span_height)) {
+                    solid_height = solid_span_height;
+                }
             }
 #endif
         }
@@ -499,6 +504,10 @@ void rc_render(void) {
         fix inv_perp = recip(perp);
         int full_h = projected_height_from_inv(inv_perp);
         int h = full_h;                                  /* slice height px */
+        if (solid_height && solid_height < 128) {
+            h = (full_h * solid_height + 63) / 128;
+            if (h < 2) h = 2;
+        }
         if (span && span_height && span_perp < perp) {
             int candidate_h = projected_span_height(span_perp, span_height);
             int far_floor = full_h / PORTAL_SPAN_REPLACE_FAR_DIV;

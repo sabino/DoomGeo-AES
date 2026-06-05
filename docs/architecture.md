@@ -155,6 +155,8 @@ current runtime accepts several compromises:
   directly and skip solid-line refinement; open-cell WAD render-line spans stay
   enabled for windows, lower walls, upper walls, and doors. The quality/clarity
   tiers keep solid-line refinement for closer native-Doom still comparisons.
+  Refined solid-line hits also carry the front sector height, so low rooms such
+  as the E1M1 start do not render every wall column as a full 128-unit slab.
 - The converter now emits grid/q8 BSP node and vertex arrays beside the raw WAD
   geometry, but the active renderer has not yet switched to front-to-back
   visible-seg ownership. That is the next step toward replacing first-grid-wall

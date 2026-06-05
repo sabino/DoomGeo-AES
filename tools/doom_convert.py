@@ -550,6 +550,18 @@ def solid_line_texture_x(line: LineDef, sidedefs: list[SideDef]) -> int:
     return sidedefs[line.side_front].texture_x
 
 
+def solid_line_height(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> int:
+    if line.special in DOOR_SPECIALS:
+        return 128
+    if line.side_front == 0xFFFF or line.side_front >= len(sidedefs):
+        return 128
+    sector_index = sidedefs[line.side_front].sector
+    if sector_index < 0 or sector_index >= len(sectors):
+        return 128
+    sector = sectors[sector_index]
+    return min(128, max(16, sector.ceiling_height - sector.floor_height))
+
+
 def first_visible_texture(*sides: SideDef) -> str:
     for side in sides:
         for name in (side.mid_texture, side.bottom_texture, side.top_texture):
@@ -579,7 +591,7 @@ def line_side_sectors(line: LineDef, sidedefs: list[SideDef], sectors: list[Sect
 def visual_line_span(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> tuple[int, str, int, int] | None:
     if is_solid_linedef(line, sidedefs, sectors):
         texture_name = solid_line_texture(line, sidedefs)
-        return 0, texture_name, solid_line_texture_x(line, sidedefs), 0
+        return 0, texture_name, solid_line_texture_x(line, sidedefs), solid_line_height(line, sidedefs, sectors)
 
     sides = line_side_sectors(line, sidedefs, sectors)
     if sides is None:

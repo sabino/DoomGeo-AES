@@ -673,6 +673,11 @@ readable.
   farther two-sided floor or ceiling transition. The ray also preserves the
   far-wall hit before deciding whether a portal span is visually dominant enough
   to replace that column.
+- Solid WAD render lines now keep their front-sector height in the generated
+  render metadata. Quality/clarity solid-line refinement uses that height to
+  shrink low-room walls instead of projecting every one-sided wall as a full
+  128-unit column, improving the E1M1 start-room read without changing collision
+  or door cells.
 - `DOOM_ADAPTIVE_LINE_REFINEMENT`,
   `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
   `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`
