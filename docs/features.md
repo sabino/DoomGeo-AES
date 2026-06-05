@@ -561,6 +561,10 @@ readable.
   overlay enabled and longer holds. This gives a quick frame-pacing visual
   register under `.tools/screens/latest/movement-bench/` before and after
   renderer-cost changes.
+- Balanced rendering keeps the cheaper coarse wall path for distant solid walls
+  but refines nearby solid hits against the converted WAD line metadata. This
+  improves close wall texture phase/orientation readability without returning
+  the default ROM to the full-column refinement cost of the comparison tiers.
 - The converter flattens non-door two-sided sector transitions into narrow
   bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
   progression traversable in the Neo Geo port's 2D collision grid without

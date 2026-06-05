@@ -453,8 +453,16 @@ void rc_render(void) {
             tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
+#if DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT
+        if (!span && g_render_cell_count[mapY][mapX]) {
 #if DOOM_SOLID_LINE_REFINEMENT
-        if (!span && g_render_cell_count[mapY][mapX]) rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+            rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+#else
+            if (perp <= ((fix)DOOM_NEAR_LINE_REFINEMENT_CELLS << FBITS)) {
+                rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+            }
+#endif
+        }
 #endif
         distbuf[x] = perp;
 
