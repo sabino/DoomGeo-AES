@@ -397,6 +397,9 @@ void rc_render(void) {
         allow_span_refinement = 0;
         near_refinement_cells = DOOM_OVERRUN_LINE_REFINEMENT_CELLS;
     } else if (render_motion_active) {
+#if !DOOM_MOVING_SPAN_REFINEMENT
+        allow_span_refinement = 0;
+#endif
         near_refinement_cells = DOOM_MOVING_LINE_REFINEMENT_CELLS;
     }
 #endif

@@ -73,12 +73,12 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 - Doom flats are sampled into tile banks and perspective plane caches at build
   time. Normal runtime floor identity remains a palette-level cue over those
   cached planes. Runtime column phase is driven from the camera plane rather
-  than raw map X/Y, which keeps forward walking from forcing unrelated backdrop
-  column shifts while still giving strafing a cheap lateral phase cue. The
-  player cell and a few wall-stopped forward view samples choose a representative
-  visible sector class, so hazards/liquids can read before contact without
-  introducing runtime floor casting. Liquid classes add a slow palette pulse
-  over the same floor gradients instead of animating flat pixels.
+  than raw map X/Y, which keeps the cached floor/ceiling bank inside the
+  hardware-safe tile range while avoiding runtime floor casting. The player cell
+  and a few wall-stopped forward view samples choose a representative visible
+  sector class, so hazards/liquids can read before contact. Liquid classes add a
+  slow palette pulse over the same floor gradients instead of animating flat
+  pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue
@@ -103,9 +103,10 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   from the selected IWAD and the runtime refuses to grant/select weapons whose
   psprite art is missing. The default shareware build masks missing plasma/BFG;
   explicit Freedoom builds provide the full redistributable weapon-art path.
-- The perspective plane cache is intentionally compact. Earlier multi-phase
-  plane caches pushed monster tiles past the practical C-ROM tile index range,
-  making enemies invisible even though their sprite slots were active.
+- The perspective plane cache is intentionally compact. Multi-phase plane
+  experiments fit in C-ROM bytes but pushed floor/sprite references past the
+  practical Neo Geo tile index range, producing invalid/black strips even though
+  the ROM image still built.
 
 ## Why Not Exact Doom Yet
 
@@ -143,12 +144,12 @@ current runtime accepts several compromises:
   16 of its 32 wall columns per frame during normal movement, so texture changes
   settle in roughly two frames; the overrun path clamps the budget back down
   when `wait_vblank_status()` reports late frames.
-- Balanced mode also adapts WAD line refinement by motion state. Standing or
-  non-overrun frames keep the normal portal-span pass and near solid-line
-  correction, while moving frames use a tighter near-hit radius and late-frame
-  recovery skips span refinement for one frame. This keeps the runtime in the
-  sprite-strip model while spending less 68000 time on line intersection scans
-  exactly when input response matters most.
+- Balanced mode also adapts WAD line refinement by motion state. Standing frames
+  keep the normal portal-span pass and near solid-line correction, while moving
+  frames skip portal-span refinement and use a tighter near-hit radius. Late-frame
+  recovery keeps the same reduced span work for one frame. This keeps the runtime
+  in the sprite-strip model while spending less 68000 time on line intersection
+  scans exactly when input response matters most.
 - The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
   budget. Balanced defaults update four of 20 backdrop columns per normal frame
   and two after a late frame, keeping plane catch-up bounded without turning the

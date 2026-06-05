@@ -39,10 +39,11 @@ after the current documentation pass.
 
 ## Rendering Fidelity
 
-- Continue tuning the cached perspective floor/ceiling pass: the first
-  camera-lateral phase and faster column budget reduced obvious forward-motion
-  swimming, but true forward texture phase still needs either additional baked
-  phase tiles or a different Neo Geo-friendly approximation.
+- Continue tuning the cached perspective floor/ceiling pass. The stable default
+  keeps one phase per direction because multi-phase floor banks exceeded the
+  practical sprite tile index range; any future forward-motion cue needs a
+  smaller tile layout, fewer plane rows/directions, or a non-tile-index-heavy
+  approximation.
 - Extend the current WAD render-line refinement into a true higher-fidelity
   path using the generated grid/q8 BSP vertex/node data. The converter now emits
   and verifies that data; the runtime still needs the front-to-back visible-seg

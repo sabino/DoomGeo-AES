@@ -647,9 +647,9 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
         plane_x = -dir_y * fov_plane
         plane_y = dir_x * fov_plane
         for phase_y in range(PLANE_PERSPECTIVE_PHASES):
-            origin_y = (phase_y * 256) // PLANE_PERSPECTIVE_PHASES
+            origin_y = (phase_y * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
             for phase_x in range(PLANE_PERSPECTIVE_PHASES):
-                origin_x = (phase_x * 256) // PLANE_PERSPECTIVE_PHASES
+                origin_x = (phase_x * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
                 for row in range(PLANE_PERSPECTIVE_ROWS):
                     screen_tile_y = row if ceiling else BG_HALF_ROWS + row
                     for col in range(PLANE_PERSPECTIVE_COLS):

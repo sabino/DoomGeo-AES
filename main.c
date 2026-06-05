@@ -4610,9 +4610,8 @@ static void update_background_scroll(u8 frame_overrun) {
         bg_direction_bucket = plane_direction_bucket(dir_x, dir_y);
     }
     direction = bg_direction_bucket;
-    /* With one baked phase, only horizontal column phase is available.
-     * Drive it from camera-lateral motion so walking forward does not force
-     * unrelated floor/ceiling column shifts. */
+    /* Horizontal column wrapping is driven by camera-lateral motion so walking
+     * forward does not force unrelated floor/ceiling column shifts. */
     scroll_col = wrap_background_scroll((int)(((long)px * plane_x + (long)py * plane_y) >> 14));
     key = (u32)direction | ((u32)scroll_col << 8);
     if (key != bg_pending_key) {

@@ -14,7 +14,7 @@ EXPECTED_SIZE = (960, 672)
 PLAYFIELD_BOX = (0, 40, 960, 560)
 HUD_BOX = (0, 560, 960, 672)
 FPS_BOX = (0, 0, 220, 90)
-FRAME_STATS_BOX = (660, 230, 760, 285)
+FRAME_STATS_BOX = (640, 165, 780, 285)
 
 
 def pixels(image: Image.Image, box: tuple[int, int, int, int]) -> list[tuple[int, int, int]]:

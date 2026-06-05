@@ -73,9 +73,9 @@ readable.
   shrink.
 - Floor and ceiling default to compact pre-baked perspective tile caches selected
   by player direction and camera-lateral coarse position. The runtime wraps
-  those columns incrementally over several frames so strafing moves the planes
-  while forward walking avoids unrelated column swimming. `DOOM_FLAT_PLANES=1`
-  switches back to static solid planes for debugging.
+  columns incrementally so strafing moves the planes while keeping the tile bank
+  inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
+  solid planes for debugging.
 - The converter also emits a compact per-cell sector floor visual class and
   light band derived from `SECTORS` floor flat names, specials, and light
   levels. The runtime uses those generated cells to tint floor/ceiling palettes
@@ -579,11 +579,15 @@ readable.
   four frames. The overrun budget still backs off when a frame reaches vblank
   late, and `DOOM_WALL_UPLOAD_COLUMNS` / `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`
   let movement benches test alternate budgets without hand-editing `CFLAGS`.
-- The cached floor/ceiling updater now refreshes four of its 20 backdrop columns
-  per normal frame and two after a late frame, so turn/strafe plane changes
-  settle in about half the old time. `DOOM_BG_SCROLL_COLUMNS` and
-  `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement
-  bench path.
+- Balanced movement frames skip portal-span refinement and tighten near-line
+  refinement to a smaller radius, so held input spends less CPU time on
+  WAD-line intersection scans. Standing frames keep the richer portal-span pass
+  for visual recovery.
+- The cached floor/ceiling updater refreshes four of its 20 backdrop columns per
+  normal frame and two after a late frame, so turn/strafe plane changes settle in
+  about half the old time. `DOOM_BG_SCROLL_COLUMNS` and
+  `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement bench
+  path.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
@@ -594,13 +598,12 @@ readable.
   improves close wall texture phase/orientation readability without returning
   the default ROM to the full-column refinement cost of the comparison tiers.
 - Balanced mode tightens that near-line refinement radius while the player is
-  actively moving, and after a late frame it uses an even smaller recovery
-  radius while skipping portal-span refinement for one frame. Windows, lower
-  walls, upper walls, and doors still use span refinement on normal frames. The
-  quality/clarity tiers keep solid-line refinement for closer native-Doom still
-  comparisons.
+  actively moving and skips portal-span refinement on those moving frames.
+  Standing frames restore the portal-span pass, and after a late frame the same
+  reduced work is kept for one recovery frame. The quality/clarity tiers keep
+  solid-line refinement for closer native-Doom still comparisons.
 - `DOOM_ADAPTIVE_LINE_REFINEMENT`,
-  `DOOM_MOVING_LINE_REFINEMENT_CELLS`, and
+  `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
   `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`
   when movement benches need to test a different CPU/fidelity balance.
 - The converter flattens non-door two-sided sector transitions into narrow
