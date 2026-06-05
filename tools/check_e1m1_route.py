@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check generated E1M1 start-to-exit route connectivity."""
+"""Check generated Doom map start-to-exit route connectivity."""
 
 from __future__ import annotations
 
@@ -16,6 +16,13 @@ def parse_define_number(text: str, name: str) -> float:
     if not match:
         raise ValueError(f"missing {name}")
     return float(match.group(1))
+
+
+def parse_define_string(text: str, name: str) -> str:
+    match = re.search(rf"^#define\s+{re.escape(name)}\s+\"([^\"]*)\"", text, re.MULTILINE)
+    if not match:
+        raise ValueError(f"missing {name}")
+    return match.group(1)
 
 
 def parse_grid(text: str, symbol: str) -> list[list[int]]:
@@ -35,7 +42,8 @@ def parse_exits(text: str) -> list[tuple[int, int]]:
         raise ValueError("missing g_runtime_exits")
     end = text.index("};", start)
     exits: list[tuple[int, int]] = []
-    for x_q8, y_q8, _special in re.findall(r"\{(-?\d+),(-?\d+),(\d+)\}", text[start:end]):
+    for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+)(?:,\d+,\d+)?\}", text[start:end]):
+        x_q8, y_q8, _special = match.groups()
         exits.append((int(x_q8) >> 8, int(y_q8) >> 8))
     if not exits:
         raise ValueError("no exits parsed")
@@ -81,10 +89,12 @@ def bfs(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--header", default="build/doom_map_generated.h", help="Generated map header to inspect")
+    parser.add_argument("--label", help="Label to print in route results")
     args = parser.parse_args()
 
     header = Path(args.header)
     text = header.read_text(encoding="ascii")
+    label = args.label or parse_define_string(text, "DOOM_MAP_NAME")
     grid = parse_grid(text, "g_map")
     start = (int(parse_define_number(text, "DOOM_START_X")), int(parse_define_number(text, "DOOM_START_Y")))
     exits = parse_exits(text)
@@ -104,18 +114,18 @@ def main() -> int:
     open_path = bfs(grid, start, targets, allow_doors=False)
     door_path = bfs(grid, start, targets, allow_doors=True)
     if door_path is None:
-        print(f"{header}: no generated route from start {start} to exits {sorted(targets)} even with doors", file=sys.stderr)
+        print(f"{label}: no generated route from start {start} to exits {sorted(targets)} even with doors", file=sys.stderr)
         return 1
 
     door_cells = [(x, y, grid[y][x] - 2) for x, y in door_path if grid[y][x] >= 2]
     if not door_cells:
         print(
-            f"E1M1 route OK: start={start} exit={door_path[-1]} steps={len(door_path) - 1} doors=0 open_route=yes"
+            f"{label} route OK: start={start} exit={door_path[-1]} steps={len(door_path) - 1} doors=0 open_route=yes"
         )
         return 0
 
     print(
-        "E1M1 route OK: "
+        f"{label} route OK: "
         f"start={start} exit={door_path[-1]} steps={len(door_path) - 1} "
         f"doors={len(door_cells)} open_route={'yes' if open_path else 'no'} "
         f"door_cells={door_cells}"

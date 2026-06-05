@@ -21,11 +21,9 @@ after the current documentation pass.
 - Keep hardware-checking the direct C+D-pad and diagonal weapon shortcuts with
   `tools/smoke_weapon_shortcuts.sh`, then tune the mapping if diagonals are
   awkward on the target controls.
-- Replace the current synthetic shareware plasma/BFG fallback psprites with
-  exact art by testing a registered/commercial WAD path.
-- Improve BFG/plasma fidelity: BFG trace behavior, better projectile art when a
-  registered/commercial WAD provides exact assets, and visible pickup sprites
-  when the source WAD provides them.
+- Improve BFG/plasma fidelity under IWADs that actually provide those psprites:
+  BFG trace behavior, projectile tuning, and visible pickup sprites when the
+  source WAD provides them.
 - Complete enemy sprite coverage beyond the current A/B eight-way walk rotation
   groups plus partial rotated attack/pain coverage: full death rotations,
   registered/Doom II reaction rotations, and more faithful thing placement
@@ -41,15 +39,19 @@ after the current documentation pass.
 
 ## Rendering Fidelity
 
-- Tune the first cached perspective floor/ceiling pass: reduce noise, improve
-  movement phase choices, and keep uploads inside the Neo Geo sprite/vblank
-  budget.
+- Continue tuning the cached perspective floor/ceiling pass. The stable default
+  keeps one phase per direction because multi-phase floor banks exceeded the
+  practical sprite tile index range; any future forward-motion cue needs a
+  smaller tile layout, fewer plane rows/directions, or a non-tile-index-heavy
+  approximation.
 - Extend the current WAD render-line refinement into a true higher-fidelity
-  path using generated seg/node data.
-- Add sector-aware upper/lower wall spans, two-sided windows, and multiple
-  clipped spans; these are the main remaining reasons the native Doom E1M1
-  start view does not match exactly even though the same map and player start
-  are loaded.
+  path using the generated grid/q8 BSP vertex/node data. The converter now emits
+  and verifies that data; the runtime still needs the front-to-back visible-seg
+  owner pass that feeds the existing sprite-strip buffers.
+- Extend the new one-span two-sided wall approximation into real multiple
+  clipped spans for windows, ledges, and upper/lower sector transitions; these
+  are still a main reason the native Doom E1M1 start view does not match exactly
+  even though the same map and player start are loaded.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or
@@ -59,6 +61,9 @@ after the current documentation pass.
 
 - Keep refining minimap responsiveness after the incremental open/close pass:
   redraw only changed cells where possible.
+- Keep `make episode-route-check` green as the Episode 1 conversion baseline:
+  E1M1-E1M7 and E1M9 route through the generated grid, and E1M8 uses the
+  boss-death completion path.
 - Reduce runtime work in monster selection/projection.
 - Add a repeatable screenshot smoke test to CI for the Linux ROM build.
 - Convert more maps once E1M1 visual and gameplay fundamentals are stable.
@@ -69,4 +74,5 @@ after the current documentation pass.
 - Convert Doom sound lumps to Neo Geo-friendly sample data.
 - Decide whether music should be simplified YM2610 arrangements, sample-based
   approximations, or skipped until the visual/gameplay port is stronger.
-- Add menus, intermission flow, and more complete restart/progression behavior.
+- Replace the current standalone-map progression prompt with a true multi-map
+  episode/intermission flow once multiple generated maps can live in one cart.

@@ -64,7 +64,7 @@ def main() -> int:
 
     root = Path(args.dir)
     names = {
-        "plasma": "weapon-shortcut-before.png",
+        "rocket_initial": "weapon-shortcut-before.png",
         "rocket": "weapon-shortcut-cdown.png",
         "chaingun": "weapon-shortcut-held-c-right.png",
     }
@@ -84,18 +84,20 @@ def main() -> int:
     for state, image in images.items():
         weapon = region_score(image, WEAPON_BOX)
         hud = region_score(image, HUD_BOX)
-        if weapon["colored"] < 7000 or weapon["bright"] < 30000 or weapon["varied"] < 20:
+        if weapon["colored"] < 7000 or weapon["bright"] < 8000 or weapon["varied"] < 20:
             errors.append(f"{root / names[state]}: weak weapon evidence {weapon}")
-        if hud["red"] < 9000 or hud["bright"] < 65000:
+        if hud["red"] < 9000 or hud["bright"] < 55000:
             errors.append(f"{root / names[state]}: weak arsenal HUD evidence {hud}")
 
     comparisons = [
-        ("plasma", "rocket", 12000),
+        ("rocket_initial", "rocket", 0),
         ("rocket", "chaingun", 12000),
-        ("plasma", "chaingun", 14000),
+        ("rocket_initial", "chaingun", 12000),
     ]
     for left, right, minimum in comparisons:
         changed = diff_pixels(images[left], images[right], WEAPON_BOX)
+        if minimum == 0:
+            continue
         if changed < minimum:
             errors.append(f"{left}->{right}: weak weapon shortcut image delta {changed} < {minimum}")
 

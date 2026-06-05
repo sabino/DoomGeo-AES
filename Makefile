@@ -43,6 +43,12 @@ DOOM_MAP_WIDTH?=76
 DOOM_MAP_HEIGHT?=54
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
+DOOM_DETAIL?=balanced
+DOOM_FRAME_STATS?=0
+DOOM_WALL_UPLOAD_COLUMNS?=
+DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
+EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
+EPISODE_MAP?=E1M1
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
@@ -51,6 +57,43 @@ GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
 CUSTOM_GENERATE_TARGETS+=doom-assets
+
+ifeq ($(DOOM_DETAIL),clarity)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_CLARITY=1
+else ifeq ($(DOOM_DETAIL),quality)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_QUALITY=1
+else ifeq ($(DOOM_DETAIL),balanced)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_BALANCED=1
+else ifeq ($(DOOM_DETAIL),speed)
+DOOM_DETAIL_DEFINE=-DDOOM_DETAIL_SPEED=1
+else
+$(error DOOM_DETAIL must be clarity, quality, balanced, or speed)
+endif
+override CFLAGS += $(DOOM_DETAIL_DEFINE)
+ifeq ($(DOOM_FRAME_STATS),1)
+override CFLAGS += -DDOOM_FRAME_STATS=1
+endif
+ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
+override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)),)
+override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_OVERRUN=$(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_BG_SCROLL_COLUMNS)),)
+override CFLAGS += -DBG_SCROLL_COLUMNS_PER_FRAME=$(DOOM_BG_SCROLL_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_BG_SCROLL_OVERRUN_COLUMNS)),)
+override CFLAGS += -DBG_SCROLL_COLUMNS_OVERRUN=$(DOOM_BG_SCROLL_OVERRUN_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_ADAPTIVE_LINE_REFINEMENT)),)
+override CFLAGS += -DDOOM_ADAPTIVE_LINE_REFINEMENT=$(DOOM_ADAPTIVE_LINE_REFINEMENT)
+endif
+ifneq ($(strip $(DOOM_MOVING_LINE_REFINEMENT_CELLS)),)
+override CFLAGS += -DDOOM_MOVING_LINE_REFINEMENT_CELLS=$(DOOM_MOVING_LINE_REFINEMENT_CELLS)
+endif
+ifneq ($(strip $(DOOM_OVERRUN_LINE_REFINEMENT_CELLS)),)
+override CFLAGS += -DDOOM_OVERRUN_LINE_REFINEMENT_CELLS=$(DOOM_OVERRUN_LINE_REFINEMENT_CELLS)
+endif
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
@@ -100,7 +143,7 @@ $(FACE_TEST_ASSET_ROM):
 	mkdir -p $@
 
 $(FACE_TEST_GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(FACE_TEST_ASSET_ROM)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --face-tune-grid --out-dir $(FACE_TEST_ASSET_ROM)
 	touch $@
 
 $(FACE_TEST_PROM): $(FACE_TEST_ELF) | $(FACE_TEST_ROM)
@@ -215,6 +258,28 @@ exit-test-gngeo:
 	$(MAKE) exit-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/exit-test-rom $(GAMEROM)
 
+e1m8-boss-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M8 DOOM_DETAIL=quality BUILDDIR=build/e1m8-boss-test ROM=build/e1m8-boss-test-rom GFX_ROM_DIR=build/e1m8-boss-test-assets CFLAGS="-Ibuild/e1m8-boss-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M8_BOSS_TEST"
+	cp $(ROM)/neogeo.zip build/e1m8-boss-test-rom/neogeo.zip
+
+e1m8-boss-test-gngeo:
+	$(MAKE) e1m8-boss-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/e1m8-boss-test-rom $(GAMEROM)
+
+episode-map-rom:
+	$(MAKE) cart DOOM_MAP=$(EPISODE_MAP) BUILDDIR=build/episode-roms/$(EPISODE_MAP) ROM=build/episode-roms/$(EPISODE_MAP)-rom GFX_ROM_DIR=build/episode-roms/$(EPISODE_MAP)-assets
+	cp $(ROM)/neogeo.zip build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip
+
+episode-map-gngeo:
+	$(MAKE) episode-map-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/episode-roms/$(EPISODE_MAP)-rom $(GAMEROM)
+
+episode-roms:
+	@for map in $(EPISODE_MAPS); do \
+		echo "== $$map =="; \
+		$(MAKE) episode-map-rom EPISODE_MAP=$$map || exit $$?; \
+	done
+
 hidden-attack-test-rom:
 	$(MAKE) cart BUILDDIR=build/hidden-attack-test ROM=build/hidden-attack-test-rom GFX_ROM_DIR=build/hidden-attack-test-assets CFLAGS="-Ibuild/hidden-attack-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_HIDDEN_ATTACK_TEST"
 	cp $(ROM)/neogeo.zip build/hidden-attack-test-rom/neogeo.zip
@@ -232,7 +297,7 @@ melee-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/melee-test-rom $(GAMEROM)
 
 monster-gallery-rom:
-	$(MAKE) cart BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
 	cp $(ROM)/neogeo.zip build/monster-gallery-rom/neogeo.zip
 
 monster-gallery-gngeo:
@@ -240,7 +305,7 @@ monster-gallery-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/monster-gallery-rom $(GAMEROM)
 
 arsenal-test-rom:
-	$(MAKE) cart BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
 	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip
 
 arsenal-test-gngeo:
@@ -248,7 +313,7 @@ arsenal-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
 
 death-test-rom:
-	$(MAKE) cart BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
 	cp $(ROM)/neogeo.zip build/death-test-rom/neogeo.zip
 
 death-test-gngeo:
@@ -256,7 +321,7 @@ death-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
 powerup-test-rom:
-	$(MAKE) cart BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 	cp $(ROM)/neogeo.zip build/powerup-test-rom/neogeo.zip
 
 powerup-test-gngeo:
@@ -320,7 +385,16 @@ smoke-screenshot:
 route-check: $(DOOM_MAP_HEADER)
 	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check
+episode-route-report: $(DOOM_IWAD)
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK)
+
+episode-route-check: $(DOOM_IWAD)
+	$(PYTHON) tools/check_episode_routes.py --iwad $(DOOM_IWAD) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --skill-mask $(DOOM_SKILL_MASK) --strict
+
+bsp-asset-check: doom-assets
+	$(PYTHON) tools/check_bsp_assets.py --map-header $(DOOM_MAP_HEADER) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
@@ -366,7 +440,7 @@ $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
 
 $(GFX_ROM_DIR):

@@ -16,9 +16,9 @@ drawing pixels.
 | Area | Status |
 | --- | --- |
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
-| Rendering | 40-column wall raycaster with WAD-derived render-line hit refinement, Doom wall/door atlases, depth palettes, sprite-backed floor/ceiling approximation, and seven visible world-thing slots kept under the Neo Geo scanline limit. Failed/missing sprite draws no longer consume visible thing slots. |
+| Rendering | Default 32-column wall raycaster tuned for playable movement response, with WAD-derived portal/span hits, Doom wall/door atlases, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity` enable heavier visual comparison modes, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
-| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths. Shareware builds use synthetic fallback psprite frames for plasma/BFG because those Doom lumps are not present in `doom1.wad`; a registered/commercial WAD can supply the exact art. |
+| Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths when the selected IWAD supplies the matching psprite art. The default shareware build masks unavailable plasma/BFG psprites instead of drawing fake placeholders; explicit Freedoom builds exercise the full redistributable weapon-art path. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Higher-resolution internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Flow | Normal ROMs boot to a fix-layer block-letter intro/menu and start E1M1 with B or D. Focused verification ROMs skip the intro so smoke captures still launch directly into their scenario. |
@@ -67,9 +67,9 @@ drawing pixels.
 | --- | --- |
 | ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
 
-| Arsenal test ROM | BFG fallback weapon | Held-C weapon shortcut |
-| --- | --- | --- |
-| ![Arsenal verification ROM with all weapons, keycards, ammo, armor, and the synthetic shareware plasma fallback visible](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Arsenal verification ROM after selecting BFG with the synthetic shareware BFG fallback visible](docs/screenshots/doomgeo-aes-bfg-fallback.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
+| Arsenal test ROM | Held-C weapon shortcut |
+| --- | --- |
+| ![Arsenal verification ROM with available WAD-backed weapons, keycards, ammo, and armor](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
 
 | Death/drop test ROM |
 | --- |
@@ -87,12 +87,19 @@ The comparison capture is generated locally with `tools/capture_compare.sh` from
 the same shareware `E1M1` WAD data. It intentionally shows the current renderer
 gap: the native start room is not yet visually matched by the Neo Geo wall and
 plane approximation even though the converted map and Player 1 start are loaded.
+Set `COMPARE_WAYPOINT` to capture additional known views: `e1m1-start`,
+`e1m2-start`, `e1m1-encounter`, `e1m1-scout`, or `e1m2-keydoor`. Non-start
+native waypoints are driven by approximate scripted input from the native Doom
+spawn, while the Neo Geo side uses the matching focused ROM target when one
+exists.
 
 ## Controls
 
 | Input | Action |
 | --- | --- |
-| B or D on intro menu | Start E1M1 |
+| D-pad Up / Down on intro menu | Move menu selection |
+| B or D on intro menu | Confirm selection / start compiled map |
+| A on submenu | Return to the main intro menu |
 | D-pad Up / Down | Move forward/back |
 | D-pad Left / Right | Turn |
 | Hold A + Left/Right | Strafe |
@@ -101,7 +108,7 @@ plane approximation even though the converted map and Player 1 start are loaded.
 | Hold C + D-pad | Fast weapon shortcuts: Up shotgun, Right chaingun, Down rocket, Down+Right plasma, Down+Left BFG, Left close/basic. Direction-first and C-first chords both work. |
 | D | Use facing door |
 | Hold A + C | Toggle minimap |
-| D after DEAD/EXIT | Restart level |
+| D after DEAD/EXIT | Restart compiled level |
 
 The default GnGeo keyboard mapping is:
 
@@ -115,6 +122,9 @@ The default GnGeo keyboard mapping is:
 ## Build And Run
 
 Tools and downloaded WAD data are kept under `.tools/`, which is ignored by git.
+The default build uses the Doom 1 shareware WAD zip. To compare against an owned
+Doom 1 IWAD, pass `DOOM_IWAD=/path/to/DOOM.WAD`; to test the full
+redistributable weapon-art path explicitly, pass `DOOM_IWAD=$(FREEDOOM_ZIP)`.
 
 ```sh
 python3 tools/doomgeo_build.py install
@@ -126,7 +136,13 @@ SDL_VIDEODRIVER=x11 make gngeo
 Useful variants:
 
 ```sh
+make cart                         # default DOOM_DETAIL=balanced
+make cart DOOM_DETAIL=clarity     # 64 wall columns, four world thing strips
+make cart DOOM_DETAIL=quality     # 40 wall columns, seven world things
+make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
+make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things
 make route-check
+make bsp-asset-check
 tools/smoke_gameplay.sh
 make key-test-rom
 make key-test-gngeo
@@ -153,6 +169,8 @@ tools/smoke_death_drop.sh
 make powerup-test-rom
 make powerup-test-gngeo
 tools/smoke_powerup.sh
+tools/stress_movement.sh
+tools/bench_movement.sh
 make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
@@ -161,6 +179,8 @@ python3 tools/doomgeo_build.py build --target asm-rom
 python3 tools/doomgeo_build.py pages --out dist/pages
 make smoke-screenshot
 DOOM_MAP=E1M1 tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
 ```
 
 You must provide your own Neo Geo BIOS for local emulation. The browser package

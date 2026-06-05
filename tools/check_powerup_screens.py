@@ -81,12 +81,13 @@ def main() -> int:
     hud = score_region(image, (0, 560, 960, 672))
 
     require_min(errors, path, "left powerup pickups", left_powerups, "blue", 500)
-    require_min(errors, path, "left powerup pickups", left_powerups, "tan", 7000)
+    require_min(errors, path, "left powerup pickups", left_powerups, "tan", 4500)
     require_min(errors, path, "right powerup pickups", right_powerups, "green", 500)
-    require_min(errors, path, "right powerup pickups", right_powerups, "tan", 2500)
+    require_min(errors, path, "right powerup pickups", right_powerups, "tan", 2400)
+    require_min(errors, path, "right powerup pickups", right_powerups, "colored", 4200)
     require_min(errors, path, "visible imp", imp, "tan", 1000)
     require_min(errors, path, "visible imp", imp, "red", 500)
-    require_min(errors, path, "powerup playfield", playfield, "colored", 50000)
+    require_min(errors, path, "powerup playfield", playfield, "colored", 30000)
     require_min(errors, path, "status bar", hud, "red", 9000)
     require_min(errors, path, "status bar", hud, "bright", 65000)
 

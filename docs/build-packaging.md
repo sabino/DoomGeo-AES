@@ -72,10 +72,84 @@ that the converted player start can reach the converted exit from the current
 `build/doom_map_generated.h` and reports whether the route depends on generated
 door cells.
 
+For native Doom visual comparisons, run `tools/capture_compare.sh`. By default
+it captures the compiled map start view and writes native, Neo Geo, and
+side-by-side PNGs under `.tools/screens/`. The helper uses the same capture lock
+as smoke screenshots, so native and GnGeo windows cannot be cross-captured by a
+parallel comparison run. Set `COMPARE_WAYPOINT` to capture a named view:
+
+```sh
+DOOM_MAP=E1M1 tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
+COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
+```
+
+Supported waypoint names are `start`, `e1m1-start`, `e1m2-start`,
+`e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Start waypoints use the same
+map spawn on both sides. By default, non-start route waypoints drive both native
+Doom and the Neo Geo ROM with the same timed input script from that map spawn,
+with native Doom holding its speed modifier during forward movement. This makes
+the side-by-side more useful for judging equivalent route views; set
+`COMPARE_NATIVE_MOVE_MODIFIER=` to disable the native speed modifier when
+checking walk-speed captures.
+Set `COMPARE_ROUTE_MODE=focused` to use the older focused Neo Geo verification
+ROMs for `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Focused captures
+wait briefly before grabbing the window and reject all-black frames, so
+startup/transient captures do not silently become the side-by-side evidence.
+
+For a broader Episode 1 conversion baseline, run `make episode-route-report`.
+It converts `E1M1` through `E1M9` into `build/episode-route/` and reports
+which maps currently have a generated start-to-exit route at the configured
+grid size. Run `make episode-route-check` for the strict gate: E1M1-E1M7 and
+E1M9 must route, and E1M8 must expose the supported boss-death completion path.
+
+To build a standalone ROM for a specific Episode 1 map, run:
+
+```sh
+make episode-map-rom EPISODE_MAP=E1M3
+```
+
+The output lands in `build/episode-roms/E1M3-rom/`. Use
+`make episode-map-gngeo EPISODE_MAP=E1M3` to launch that standalone map in
+GnGeo. `make episode-roms` loops through E1M1-E1M9 and produces one standalone
+ROM output per map; this is still map-by-map packaging, not a single multi-map
+episode cart.
+
 For the broad playable-feature regression pass, run `tools/smoke_gameplay.sh`.
 It starts with `make route-check`, then chains the verified enemy visibility,
 key-door, weapon shortcut, death/drop, and powerup smoke helpers into one command
 and refreshes the same screenshots under `.tools/screens/latest/`.
+
+For movement feel and frame-pacing registers, run `tools/stress_movement.sh`.
+It starts the normal ROM, holds forward, turn, and strafe inputs, and captures
+the resulting poses. Run `tools/bench_movement.sh` for the same path with
+GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
+`.tools/screens/latest/movement-bench/` and the emulator log is written to
+`.tools/logs/movement-bench-gngeo.log`. The bench finishes with
+`tools/check_movement_screens.py`, which rejects missing, blank, static, or
+obviously wrong movement captures before treating the run as useful evidence.
+It also rejects GnGeo logs containing `Invalid write`, so palette or VRAM range
+mistakes cannot pass as a clean movement run just because the screenshots look
+plausible.
+The default color threshold targets the bright E1M1 start-room path; darker
+maps such as E1M2 can pass a lower `--min-play-colored` value to
+`tools/check_movement_screens.py` through `MOVEMENT_CHECK_ARGS` while still
+requiring FPS, frame-stat, and pose-delta evidence.
+By default the bench uses an isolated `DOOM_FRAME_STATS=1` build under
+`build/frame-stats/`. Its green marker plus `NN` playfield register reports how many
+frames in the latest 64-frame window reached `wait_vblank_status()` after
+vblank had already started; `00` means no measured late frames in that window.
+Set `SMOKE_MAKE_ARGS` to pass isolated build variables through the same path,
+for example `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
+ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`. When a
+movement run needs renderer-budget experiments, the same variable can carry
+`DOOM_WALL_UPLOAD_COLUMNS`, `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`,
+`DOOM_BG_SCROLL_COLUMNS`, or `DOOM_BG_SCROLL_OVERRUN_COLUMNS` without editing
+source. For CPU-side wall intersection tuning, pass
+`DOOM_ADAPTIVE_LINE_REFINEMENT`, `DOOM_MOVING_LINE_REFINEMENT_CELLS`, or
+`DOOM_OVERRUN_LINE_REFINEMENT_CELLS` through the same path. When a custom
+`ROM=...` directory is used, the smoke helper copies the local
+`neogeo.zip` BIOS package there before launching GnGeo.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting
@@ -99,6 +173,11 @@ For a focused first-level completion check, run `tools/smoke_e1m1_exit.sh`. It
 builds `make exit-test-rom`, starts two converted cells left of the real
 generated E1M1 exit trigger, walks into that trigger, captures the completed
 frame, and checks the `EXIT` plus kill/item/secret percentage overlay.
+
+For the E1M8 special boss-death exit, run `tools/smoke_e1m8_boss_exit.sh`. It
+builds `make e1m8-boss-test-rom` from the real E1M8 generated map, stages the
+two original Baron things in front of the player, fires once, and checks that
+the normal completion overlay appears after both bosses die.
 
 For an invisible-attacker regression pass, run `tools/smoke_hidden_attack.sh`.
 It builds `make hidden-attack-test-rom`, launches `make hidden-attack-test-gngeo`,
@@ -168,10 +247,11 @@ visible pickup/imp setup, then runs `tools/check_powerup_screens.py` to reject
 frames without powerup-colored pickups, the visible imp, and status-bar
 evidence.
 
-`tools/smoke_capture.sh` serializes emulator launches with an owner-tracked lock
-under `.tools/locks/` so parallel screenshot refreshes do not capture the wrong
-GnGeo window. If a previous aborted run left a directory-only or dead-PID lock,
-the helper clears it automatically before starting the next capture.
+`tools/smoke_capture.sh` and `tools/capture_compare.sh` serialize emulator
+launches with an owner-tracked lock under `.tools/locks/` so parallel screenshot
+refreshes do not capture the wrong native or GnGeo window. If a previous aborted
+run left a directory-only or dead-PID lock, the helpers clear it automatically
+before starting the next capture.
 
 Fast weapon shortcut input can be smoke-checked with:
 

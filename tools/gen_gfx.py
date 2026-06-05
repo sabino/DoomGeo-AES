@@ -33,7 +33,7 @@ M_PAD = 0x10000   # 64 KiB Z80 program, all 0x00 (NOP) -> silent
 V_PAD = 0x10000   # 64 KiB ADPCM samples, empty
 
 WALL_TEXTURE = "BROWN1"
-WALL_ALT_TEXTURES = ("BROWNGRN", "BROWN1", "SUPPORT2", "LITE3", "COMPTILE", "DOORSTOP", "BROWN144")
+WALL_ALT_TEXTURES = ("BROWNGRN", "BROWN1", "SUPPORT2", "SLADWALL", "COMPTALL", "COMPTILE", "BROWN144")
 DOOR_TEXTURE = "BIGDOOR2"
 WALL_MIP_TILE = 1
 SOLID_TILE = 2
@@ -112,7 +112,11 @@ HUD_SMALL_DIGIT_BASE = HUD_DIGIT_BASE + HUD_DIGIT_TILES
 HUD_SMALL_DIGIT_TILES = 10
 CEILING_PERSPECTIVE_BASE = HUD_SMALL_DIGIT_BASE + HUD_SMALL_DIGIT_TILES
 FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
-SPRITE_CACHE_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
+TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
+TITLEPIC_COLS = 20
+TITLEPIC_ROWS = 13
+TITLEPIC_TILES = TITLEPIC_COLS * TITLEPIC_ROWS
+SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
 # Must match main.c/config.h's weapon sprite-chain top. If this differs, the
 # correct Doom psprite is baked into the wrong part of the visible tile window.
 WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
@@ -121,6 +125,49 @@ DOOM_PSPR_SX = 1
 DOOM_PSPR_SY = 32
 WEAPON_BAKE_Y_ADJUST = 0
 WEAPON_CENTERED_FRAMES = {"SHTGB0", "SHTGC0", "SHTGD0"}
+
+
+def recompute_layout() -> None:
+    global WALL_ATLAS_TILES, WALL_ALT_ATLAS_BASE, DOOR_ATLAS_BASE
+    global PLANE_PERSPECTIVE_TILES, CEILING_FLAT_BASE, FLOOR_FLAT_BASE
+    global HUD_BASE, HUD_FACE_BASE, WEAPON_BASE, HUD_KEYCARD_BASE
+    global HUD_DIGIT_BASE, HUD_SMALL_DIGIT_BASE, CEILING_PERSPECTIVE_BASE
+    global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, SPRITE_CACHE_BASE
+
+    WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
+    WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
+    DOOR_ATLAS_BASE = WALL_ALT_ATLAS_BASE + len(WALL_ALT_TEXTURES) * WALL_ATLAS_TILES
+    PLANE_PERSPECTIVE_TILES = (
+        PLANE_PERSPECTIVE_DIRS
+        * PLANE_PERSPECTIVE_PHASES
+        * PLANE_PERSPECTIVE_PHASES
+        * PLANE_PERSPECTIVE_ROWS
+        * PLANE_PERSPECTIVE_COLS
+    )
+    CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
+    FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
+    HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
+    HUD_FACE_BASE = HUD_BASE + HUD_TILES
+    WEAPON_BASE = HUD_FACE_BASE + len(HUD_FACE_FRAMES) * HUD_FACE_TILES
+    HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
+    HUD_DIGIT_BASE = HUD_KEYCARD_BASE + HUD_KEYCARD_TILES
+    HUD_SMALL_DIGIT_BASE = HUD_DIGIT_BASE + HUD_DIGIT_TILES
+    CEILING_PERSPECTIVE_BASE = HUD_SMALL_DIGIT_BASE + HUD_SMALL_DIGIT_TILES
+    FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
+    TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
+    SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+
+
+def apply_detail_layout(detail: str) -> None:
+    global WALL_ATLAS_COLS, PLANE_PERSPECTIVE_DIRS
+
+    if detail == "clarity":
+        WALL_ATLAS_COLS = 32
+        PLANE_PERSPECTIVE_DIRS = 4
+    else:
+        WALL_ATLAS_COLS = 16
+        PLANE_PERSPECTIVE_DIRS = 16
+    recompute_layout()
 
 
 def encode_tile(px):
@@ -451,13 +498,14 @@ def sample_texture_tile(texture, playpal, palette, src_x, src_y, src_w, src_h):
 def sample_wall_column_tile(texture, playpal, palette, tex_col, tex_row, cols, rows):
     height = len(texture)
     width = len(texture[0])
-    tx = min(width - 1, int((tex_col + 0.5) * width / cols))
+    src_x0 = tex_col * width / cols
+    src_x1 = (tex_col + 1) * width / cols
     tile = [[0] * 16 for _ in range(16)]
     for y in range(16):
         ty = min(height - 1, int(((tex_row * 16) + y + 0.5) * height / (rows * 16)))
-        color = quantize_color(texture[ty][tx], playpal, palette)
         for x in range(16):
-            tile[y][x] = color
+            tx = min(width - 1, int(src_x0 + (x + 0.5) * (src_x1 - src_x0) / 16))
+            tile[y][x] = quantize_color(texture[ty][tx], playpal, palette)
     return tile
 
 
@@ -599,9 +647,9 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
         plane_x = -dir_y * fov_plane
         plane_y = dir_x * fov_plane
         for phase_y in range(PLANE_PERSPECTIVE_PHASES):
-            origin_y = (phase_y * 256) // PLANE_PERSPECTIVE_PHASES
+            origin_y = (phase_y * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
             for phase_x in range(PLANE_PERSPECTIVE_PHASES):
-                origin_x = (phase_x * 256) // PLANE_PERSPECTIVE_PHASES
+                origin_x = (phase_x * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
                 for row in range(PLANE_PERSPECTIVE_ROWS):
                     screen_tile_y = row if ceiling else BG_HALF_ROWS + row
                     for col in range(PLANE_PERSPECTIVE_COLS):
@@ -697,6 +745,17 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
             tiles.append(tile)
 
     return tiles, patch_name, palette, src_w, src_h
+
+
+def titlepic_tiles(iwad, zip_member):
+    if not iwad:
+        palette = [(6, 6, 8), (54, 40, 26), (118, 26, 18), (170, 146, 74), (210, 198, 150)] * 3
+        return [tile_solid() for _ in range(TITLEPIC_TILES)], "fallback-title", palette, TITLEPIC_COLS * 16, 200
+    try:
+        return patch_grid_tiles(iwad, zip_member, "TITLEPIC", TITLEPIC_COLS, TITLEPIC_ROWS)
+    except ValueError:
+        palette = [(6, 6, 8), (54, 40, 26), (118, 26, 18), (170, 146, 74), (210, 198, 150)] * 3
+        return [tile_solid() for _ in range(TITLEPIC_TILES)], "fallback-title", palette, TITLEPIC_COLS * 16, 200
 
 
 def stbar_with_face(wad, face_name, face_dx=0, face_dy=0):
@@ -823,157 +882,57 @@ def hud_face_tiles(iwad, zip_member, face_names, palette, face_tune_grid=False):
     return tiles, "+".join(face_names)
 
 
-def closest_playpal_index(playpal, rgb):
-    r, g, b = rgb
-    return min(
-        range(len(playpal)),
-        key=lambda i: (
-            (playpal[i][0] - r) ** 2
-            + (playpal[i][1] - g) ** 2
-            + (playpal[i][2] - b) ** 2
-        ),
-    )
-
-
-def synthetic_weapon_color_set(playpal):
-    return {
-        "black": closest_playpal_index(playpal, (8, 8, 8)),
-        "dark": closest_playpal_index(playpal, (42, 42, 42)),
-        "mid": closest_playpal_index(playpal, (96, 96, 90)),
-        "light": closest_playpal_index(playpal, (168, 160, 145)),
-        "white": closest_playpal_index(playpal, (230, 224, 196)),
-        "green_dark": closest_playpal_index(playpal, (10, 82, 25)),
-        "green": closest_playpal_index(playpal, (30, 180, 58)),
-        "green_hot": closest_playpal_index(playpal, (120, 255, 115)),
-        "yellow": closest_playpal_index(playpal, (255, 220, 90)),
-    }
-
-
-def synthetic_weapon_patch(part_name, playpal):
-    name = part_name.upper()
-    colors = synthetic_weapon_color_set(playpal)
-
-    def blank(width, height):
-        return [[-1] * width for _ in range(height)]
-
-    def rect(patch, x0, y0, x1, y1, color):
-        for y in range(max(0, y0), min(len(patch), y1)):
-            row = patch[y]
-            for x in range(max(0, x0), min(len(row), x1)):
-                row[x] = color
-
-    def ellipse(patch, cx, cy, rx, ry, color):
-        if rx <= 0 or ry <= 0:
-            return
-        for y in range(max(0, cy - ry), min(len(patch), cy + ry + 1)):
-            row = patch[y]
-            for x in range(max(0, cx - rx), min(len(row), cx + rx + 1)):
-                dx = x - cx
-                dy = y - cy
-                if dx * dx * ry * ry + dy * dy * rx * rx <= rx * rx * ry * ry:
-                    row[x] = color
-
-    def line_diag(patch, x0, y0, length, slope, width, color):
-        for i in range(length):
-            x = x0 + i
-            y = y0 + (i * slope) // 16
-            rect(patch, x, y, x + width, y + width, color)
-
-    if name.startswith("PLSF"):
-        patch = blank(42, 34)
-        ellipse(patch, 21, 16, 18, 11, colors["green"])
-        ellipse(patch, 21, 16, 10, 6, colors["green_hot"])
-        rect(patch, 5, 15, 37, 19, colors["yellow"])
-        rect(patch, 19, 3, 23, 31, colors["yellow"])
-        return patch, -139, -70
-
-    if name.startswith("BFGF"):
-        patch = blank(58, 42)
-        ellipse(patch, 29, 20, 26, 15, colors["green"])
-        ellipse(patch, 29, 20, 15, 8, colors["green_hot"])
-        rect(patch, 4, 18, 54, 24, colors["yellow"])
-        rect(patch, 26, 4, 32, 38, colors["yellow"])
-        return patch, -131, -72
-
-    if name.startswith("PLSG"):
-        patch = blank(78, 70)
-        alt = "B" in name
-        rect(patch, 24, 10, 54, 42, colors["dark"])
-        rect(patch, 29, 14, 49, 37, colors["mid"])
-        rect(patch, 34, 16, 44, 34, colors["green_dark"])
-        rect(patch, 37, 18, 47 if alt else 43, 32, colors["green"])
-        rect(patch, 16, 42, 62, 58, colors["dark"])
-        rect(patch, 21, 46, 57, 54, colors["mid"])
-        rect(patch, 30, 55, 48, 68, colors["black"])
-        rect(patch, 34, 58, 44, 69, colors["dark"])
-        line_diag(patch, 8, 47, 24, -5, 5, colors["light"])
-        line_diag(patch, 46, 40, 24, 5, 5, colors["light"])
-        rect(patch, 31, 9, 47, 13, colors["light"])
-        rect(patch, 35, 17, 43, 20, colors["green_hot"])
-        return patch, -121, -112
-
-    if name.startswith("BFGG"):
-        patch = blank(98, 78)
-        alt = "B" in name
-        rect(patch, 14, 22, 84, 58, colors["dark"])
-        rect(patch, 22, 17, 76, 47, colors["mid"])
-        rect(patch, 31, 21, 67, 43, colors["light"])
-        rect(patch, 38, 24, 60, 40, colors["green_dark"])
-        rect(patch, 42, 27, 64 if alt else 56, 37, colors["green"])
-        rect(patch, 8, 34, 26, 64, colors["black"])
-        rect(patch, 72, 34, 90, 64, colors["black"])
-        rect(patch, 20, 58, 78, 73, colors["dark"])
-        rect(patch, 30, 63, 68, 76, colors["black"])
-        ellipse(patch, 49, 32, 12, 7, colors["green_hot"] if alt else colors["green"])
-        rect(patch, 30, 17, 68, 21, colors["white"])
-        return patch, -113, -116
-
-    return None
-
-
 def weapon_tiles(iwad, zip_member, patch_names):
     if not iwad:
         palette = [(16, 16, 16), (48, 48, 48), (96, 96, 96)] * 5
-        return [tile_solid() for _ in range(WEAPON_TILES * len(WEAPON_FRAMES))], "fallback-weapon", palette, WEAPON_STRIPS * 16, WEAPON_ROWS * 16
+        return [tile_solid() for _ in range(WEAPON_TILES * len(WEAPON_FRAMES))], "fallback-weapon", palette, WEAPON_STRIPS * 16, WEAPON_ROWS * 16, 0
 
     wad = Wad(read_wad(iwad, zip_member))
     playpal = playpal_rgb(wad)
+    requirements = {
+        0: ("PISGA0", "PISGB0", "PISFA0", "PISGC0", "PISGD0"),
+        1: ("SHTGA0", "SHTGB0", "SHTGC0", "SHTGD0"),
+        2: ("CHGGA0", "CHGGB0"),
+        3: ("MISGA0", "MISGB0"),
+        4: ("PLSGA0", "PLSGB0", "PLSFA0", "PLSFB0"),
+        5: ("BFGGA0", "BFGGB0", "BFGFA0", "BFGFB0"),
+        6: ("PUNGA0", "PUNGB0", "PUNGC0", "PUNGD0"),
+        7: ("SAWGA0", "SAWGB0", "SAWGC0", "SAWGD0"),
+    }
+    weapon_asset_mask = 0
+    for weapon, lumps in requirements.items():
+        if all(name in wad.by_name for name in lumps):
+            weapon_asset_mask |= 1 << weapon
+
     frames = []
     for patch_name in patch_names:
         frame_patches = []
+        frame_sources = []
         for part_name in patch_name.upper().split("+"):
             part_name = part_name.strip()
             lump_ids = wad.by_name.get(part_name)
             if not lump_ids:
-                synthetic = synthetic_weapon_patch(part_name, playpal)
-                if synthetic:
-                    patch, left, top = synthetic
-                    frame_patches.append((f"{part_name}:synthetic-shareware-fallback", patch, left, top))
-                    continue
-                fallback_ids = wad.by_name.get("PISGA0")
-                if not fallback_ids:
-                    raise ValueError(f"weapon patch {part_name!r} not found in WAD and PISGA0 fallback is unavailable")
-                data = wad.lump_data(fallback_ids[0])
-                _width, _height, left, top = patch_header(data)
-                frame_patches.append((f"{part_name}:PISGA0-fallback", decode_patch(data), left, top))
+                frame_sources.append(f"{part_name}:missing")
                 continue
             data = wad.lump_data(lump_ids[0])
             _width, _height, left, top = patch_header(data)
             frame_patches.append((part_name, decode_patch(data), left, top))
-        frames.append((patch_name.upper(), frame_patches))
+            frame_sources.append(part_name)
+        frames.append((patch_name.upper(), frame_patches, "+".join(frame_sources)))
 
     palette_src = []
-    for _frame_name, frame_patches in frames:
+    for _frame_name, frame_patches, _frame_source in frames:
         for _name, patch, _left, _top in frame_patches:
             palette_src.extend(patch)
-    palette = texture_palette(palette_src, playpal)
+    palette = texture_palette(palette_src, playpal) if palette_src else [(16, 16, 16), (48, 48, 48), (96, 96, 96)] * 5
     dst_w = WEAPON_STRIPS * 16
     dst_h = WEAPON_ROWS * 16
 
     tiles = []
-    max_w = max(len(patch[0]) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
-    max_h = max(len(patch) for _frame_name, frame_patches in frames for _name, patch, _left, _top in frame_patches)
-    for frame_name, frame_patches in frames:
+    present_patches = [patch for _frame_name, frame_patches, _frame_source in frames for _name, patch, _left, _top in frame_patches]
+    max_w = max((len(patch[0]) for patch in present_patches), default=dst_w)
+    max_h = max((len(patch) for patch in present_patches), default=dst_h)
+    for frame_name, frame_patches, _frame_source in frames:
         canvas = [[-1] * dst_w for _ in range(dst_h)]
 
         for _name, patch, left, top in frame_patches:
@@ -1007,7 +966,7 @@ def weapon_tiles(iwad, zip_member, patch_names):
                         tile[y][x] = 0 if color < 0 else quantize_color(color, playpal, palette)
                 tiles.append(tile)
 
-    return tiles, "+".join(frame_name for frame_name, _frame_patches in frames), palette, max_w, max_h
+    return tiles, "+".join(frame_source for _frame_name, _frame_patches, frame_source in frames), palette, max_w, max_h, weapon_asset_mask
 
 
 def hud_keycard_tiles(iwad, zip_member):
@@ -1119,11 +1078,14 @@ def hud_small_digit_tiles(iwad, zip_member):
     return tiles, palette, "+".join(sources)
 
 
-def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x=False):
-    if not iwad:
+def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x=False, wad=None, playpal=None):
+    if not iwad and wad is None:
         return [], [], [], start_tile
 
-    wad = Wad(read_wad(iwad, zip_member))
+    if wad is None:
+        wad = Wad(read_wad(iwad, zip_member))
+    if playpal is None:
+        playpal = playpal_rgb(wad)
     sprite_name = sprite_name.upper()
     lump_ids = wad.by_name.get(sprite_name)
     if not lump_ids:
@@ -1131,8 +1093,8 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x
     data = wad.lump_data(lump_ids[0])
     _patch_w, _patch_h, left_offset, top_offset = patch_header(data)
     patch = decode_patch(data)
-    playpal = playpal_rgb(wad)
     palette = texture_palette(patch, playpal)
+    quant_lut = [quantize_color(i, playpal, palette) for i in range(256)]
     src_h = len(patch)
     src_w = len(patch[0])
 
@@ -1163,7 +1125,8 @@ def sprite_scale_tiles(iwad, zip_member, sprite_name, scales, start_tile, flip_x
                         sx = min(src_w - 1, int(dx / scale))
                         if flip_x:
                             sx = src_w - 1 - sx
-                        tile[y][x] = quantize_color(patch[sy][sx], playpal, palette)
+                        color = patch[sy][sx]
+                        tile[y][x] = 0 if color < 0 else quant_lut[color]
                 tiles.append(tile)
         next_tile += strips * rows
     return tiles, meta, palette, next_tile
@@ -1202,9 +1165,11 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     metas = []
     palettes = []
     next_tile = SPRITE_CACHE_BASE
+    wad = Wad(read_wad(iwad, zip_member)) if iwad else None
+    playpal = playpal_rgb(wad) if wad is not None else None
     for thing_type, angle, frame, flip_x in specs:
         first_scale = len(metas)
-        frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x)
+        frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x, wad=wad, playpal=playpal)
         if not frame_meta:
             continue
         tiles.extend(frame_tiles)
@@ -1214,7 +1179,7 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     return tiles, defs, metas, palettes
 
 
-def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wall_alt_sources, door_palette, door_source, hud_palette, hud_source, hud_key_palette, hud_key_source, hud_small_digit_palette, hud_small_digit_source, ceiling_palette, ceiling_source, floor_palette, floor_source, weapon_palette, weapon_source, sprite_defs, sprite_meta, sprite_palettes):
+def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wall_alt_sources, door_palette, door_source, hud_palette, hud_source, hud_key_palette, hud_key_source, hud_small_digit_palette, hud_small_digit_source, ceiling_palette, ceiling_source, floor_palette, floor_source, title_palette, title_source, weapon_palette, weapon_source, weapon_asset_mask, sprite_defs, sprite_meta, sprite_palettes):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="ascii") as f:
         f.write("/* Generated by tools/gen_gfx.py; do not edit by hand. */\n")
@@ -1282,8 +1247,16 @@ def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wal
             r, g, b = to_neo_rgb(rgb)
             f.write(f"    {{{r},{g},{b}}},\n")
         f.write("};\n\n")
+        f.write("#define TITLE_PALETTE_COLORS 15\n")
+        f.write(f"#define TITLEPIC_SOURCE \"{title_source}\"\n")
+        f.write("static const u8 g_title_palette_rgb[TITLE_PALETTE_COLORS][3] = {\n")
+        for rgb in title_palette:
+            r, g, b = to_neo_rgb(rgb)
+            f.write(f"    {{{r},{g},{b}}},\n")
+        f.write("};\n\n")
         f.write("#define WEAPON_PALETTE_COLORS 15\n")
         f.write(f"#define WEAPON_PATCH_SOURCE \"{weapon_source}\"\n")
+        f.write(f"#define WEAPON_ASSET_MASK 0x{weapon_asset_mask:02X}\n")
         f.write("static const u8 g_weapon_palette_rgb[WEAPON_PALETTE_COLORS][3] = {\n")
         for rgb in weapon_palette:
             r, g, b = to_neo_rgb(rgb)
@@ -1303,8 +1276,8 @@ def write_palette_header(path, wall_palette, wall_source, wall_alt_palettes, wal
         f.write("    u16 tile_base;\n")
         f.write("    u8 strips;\n")
         f.write("    u8 rows;\n")
-        f.write("    u8 width;\n")
-        f.write("    u8 height;\n")
+        f.write("    u16 width;\n")
+        f.write("    u16 height;\n")
         f.write("    s16 origin_x;\n")
         f.write("    s16 origin_y;\n")
         f.write("} DoomSpriteScale;\n\n")
@@ -1332,6 +1305,7 @@ def main():
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
     ap.add_argument("--wall-alt-textures", default=",".join(WALL_ALT_TEXTURES), help="Comma-separated extra Doom wall atlases for per-cell map texture classes")
     ap.add_argument("--door-texture", default=DOOR_TEXTURE, help="Doom door texture to precompose into the second wall atlas")
+    ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="balanced", help="Tile layout tier; clarity doubles wall atlas sampling and trims plane direction cache")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
@@ -1384,6 +1358,7 @@ def main():
     ap.add_argument("--monster-sprites", default=default_monster_sprites, help="Comma-separated Doom thing_type:sprite_frame pairs")
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
+    apply_detail_layout(args.detail)
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
@@ -1408,8 +1383,9 @@ def main():
     floor_source, floor_palette, floor_tiles = flat_texture_tiles(args.iwad, args.zip_member, floor_flat)
     ceiling_perspective_tiles = perspective_plane_tiles(args.iwad, args.zip_member, ceiling_flat, ceiling_palette, ceiling=True)
     floor_perspective_tiles = perspective_plane_tiles(args.iwad, args.zip_member, floor_flat, floor_palette)
+    title_tiles, title_source, title_palette, title_w, title_h = titlepic_tiles(args.iwad, args.zip_member)
     weapon_frames = [item.strip().upper() for item in args.weapon_frames.split(",") if item.strip()]
-    weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
+    weapon_cache, weapon_source, weapon_palette, weapon_w, weapon_h, weapon_asset_mask = weapon_tiles(args.iwad, args.zip_member, weapon_frames)
     hud_key_tiles, hud_key_source, hud_key_palette = hud_keycard_tiles(args.iwad, args.zip_member)
     hud_digit_cache, hud_digit_source = hud_digit_tiles(args.iwad, args.zip_member, hud_palette)
     hud_small_digit_cache, hud_small_digit_palette, hud_small_digit_source = hud_small_digit_tiles(args.iwad, args.zip_member)
@@ -1435,8 +1411,11 @@ def main():
             ceiling_source,
             floor_palette,
             floor_source,
+            title_palette,
+            title_source,
             weapon_palette,
             weapon_source,
+            weapon_asset_mask,
             sprite_defs,
             sprite_meta,
             sprite_palettes,
@@ -1456,6 +1435,7 @@ def main():
         + hud_small_digit_cache
         + ceiling_perspective_tiles
         + floor_perspective_tiles
+        + title_tiles
         + sprite_tiles
     )
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
@@ -1522,6 +1502,7 @@ def main():
     print(f"  floor flat: {floor_source} tile={FLOOR_FLAT_BASE}..{FLOOR_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
     print(f"  ceiling perspective: tile={CEILING_PERSPECTIVE_BASE}..{CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {PLANE_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
     print(f"  floor perspective: tile={FLOOR_PERSPECTIVE_BASE}..{FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {PLANE_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
+    print(f"  titlepic: {title_source} tile={TITLEPIC_BASE}..{TITLEPIC_BASE + TITLEPIC_TILES - 1} ({TITLEPIC_COLS}x{TITLEPIC_ROWS}) source={title_w}x{title_h}")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")
     print(f"  weapon frames: {weapon_source} tile={WEAPON_BASE}..{WEAPON_BASE + len(weapon_frames) * WEAPON_TILES - 1} ({WEAPON_STRIPS}x{WEAPON_ROWS}x{len(weapon_frames)}) source={weapon_w}x{weapon_h}")

@@ -17,51 +17,100 @@ readable.
   `DOOM_MAP_HEIGHT`, and `DOOM_SKILL_MASK` at build time. The default skill
   mask is `4`, matching hard/Ultra-Violence THING placement; use `1` for easy
   or `2` for medium placement.
+- The generated header exposes the current map code and Episode 1 next-map
+  metadata. Exit records also carry a compact destination derived from the Doom
+  line special, so E1M3's secret exit can report E1M9 while the normal exit
+  reports E1M4. The intro menu shows the compiled map instead of a hard-coded
+  E1M1 label, and the completion overlay can show the reached exit's next
+  standalone map code.
+- Pickup/key runtime positions preserve the original WAD fractional placement
+  when possible. If the coarse wall grid makes the exact WAD point solid, the
+  converter moves the pickup into the nearest open cell but clamps it toward
+  the original point instead of snapping it to the cell center. This keeps E1M2
+  key/weapon placements closer to native Doom while staying collectible.
 
 ## Rendering
 
-- 40 wall-column sprites cover the 320-pixel screen in 8-pixel logical columns
-  backed by 16-pixel Neo Geo strips.
+- The default `DOOM_DETAIL=balanced` renderer uses 32 wall-column sprites over
+  the 320-pixel playfield, giving 10-pixel logical columns backed by 16-pixel
+  Neo Geo strips. This is the playable-response mode for normal builds;
+  `DOOM_DETAIL=quality` and the heavier 64-column `clarity` tier remain
+  available for visual comparison.
 - Each frame casts fixed-point DDA rays, computes projected wall height, refines
   visual hits against compact WAD-derived render lines indexed by the hit cell,
   and writes Neo Geo sprite shrink/position data.
+- Wall projection uses a taller Doom-biased scale than the raw playfield height,
+  so converted rooms spend less of the view on floor/ceiling backdrop and more
+  on readable wall structure.
 - The render-line broadphase is done offline by the converter. The E1M1 build
-  currently emits 325 visual render lines and 857 cell references; the runtime
-  checks at most 7 line candidates in a hit cell instead of scanning the whole
-  render-line table for every wall column. Hit cells with no render-line refs
-  now return immediately to the base DDA result before doing q4 refinement
-  setup.
+  currently emits 456 visual render lines and 1310 cell references; the runtime
+  checks only the compact line candidates indexed by the traversed/hit cell
+  instead of scanning the whole render-line table for every wall column.
+- In balanced/speed tiers, solid grid-cell hits skip the extra solid-line
+  refinement pass. Open-cell portal/lower/upper span hits still run, so visible
+  sector transitions keep their Doom-like cues without paying the full
+  per-column line-intersection cost on every solid wall.
+- In addition to solid linedefs, the converter now emits selected two-sided
+  lower, upper, and mid-texture visual lines. The runtime can draw one
+  top- or bottom-aligned partial wall span per column when that span projects
+  large enough to be readable. Small open-cell spans no longer stop the ray, so
+  window/opening views prefer the farther room or wall instead of collapsing
+  into dark horizontal fences. Nearby larger spans still occlude as ledge/step
+  cues.
 - The renderer caches each column's ray vector, DDA reciprocal deltas, and step
   signs for the current angle/FOV, rebuilding that cache only when the view
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- This renderer spends more sprite budget on wall fidelity than the older
-  20-column pass while holding seven visible world-thing slots for monsters,
-  pickups, projectiles, corpses, and weapon sprites under the Neo Geo scanline
-  limit.
+- The default renderer now leaves more active playfield sprite headroom for
+  world things: 20 backdrop strips, 32 wall columns, nine 4-strip world things,
+  and seven weapon strips fit inside the first 95 active sprites. Alternate
+  build tiers are available for different tradeoffs: `DOOM_DETAIL=clarity` uses
+  64 wall columns and one world thing, `balanced` uses 32 columns and nine
+  things, and `speed` uses 20 columns and eleven things.
 - Wall textures are precomposed offline from Doom wall patches into Neo Geo
-  tile strips. The current preferred wall texture is `STARTAN3`, with alternate
-  atlases for common E1M1 walls and `BIGDOOR2` doors.
-- Floor and ceiling use compact pre-baked perspective tile caches selected by
-  player direction and coarse position. The runtime wraps those tile columns
-  incrementally over several frames so movement reads less static without
-  spending one full vblank on plane uploads. The direction bucket is cached and
-  recalculated only when the view vector changes, so straight movement keeps the
-  cheaper scroll update path. Plane column uploads compute a direction/column
-  tile base once and step row addresses by the generated cache width instead of
-  rebuilding the full perspective index for every tile. The background path
-  also asks the raycaster only for the facing vector and wraps coarse scroll with
-  bounded subtracts before deciding whether to upload columns. This is a
-  compromise, not true Doom span rendering; the cache is deliberately kept small
-  so monster and pickup sprite tiles stay inside the visible Neo Geo C-ROM tile
-  range.
+  tile strips. In clarity mode the wall, alternate-wall, and door atlases use
+  32 texture-phase columns for closer-range readability; the other detail tiers
+  keep the older 16-column atlases. The current preferred wall texture is
+  `STARTAN3`, with alternate atlases for common E1M1 walls and `BIGDOOR2`
+  doors.
+- Each baked wall strip samples the narrow source texture band represented by
+  that phase instead of repeating a single source texel across the 16-pixel
+  Neo Geo tile. The runtime still draws one sprite strip per wall column, but
+  close doors and panels retain more horizontal texture detail after hardware
+  shrink.
+- Floor and ceiling default to compact pre-baked perspective tile caches selected
+  by player direction and camera-lateral coarse position. The runtime wraps
+  columns incrementally so strafing moves the planes while keeping the tile bank
+  inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
+  solid planes for debugging.
+- The converter also emits a compact per-cell sector floor visual class and
+  light band derived from `SECTORS` floor flat names, specials, and light
+  levels. The runtime uses those generated cells to tint floor/ceiling palettes
+  when the player enters water-like, damaging nukage/slime/lava, blood, or
+  darker/brighter sectors. This keeps sector identity visible without runtime
+  WAD parsing or extra floor-casting work.
+- The floor palette selector also samples a few wall-stopped view rays ahead of
+  the player and lets visible higher-priority sector classes bias the active
+  flat-plane tint. Nukage, slime, lava, blood, and water therefore read with a
+  restrained preview tint before the player steps into them, while the renderer
+  still avoids runtime floor casting.
+- Sector floor/ceiling palette preview sampling is cached by coarse player
+  position and view vector. Straight movement inside the same coarse pose
+  bucket skips the three forward preview rays, while liquid pulse sectors still
+  advance their low-cost palette phase.
+- Water, blood, and hazardous liquid classes also apply a slow four-phase
+  palette pulse to the already-baked floor gradients. This is a low-cost
+  substitute for Doom's animated flats that keeps liquid sectors visibly active
+  without runtime pixel drawing or extra floor sprites.
 - Floor flats keep the WAD texture pattern but normalize green-dominant palette
   entries toward warm gray/brown before emitting Neo Geo tiles. This keeps E1M1
   closer to Doom's sober floor tone and avoids stray green speckles being read
   as a missing sprite or palette glitch.
 - Depth palettes and directional shading give walls/planes distance cues without
-  runtime pixel drawing.
+  runtime pixel drawing. The wall depth budget is capped to fit the primary
+  wall, door, and seven alternate wall palette ranges inside the Neo Geo's
+  256 palette slots; GnGeo movement benches now reject invalid palette writes.
 - Point-blank wall fallback is limited to the primary wall atlas. Alternate
   walls and doors keep their own baked columns at close range, avoiding the
   wrong-palette block artifacts that could look like red/green missing sprites.
@@ -69,6 +118,13 @@ readable.
 ## HUD And UI
 
 - Doom `STBAR` is baked into the HUD sprite strip area.
+- Normal ROMs now boot to a small fix-layer menu state flow instead of the old
+  one-line intro prompt. It has Start, skill/build info, compiled-map/next-map
+  info, and options placeholder pages. Focused verification ROMs still define
+  `DOOM_SKIP_INTRO` and boot directly into their scenario.
+- The normal intro/menu backdrop uses the WAD `TITLEPIC` converted offline into
+  Neo Geo sprite tiles and a generated palette. Those sprites are menu-only and
+  are hidden before the game initializes the playfield renderer.
 - Doom status face frames are baked into a dedicated face bank and switch by
   health, turn direction, pain, evil grin, and death state.
 - Large red Doom-style `STTNUM` digits are rendered on the fix layer for ammo,
@@ -98,10 +154,10 @@ readable.
 
 - Implemented runtime weapons: fist, pistol, shotgun, chaingun, rocket
   launcher, plasma rifle, BFG, and chainsaw.
-- The shareware WAD does not contain the original `PLSG`/`BFGG` weapon patches
-  or `CELL`/`CELP` pickup sprites. Shareware builds therefore bake synthetic
-  fallback psprite frames for plasma/BFG, while registered/commercial WAD builds
-  can bake the exact art through the same C-ROM path.
+- Weapon psprites are gated by generated WAD asset coverage. The default
+  shareware build masks missing plasma/BFG psprites instead of drawing
+  placeholder guns; explicit Freedoom builds exercise the full redistributable
+  plasma/BFG path.
 - Pistol/chaingun use compact hitscan-style targeting.
 - Plasma rifle spends cells rapidly and launches the baked small fireball strip
   as a visible forward projectile. A direct projectile hit applies compact
@@ -159,19 +215,29 @@ readable.
 - Runtime things include common E1M1 pickups, keys, bullet/shell/rocket/cell
   ammo, armor, health, backpack, standard Doom powerups, weapons, barrels,
   monsters, projectiles, corpses, and explosions.
+- Converted pickups keep sub-cell placement after coarse-grid correction, so
+  keys and weapons no longer drift as far from their original WAD locations when
+  a nearby wall line occupies the raw grid cell.
 - Visible thing selection uses one priority-ranked projection pass for
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
   older five full scans of `NG_RUNTIME_THING_COUNT` every frame.
+- Empty world-sprite slots remember that they are already hidden, so normal
+  gameplay no longer rewrites every unused enemy/pickup sprite control block on
+  every frame. The logical slot state is still cleared when a candidate fails to
+  render, but repeated hidden slots stop spending VRAM writes.
+- The converter emits compact runtime class/info bytes for every supported
+  thing, so monster, threat, pickup, corpse, shootable, and render eligibility
+  tests can use generated metadata instead of repeated type-switch scans.
 - Before projection and line-of-sight checks, thing selection now applies a
   conservative player-facing prefilter that rejects behind-camera and extremely
   distant candidates. This keeps normal E1M1 visible things intact while
   avoiding expensive projection work for objects that cannot contribute to the
-  seven visible world-sprite slots.
+  configured visible world-sprite slots.
 - Ranged-attack warmup now tracks only the previous and current readable
   world-sprite slots. That replaces another per-frame scan across all converted
-  runtime things with a bounded pass over the seven visible slots plus the
-  previous seven-slot list.
+  runtime things with a bounded pass over the configured visible slots plus the
+  previous-slot list.
 - Combat damage and ranged attack paths reuse resolved runtime thing types
   after cheap coordinate, cooldown, and readability checks, reducing repeated
   per-frame classification work during active fights without changing damage,
@@ -190,11 +256,23 @@ readable.
 - Player projectile hit tests and monster movement occupancy now use coarse
   map-cell rejection before exact q8 distance and type checks. This preserves
   the exact hit/separation thresholds while avoiding most all-thing work for
-  objects outside the local collision area.
+  objects outside the local collision area. Player projectile hit range and
+  coarse-cell span are derived once at spawn time and reused for every active
+  projectile frame, and projectile/monster-spacing candidates cache their q8
+  coordinates for both coarse-cell and exact-range checks. Monster movement
+  occupancy reuses the runtime shootable predicate after the coarse cell reject
+  instead of resolving a full type and rechecking monster/barrel classes for
+  each nearby candidate.
+- Projectile updates split player-owned target scans from monster-owned player
+  collision checks, avoiding the opposite ownership path each active projectile
+  frame. Monster projectile spawn also reuses the player point already loaded
+  by the ranged-damage pass.
 - Nearby pickup collection uses the same local map-cell prefilter before
   resolving thing type or exact q8 pickup distance. This keeps key, item,
   weapon, and dynamic-drop pickup behavior unchanged while avoiding most
-  per-frame all-thing pickup checks.
+  per-frame all-thing pickup checks. Static pickup and dynamic-drop scans cache
+  each candidate q8 coordinate once for both the coarse-cell and exact-radius
+  tests.
 - Per-frame thing timer maintenance is bounded to the shootable candidate list
   and then skips entries with no active flash, attack, explosion,
   death-animation, or delayed-drop timers before touching detailed state
@@ -203,9 +281,10 @@ readable.
   dead entries and test cheap distance, readability, path, or forward-cone
   bounds before resolving runtime thing types or doing line-of-sight work. The
   final damage and wake-up thresholds are unchanged.
-- Line-of-sight checks return immediately when both points are in the same
-  converted map cell, avoiding sampled wall-step work for close combat and
-  projection fallback cases that cannot cross a wall cell.
+- Line-of-sight checks compare converted map cells before doing absolute
+  distance setup, then reuse cached absolute dx/dy values for the sampled step
+  count. Same-cell checks still avoid sampled wall-step work for close combat
+  and projection fallback cases that cannot cross a wall cell.
 - Monster AI applies its active-range gate before resolving thing type, so
   distant converted things do not spend CPU on monster classification during
   movement ticks.
@@ -217,7 +296,9 @@ readable.
   opened E1M1 routes are picked up immediately.
 - Visible thing selection rejects behind-camera and far-away things before
   resolving runtime type or render bucket, reducing per-frame sprite candidate
-  work while preserving the same final projection and priority rules.
+  work while preserving the same final projection and priority rules. The
+  precheck short-circuits behind-camera and range rejects before doing the
+  side-of-camera multiply used for far-offscreen rejection.
 - A conservative side-of-camera band now rejects far-offscreen world sprites
   before runtime type lookup and exact projection. The exact projector and
   screen bounds still decide everything near the view, so visible E1M1
@@ -227,8 +308,9 @@ readable.
   point instead of querying the raycaster again per candidate.
 - Rendered monster angle-frame selection also reuses the candidate pass player
   point, avoiding another raycaster position query for each visible monster.
-  Slot rendering keeps monster/projectile/explosion classification local to the
-  slot instead of rechecking the same type several times.
+  Slot rendering caches the resolved type plus monster/shootable flags, so
+  bounded visible-slot targeting, melee, ranged-readiness, and ranged-damage
+  passes do not re-resolve the same type before the next render refresh.
 - Readable, attackable, and ranged-attackable world-sprite slot flags are
   cached when each slot is rendered. Targeting, melee, monster ranged attacks,
   projectile ownership, and AI visibility checks reuse those flags instead of
@@ -240,13 +322,23 @@ readable.
 - HUD status numbers, key slots, and ammo reserve counters now update only
   when their displayed values change. The animated face still updates every
   frame, but quiet E1M1 traversal no longer rewrites the static HUD sprites and
-  small counter digits every vblank.
+  small counter digits every vblank. The arms/weapon status strip also reuses
+  the status bits already computed for the change check when it redraws.
 - `tools/smoke_gameplay.sh` chains the verified enemy visibility, key-door,
   weapon shortcut, death/drop, and powerup screenshot passes for a broad local
   playable-feature regression check.
 - `make route-check` statically verifies the generated E1M1 start-to-exit
   route against `build/doom_map_generated.h`, including whether completion
   depends on generated door cells.
+- `make episode-route-report` converts shareware `E1M1` through `E1M9` into
+  isolated generated headers and reports whether each map has a coarse-grid
+  start-to-exit route. `make episode-route-check` runs the same pass in strict
+  mode. The default grid now routes E1M1-E1M7 and E1M9, while E1M8 reports the
+  supported boss-death exit because it has no linedef exit.
+- `make episode-map-rom EPISODE_MAP=E1M3` and `make episode-map-gngeo
+  EPISODE_MAP=E1M3` build or launch a standalone ROM for a specific Episode 1
+  map under `build/episode-roms/`. `make episode-roms` loops through E1M1-E1M9
+  and builds one standalone ROM output per map.
 - The default ROM starts on shareware `E1M1`; `make key-test-rom` and
   `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
   the real red keycard and red locked-door path can be verified without
@@ -282,11 +374,30 @@ readable.
   monster placement.
 - `tools/smoke_e1m1_scout.sh` captures that scout viewpoint and a pistol-fire
   frame, extending the real-map evidence beyond the closer encounter ROM.
+- `tools/capture_compare.sh` can now capture named native-vs-NeoGeo comparison
+  waypoints under `.tools/screens/`: `start`, `e1m1-start`, `e1m2-start`,
+  `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. The start waypoints use
+  native and Neo Geo map spawns; non-start route waypoints now drive both
+  engines with the same timed input script from the map spawn by default, with
+  native Doom holding its speed modifier during forward movement.
+  `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
+  `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
+  visual registers when that is the useful evidence.
+- The wall atlas keeps seven alternate texture banks but now spends two of
+  those banks on high-coverage Episode 1 textures (`SLADWALL` and `COMPTALL`)
+  instead of lower-impact slots. The converter maps related stone, tech,
+  computer, light, and brown variants into those existing classes so E1M2 walls
+  retain more Doom identity without adding runtime WAD parsing or more wall
+  sprites.
 - `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
   completion ROM. It starts two converted cells left of the real generated
   E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,
   captures the completed frame, and checks the `EXIT` plus kill/item/secret
   percentage overlay.
+- `make e1m8-boss-test-rom` and `make e1m8-boss-test-gngeo` build a focused
+  E1M8 boss-exit verification ROM. It stages the two real E1M8 Baron things in
+  front of the player with low HP, and `tools/smoke_e1m8_boss_exit.sh` fires
+  once, captures the completed frame, and checks the normal `EXIT` overlay.
 - `make hidden-attack-test-rom` and `make hidden-attack-test-gngeo` build a
   readable-slot regression ROM. It places an awake shotgun guy outside the
   readable view and freezes its movement, so the HUD health value must stay
@@ -427,11 +538,11 @@ readable.
   of falling back to the first baked enemy, which prevents wrong-looking
   monsters or corrupt placeholder sprites when a WAD lacks optional art.
 - Thing slots are advanced only after a sprite actually renders. Missing,
-  offscreen, or fully clipped sprites no longer consume one of the seven visible
-  world-sprite slots, so the renderer keeps scanning for the next visible
+  offscreen, or fully clipped sprites no longer consume one of the configured
+  visible world-sprite slots, so the renderer keeps scanning for the next visible
   monster, pickup, projectile, corpse, or drop.
-- Thing selection keeps an oversized sorted candidate buffer behind those seven
-  visible slots. Edge-clipped or missing-art candidates can fail without
+- Thing selection keeps an oversized sorted candidate buffer behind those
+  configured visible slots. Edge-clipped or missing-art candidates can fail without
   starving later visible monsters in the same pass, which makes combat scenes
   less likely to contain an attacking-but-invisible enemy.
 - Visible thing selection uses separate passes for projectiles, live monsters,
@@ -459,6 +570,66 @@ readable.
 ## Map And Level Flow
 
 - Movement uses fixed-point position/direction with a Doom-like body radius.
+  Opposing inputs cancel cleanly, and forward-plus-strafe motion is combined into
+  one normalized move step so diagonal walking does not run faster or spend a
+  second collision pass.
+- The main loop records whether it reached `wait_vblank_status()` after the
+  vblank window had already started. The following active gameplay frame gives
+  player movement/turning one extra capped input tick in that case, keeping
+  walking responsiveness closer to real time after an over-budget frame without
+  moving the whole game simulation twice.
+- `tools/stress_movement.sh` boots the normal ROM, starts gameplay, and captures
+  held forward, turn, and strafe poses. Use it alongside the route/key/powerup
+  smokes when tuning renderer cost or movement feel.
+- `tools/bench_movement.sh` runs the same movement stress path with GnGeo's FPS
+  overlay enabled and longer holds. This gives a quick frame-pacing visual
+  register under `.tools/screens/latest/movement-bench/` before and after
+  renderer-cost changes.
+- Movement bench builds an isolated `DOOM_FRAME_STATS=1` ROM by default. That
+  ROM draws a compact green marker plus an `NN` fix-layer register in the playfield, where
+  `NN` is the number of frames in the latest 64-frame window that reached
+  `wait_vblank_status()` after vblank had already started. The checker rejects
+  captures where the register is missing.
+- The default balanced wall-strip upload budget refreshes all 32 wall columns
+  on normal movement frames, so texture/palette changes settle with geometry
+  instead of smearing across later frames. The overrun budget still backs off
+  when a frame reaches vblank late, and `DOOM_WALL_UPLOAD_COLUMNS` /
+  `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS` let movement benches test alternate
+  budgets without hand-editing `CFLAGS`.
+- Balanced movement frames skip portal-span refinement and tighten near-line
+  refinement to a smaller radius, so held input spends less CPU time on
+  WAD-line intersection scans. Standing frames keep the richer portal-span pass
+  for visual recovery.
+- The cached floor/ceiling updater refreshes 10 of its 20 backdrop columns per
+  normal frame and four after a late frame, so turn/strafe plane changes settle
+  quickly without runtime floor casting. `DOOM_BG_SCROLL_COLUMNS` and
+  `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement bench
+  path.
+- Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
+  to both the build and GnGeo run targets. This lets the same stress path test
+  isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
+  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`; custom
+  ROM directories receive the local `neogeo.zip` BIOS package automatically.
+- Balanced rendering keeps the cheaper coarse wall path for distant solid walls
+  but refines nearby solid hits against the converted WAD line metadata. This
+  improves close wall texture phase/orientation readability without returning
+  the default ROM to the full-column refinement cost of the comparison tiers.
+- Balanced mode tightens that near-line refinement radius while the player is
+  actively moving and skips portal-span refinement on those moving frames.
+  Standing frames restore the portal-span pass, and after a late frame the same
+  reduced work is kept for one recovery frame. The quality/clarity tiers keep
+  solid-line refinement for closer native-Doom still comparisons.
+- Portal-span refinement now filters candidates to generated lower/upper span
+  lines only, so a nearer solid render line in the same cell cannot hide a
+  farther two-sided floor or ceiling transition.
+- `DOOM_ADAPTIVE_LINE_REFINEMENT`,
+  `DOOM_MOVING_LINE_REFINEMENT_CELLS`, `DOOM_MOVING_SPAN_REFINEMENT`, and
+  `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` can be passed through `SMOKE_MAKE_ARGS`
+  when movement benches need to test a different CPU/fidelity balance.
+- The converter flattens non-door two-sided sector transitions into narrow
+  bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
+  progression traversable in the Neo Geo port's 2D collision grid without
+  making one-sided walls or locked door cells passable by default.
 - Doors are converted from Doom linedefs, can require keys, and open in grouped
   cells.
 - Door use first checks cells touching the player's collision body, then falls
@@ -467,9 +638,19 @@ readable.
   door edge or slightly off-center.
 - Exits freeze the level and show compact kill/item/secret completion
   percentage rows before restart, computed from the converted map's runtime
-  monsters, pickups, and secret cells.
+  monsters, pickups, and secret cells. When the reached exit's generated
+  metadata names a next Episode 1 map, the overlay also draws that map code as
+  the next standalone ROM to run. E1M3 normal and secret exits therefore point
+  at different staged ROM targets even though the current cart still packages
+  one generated map at a time.
+- The menu can expose compiled-map and next-map metadata, but the current ROM
+  still contains one heavy generated map/graphics set at a time. Full runtime
+  multi-map loading remains a packaging/runtime-data milestone.
 - Damaging floor cells apply periodic damage through the same hurt/armor path as
-  combat, unless the radiation-suit timer is active.
+  combat, unless the radiation-suit timer is active. The generated floor visual
+  class uses the same sector-special source for hazard tinting, and the runtime
+  lookahead samples make visible damaging floors easier to read before they hurt
+  the player.
 - Secret cells can be discovered once and increment the secret count.
 - The minimap uses the Neo Geo fix layer and overlays walls, player, threats,
   pickups, closed doors, and exits.

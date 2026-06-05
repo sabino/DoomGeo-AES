@@ -12,17 +12,110 @@
 /* ---- column resolution ----------------------------------------------
  * NUM_COLS wall columns, each COLW pixels wide. COLW must divide SCRW.
  * Sprite horizontal width = HSHRINK+1, so HSHRINK = COLW-1.
+ *
+ * The tiers follow the Doom8088-style detail trade. Clarity spends the sprite
+ * budget on walls first because navigation readability is the main bottleneck.
  */
-#define NUM_COLS 40                 /* 8px wall strips: closer to original NGRayEx smoothness */
+#if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
+#define DOOM_DETAIL_BALANCED 1
+#endif
+
+#if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
+#error "Select exactly one Doom detail tier"
+#endif
+#if defined(DOOM_DETAIL_QUALITY) && (defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
+#error "Select exactly one Doom detail tier"
+#endif
+#if defined(DOOM_DETAIL_BALANCED) && defined(DOOM_DETAIL_SPEED)
+#error "Select exactly one Doom detail tier"
+#endif
+
+#if defined(DOOM_DETAIL_CLARITY)
+#define NUM_COLS 64                 /* 5px wall strips: readable navigation */
+#elif defined(DOOM_DETAIL_BALANCED)
+#define NUM_COLS 32                 /* 10px wall strips: frees eight sprites */
+#elif defined(DOOM_DETAIL_SPEED)
+#define NUM_COLS 20                 /* 16px wall strips: fastest stable tier */
+#else
+#define NUM_COLS 40                 /* 8px wall strips: closest to original NGRayEx smoothness */
+#endif
+
+#if (SCRW % NUM_COLS) != 0
+#error "NUM_COLS must divide SCRW"
+#endif
+
 #define COLW     (SCRW / NUM_COLS)
 #define HSHRINK  (COLW - 1)        
  
 #define BG_SPLIT  (BG_WIN / 2)
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
-#define WALLH    GAME_H             /* projection scale: wall height @ dist 1 */
+#define WALLH    ((GAME_H * 3) / 2) /* projection scale: wall height @ dist 1 */
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 #define DOOM_RENDER_LINES 1         /* visual ray hits use WAD-derived lines  */
+#ifndef DOOM_SOLID_LINE_REFINEMENT
+#if defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
+#define DOOM_SOLID_LINE_REFINEMENT 1
+#else
+#define DOOM_SOLID_LINE_REFINEMENT 0
+#endif
+#endif
+#ifndef DOOM_NEAR_LINE_REFINEMENT
+#if defined(DOOM_DETAIL_SPEED)
+#define DOOM_NEAR_LINE_REFINEMENT 0
+#else
+#define DOOM_NEAR_LINE_REFINEMENT 1
+#endif
+#endif
+#define DOOM_NEAR_LINE_REFINEMENT_CELLS 5
+#ifndef DOOM_ADAPTIVE_LINE_REFINEMENT
+#if defined(DOOM_DETAIL_BALANCED)
+#define DOOM_ADAPTIVE_LINE_REFINEMENT 1
+#else
+#define DOOM_ADAPTIVE_LINE_REFINEMENT 0
+#endif
+#endif
+#ifndef DOOM_MOVING_LINE_REFINEMENT_CELLS
+#define DOOM_MOVING_LINE_REFINEMENT_CELLS 2
+#endif
+#ifndef DOOM_MOVING_SPAN_REFINEMENT
+#if defined(DOOM_DETAIL_BALANCED)
+#define DOOM_MOVING_SPAN_REFINEMENT 0
+#else
+#define DOOM_MOVING_SPAN_REFINEMENT 1
+#endif
+#endif
+#ifndef DOOM_OVERRUN_LINE_REFINEMENT_CELLS
+#define DOOM_OVERRUN_LINE_REFINEMENT_CELLS 2
+#endif
+
+#ifndef WALL_TILE_UPLOAD_COLUMNS_PER_FRAME
+#if defined(DOOM_DETAIL_CLARITY)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 16
+#elif defined(DOOM_DETAIL_QUALITY)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 12
+#elif defined(DOOM_DETAIL_BALANCED)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 32
+#elif defined(DOOM_DETAIL_SPEED)
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 10
+#else
+#define WALL_TILE_UPLOAD_COLUMNS_PER_FRAME 8
+#endif
+#endif
+
+#ifndef WALL_TILE_UPLOAD_COLUMNS_OVERRUN
+#if defined(DOOM_DETAIL_CLARITY)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 8
+#elif defined(DOOM_DETAIL_QUALITY)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 6
+#elif defined(DOOM_DETAIL_BALANCED)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 8
+#elif defined(DOOM_DETAIL_SPEED)
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 5
+#else
+#define WALL_TILE_UPLOAD_COLUMNS_OVERRUN 4
+#endif
+#endif
 
 /* ---- sprite slot assignment -----------------------------------------
  * Priority: lower index = back on Neo Geo sprite evaluation. One world thing
@@ -35,12 +128,21 @@
 #define BG_WIN    (GAME_H / 16)     
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 /*
- * Runtime sprite budget on active playfield scanlines:
- *   20 backdrop + 40 wall columns + 28 thing strips + 7 weapon strips = 95.
- * Neo Geo evaluates 96 sprites per scanline, so this leaves enough headroom
- * for several visible Doom things while keeping the weapon in front.
+ * Runtime sprite budget on active playfield scanlines depends on DOOM_DETAIL.
+ * The default clarity tier uses 20 backdrop + 64 wall columns + 4 thing strips
+ * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
+ * tier keeps the weapon in front while staying inside the practical budget.
  */
+#if defined(DOOM_DETAIL_CLARITY)
+#define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 thing + 7 weapon = 95 */
+#elif defined(DOOM_DETAIL_BALANCED)
+#define ENEMY_VISIBLE_COUNT 9
+#elif defined(DOOM_DETAIL_SPEED)
+#define ENEMY_VISIBLE_COUNT 11
+#else
 #define ENEMY_VISIBLE_COUNT 7
+#endif
+
 #define ENEMY_STRIPS 4
 #define ENEMY_BASE   (WALL_BASE + NUM_COLS)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
@@ -50,6 +152,15 @@
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   8
 #define WEAPON_Y_OFFSET 0
+#define DOOM_PLAYFIELD_SPRITE_COUNT (BG_COUNT + NUM_COLS + ENEMY_COUNT + WEAPON_COUNT)
+#define DOOM_PLAYFIELD_SCANLINE_LIMIT 95
+#if DOOM_PLAYFIELD_SPRITE_COUNT > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#error "Active playfield sprites exceed the Neo Geo scanline budget"
+#endif
+#if (WEAPON_BASE + WEAPON_COUNT - 1) > DOOM_PLAYFIELD_SCANLINE_LIMIT
+#error "Weapon sprites must stay inside the first 95 active playfield sprites"
+#endif
+
 #define HUD_BASE  (WEAPON_BASE + WEAPON_COUNT)
 #define HUD_COUNT (SCRW / 16)
 #define HUD_WIN   (HUD_H / 16)
@@ -69,7 +180,11 @@
 #define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
 #define TILE_WALL_ATLAS_BASE 3
+#if defined(DOOM_DETAIL_CLARITY)
+#define TILE_WALL_ATLAS_COLS 32     /* denser texture phase sampling for close walls */
+#else
 #define TILE_WALL_ATLAS_COLS 16
+#endif
 #define TILE_WALL_ATLAS_ROWS WALL_WIN
 #define TILE_WALL_ATLAS_TILES (TILE_WALL_ATLAS_COLS * TILE_WALL_ATLAS_ROWS)
 #define TILE_WALL_ALT_COUNT 7
@@ -78,11 +193,24 @@
 #define TILE_FLAT_COLS 16
 #define TILE_FLAT_ROWS 16
 #define TILE_FLAT_TILES (TILE_FLAT_COLS * TILE_FLAT_ROWS)
+#if defined(DOOM_DETAIL_CLARITY)
+#define TILE_PLANE_PERSPECTIVE_DIRS 4
+#else
 #define TILE_PLANE_PERSPECTIVE_DIRS 16
+#endif
 #define TILE_PLANE_PERSPECTIVE_PHASES 1
 #define TILE_PLANE_PERSPECTIVE_ROWS BG_SPLIT
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT
 #define TILE_PLANE_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
+#ifndef BG_SCROLL_COLUMNS_PER_FRAME
+#define BG_SCROLL_COLUMNS_PER_FRAME 10
+#endif
+#ifndef BG_SCROLL_COLUMNS_OVERRUN
+#define BG_SCROLL_COLUMNS_OVERRUN 4
+#endif
+#ifndef DOOM_FLAT_PLANES
+#define DOOM_FLAT_PLANES 0          /* pre-baked moving floor/ceiling cache */
+#endif
 #define TILE_CEILING_FLAT_BASE (TILE_DOOR_ATLAS_BASE + TILE_WALL_ATLAS_TILES)
 #define TILE_FLOOR_FLAT_BASE (TILE_CEILING_FLAT_BASE + TILE_FLAT_TILES)
 #define TILE_HUD_BASE (TILE_FLOOR_FLAT_BASE + TILE_FLAT_TILES)
@@ -107,7 +235,11 @@
 #define TILE_HUD_SMALL_DIGIT_COUNT 10
 #define TILE_CEILING_PERSPECTIVE_BASE (TILE_HUD_SMALL_DIGIT_BASE + TILE_HUD_SMALL_DIGIT_COUNT)
 #define TILE_FLOOR_PERSPECTIVE_BASE (TILE_CEILING_PERSPECTIVE_BASE + TILE_PLANE_PERSPECTIVE_TILES)
-#define TILE_SPRITE_CACHE_BASE (TILE_FLOOR_PERSPECTIVE_BASE + TILE_PLANE_PERSPECTIVE_TILES)
+#define TILE_TITLEPIC_BASE (TILE_FLOOR_PERSPECTIVE_BASE + TILE_PLANE_PERSPECTIVE_TILES)
+#define TILE_TITLEPIC_COLS 20
+#define TILE_TITLEPIC_ROWS 13
+#define TILE_TITLEPIC_TILES (TILE_TITLEPIC_COLS * TILE_TITLEPIC_ROWS)
+#define TILE_SPRITE_CACHE_BASE (TILE_TITLEPIC_BASE + TILE_TITLEPIC_TILES)
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
@@ -144,18 +276,23 @@
 #define PAL_WALL_ALT_DEPTH_BASE 90
 #define PAL_WALL_ALT_DEPTH_STRIDE (DEPTH_BANDS * 2)
 #define PAL_WEAPON    36
+#define PAL_TITLE     35
 #define PAL_ENEMY_BASE 37
 #define PAL_AMMO_COUNTER_SHADOW 45
 #define PAL_HUD_KEY_BASE 46
 #define PAL_AMMO_COUNTER 49
 
  
-#define DEPTH_BANDS    14
-#define PAL_DEPTH_BASE 8            /* lit: 8..13, dark: 14..19              */
+#define DEPTH_BANDS    11
+#define PAL_DEPTH_BASE 8            /* lit + dark depth bands                 */
+#define PAL_LAST_WALL_ALT_DEPTH (PAL_WALL_ALT_DEPTH_BASE + TILE_WALL_ALT_COUNT * PAL_WALL_ALT_DEPTH_STRIDE - 1)
+#if PAL_LAST_WALL_ALT_DEPTH > 255
+#error "wall alt depth palettes exceed Neo Geo palette RAM"
+#endif
 
 /* ---- movement feel --------------------------------------------------- */
-#define MOVE_SPEED 0.12             
-#define ROT_COS    0.99863        
-#define ROT_SIN    0.05234        
+#define MOVE_SPEED 0.16
+#define ROT_COS    0.99619
+#define ROT_SIN    0.08716
 
 #endif /* CONFIG_H */

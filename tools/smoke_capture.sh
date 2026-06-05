@@ -10,13 +10,17 @@ DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
+EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
 MAKE_BIN="${MAKE:-make}"
+MAKE_ARGS_VALUE="${SMOKE_MAKE_ARGS:-}"
 LOCKDIR="${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}"
 LOCK_OWNER="$LOCKDIR/pid"
 LOCK_ACQUIRED=0
+MAKE_ARGS=()
+MAKE_ROM_DIR=""
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -73,6 +77,15 @@ require_cmd xwd
 require_cmd convert
 
 mkdir -p "$(dirname "$OUT")" "$(dirname "$LOG")" "$(dirname "$LOCKDIR")"
+if [ -n "$MAKE_ARGS_VALUE" ]; then
+    # shellcheck disable=SC2206
+    MAKE_ARGS=($MAKE_ARGS_VALUE)
+    for arg in "${MAKE_ARGS[@]}"; do
+        case "$arg" in
+            ROM=*) MAKE_ROM_DIR="${arg#ROM=}" ;;
+        esac
+    done
+fi
 
 for _ in $(seq 1 300); do
     if mkdir "$LOCKDIR" 2>/dev/null; then
@@ -93,11 +106,19 @@ if [ "$LOCK_ACQUIRED" != 1 ]; then
     exit 1
 fi
 
-"$MAKE_BIN" "$BUILD_TARGET"
+"$MAKE_BIN" "${MAKE_ARGS[@]}" "$BUILD_TARGET"
+if [ -n "$MAKE_ROM_DIR" ] && [ ! -f "$MAKE_ROM_DIR/neogeo.zip" ] && [ -f build/rom/neogeo.zip ]; then
+    cp build/rom/neogeo.zip "$MAKE_ROM_DIR/neogeo.zip"
+fi
 kill_old_gngeo
 
+run_args=("$RUN_TARGET")
+if [ -n "$EXTRAOPTS_VALUE" ]; then
+    run_args+=("EXTRAOPTS=$EXTRAOPTS_VALUE")
+fi
+
 setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
-    "$MAKE_BIN" "$RUN_TARGET" >"$LOG" 2>&1 < /dev/null &
+    "$MAKE_BIN" "${MAKE_ARGS[@]}" "${run_args[@]}" >"$LOG" 2>&1 < /dev/null &
 sleep "$WAIT_SECS"
 
 wid="$(window_for_gngeo)"

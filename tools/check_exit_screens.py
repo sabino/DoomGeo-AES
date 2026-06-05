@@ -49,11 +49,13 @@ def load_image(path: Path) -> tuple[Image.Image | None, list[str]]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", default=".tools/screens/latest", help="Directory containing E1M1 exit smoke PNGs")
+    parser.add_argument("--initial", default="e1m1-exit-initial.png", help="Initial screenshot file name")
+    parser.add_argument("--complete", default="e1m1-exit-complete.png", help="Completed screenshot file name")
     args = parser.parse_args()
 
     root = Path(args.dir)
-    initial_path = root / "e1m1-exit-initial.png"
-    complete_path = root / "e1m1-exit-complete.png"
+    initial_path = root / args.initial
+    complete_path = root / args.complete
     initial, errors = load_image(initial_path)
     complete, complete_errors = load_image(complete_path)
     errors.extend(complete_errors)
@@ -87,7 +89,7 @@ def main() -> int:
         for error in errors:
             print(error, file=sys.stderr)
         return 1
-    print(f"E1M1 exit screenshots OK: 2 files in {root}")
+    print(f"exit screenshots OK: {initial_path.name}, {complete_path.name} in {root}")
     return 0
 
 

@@ -24,17 +24,29 @@ and emits generated C headers/sources under `build/`:
 
 - Coarse grid collision/render map.
 - Per-cell wall texture class and texture phase.
-- Compact visual render-line rows derived from solid Doom linedefs, stored in
-  generated map coordinates for runtime hit refinement.
+- Compact visual render-line rows derived from solid Doom linedefs plus selected
+  two-sided lower, upper, and mid-texture linedefs, stored in generated map
+  coordinates and one-span metadata for runtime hit refinement.
 - Per-cell render-line index tables, generated from the same raster cells as
   the collision grid. On E1M1 this reduces wall-hit refinement from scanning
-  325 render lines per column to checking at most 7 lines in a hit cell, with
-  about 1.7 lines on an average referenced cell.
-- Door/exit trigger tables.
+  hundreds of render lines per column to checking only local cell candidates.
+- Door/exit trigger tables. Exit records include the raw Doom line special plus
+  the generated Episode/map destination so normal and secret exits can diverge
+  without runtime WAD parsing.
 - Damage and secret bit grids.
+- Per-cell sector floor visual class and light band, derived from sector flat
+  names, specials, and light levels for low-cost runtime palette cues.
 - Runtime thing list with supported Doom thing types.
+- Runtime thing class/info bytes for monster, threat, pickup, corpse,
+  shootable, and render predicates, so the 68000 can test generated metadata
+  instead of repeatedly classifying Doom type numbers.
 - Full compact arrays for vertices, linedefs, sidedefs, sectors, segs,
   subsectors, nodes, reject, and blockmap for future higher-fidelity work.
+- BSP vertices and nodes transformed into the raycaster's grid/q8 coordinate
+  space, so a future visible-seg renderer can traverse Doom nodes without doing
+  WAD-to-grid coordinate conversion on the 68000. `make bsp-asset-check`
+  verifies the generated counts, bounds, partition vectors, and child indices
+  for the selected map.
 
 The ROM does not load a WAD at runtime.
 
@@ -50,7 +62,30 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
 
 - Doom wall textures are precomposed from `TEXTURE1`/`PNAMES`/patches into tile
   strip atlases.
-- Doom flats are sampled into tile banks and perspective plane caches.
+- Wall strip tiles are still selected by compact texture phase at runtime, but
+  each offline tile now preserves the horizontal source band for that phase
+  instead of flattening it to one repeated texel column.
+- The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
+  clarity mode emits 32-phase wall/door atlases and a four-direction plane
+  cache, while balanced/quality/speed keep the 16-phase wall atlases and
+  16-direction plane cache. The runtime defaults to the cached perspective plane
+  upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
+- Doom flats are sampled into tile banks and perspective plane caches at build
+  time. Normal runtime floor identity remains a palette-level cue over those
+  cached planes. Runtime column phase is driven from the camera plane rather
+  than raw map X/Y, which keeps the cached floor/ceiling bank inside the
+  hardware-safe tile range while avoiding runtime floor casting. The player cell
+  and a few wall-stopped forward view samples choose a representative visible
+  sector class, so hazards/liquids can read before contact. Liquid classes add a
+  slow palette pulse over the same floor gradients instead of animating flat
+  pixels.
+- The floor/ceiling path intentionally follows the same performance trade seen
+  in the Super FX Doom source: spend active runtime budget on wall visibility and
+  control response, while floors remain a cheap solid/palette/pre-baked cue
+  rather than a per-pixel texture-mapped span renderer.
+- The normal menu title backdrop is also WAD-derived: `TITLEPIC` is converted
+  offline into a small sprite-tile block and palette, then drawn only while the
+  fix-layer menu is active.
 - Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - HUD keycards are baked from the WAD keycard patches into their own compact
@@ -64,13 +99,14 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   WAD provides rotated reaction art. Runtime timers prefer those buckets, then
   fall back to the older front-facing attack/pain buckets and finally to walk
   frames without allocating extra world-sprite slots.
-- Registered/commercial-only psprite lumps that are missing from shareware are
-  replaced with synthetic fallback frames at build time, so the same runtime
-  weapon table can be tested with visibly distinct shareware plasma/BFG weapons
-  and then rebuilt with exact registered/commercial WAD art.
-- The perspective plane cache is intentionally compact. Earlier multi-phase
-  plane caches pushed monster tiles past the practical C-ROM tile index range,
-  making enemies invisible even though their sprite slots were active.
+- Weapon psprites use real WAD patches only. Builds emit a `WEAPON_ASSET_MASK`
+  from the selected IWAD and the runtime refuses to grant/select weapons whose
+  psprite art is missing. The default shareware build masks missing plasma/BFG;
+  explicit Freedoom builds provide the full redistributable weapon-art path.
+- The perspective plane cache is intentionally compact. Multi-phase plane
+  experiments fit in C-ROM bytes but pushed floor/sprite references past the
+  practical Neo Geo tile index range, producing invalid/black strips even though
+  the ROM image still built.
 
 ## Why Not Exact Doom Yet
 
@@ -80,13 +116,48 @@ current runtime accepts several compromises:
 
 - Grid/coarse collision representation with per-cell visual render-line
   refinement instead of a full BSP/seg traversal.
-- One projected wall height per column instead of multiple clipped subsector
-  spans.
+- At most one projected wall or large two-sided partial span per column instead
+  of true multiple clipped subsector spans. Small open-cell spans are allowed to
+  pass through so openings can show the farther space, but the renderer still
+  cannot draw a near lower/upper span and a far wall in the same column.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The current runtime uses a 40-column wall pass with seven 4-strip world things
-  so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit.
+  The default balanced runtime uses a 32-column wall pass with nine visible
+  world things so walls, backdrop, weapon, and HUD stay inside the practical
+  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity`
+  keep heavier visual comparison paths, while `speed` spends fewer sprites on
+  walls and more on visible world things.
+- Runtime wall projection still uses one sprite strip per wall column. In the
+  balanced/speed tiers, solid grid-cell hits use the rasterized map wall
+  directly and skip solid-line refinement; open-cell WAD render-line spans stay
+  enabled for windows, lower walls, upper walls, and doors. The quality/clarity
+  tiers keep solid-line refinement for closer native-Doom still comparisons.
+- The converter now emits grid/q8 BSP node and vertex arrays beside the raw WAD
+  geometry, but the active renderer has not yet switched to front-to-back
+  visible-seg ownership. That is the next step toward replacing first-grid-wall
+  ray ownership with Doom-like seg ownership while still filling the existing
+  Neo Geo sprite-strip buffers.
+- Wall strip geometry updates every dirty frame, but texture/palette SCB1
+  rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
+  controller response and wall height motion from stalling behind a full
+  15-tile rewrite of every wall column while turning. Balanced mode refreshes
+  all 32 wall columns during normal movement, so texture changes settle in the
+  same frame as wall geometry in the common case; the overrun path clamps the
+  budget back down when `wait_vblank_status()` reports late frames.
+- Wall depth shading uses 11 bands per side. With the primary wall, door, and
+  seven alternate wall texture palettes, this keeps every wall-depth palette
+  below Neo Geo palette index 256. Higher band counts overflow palette RAM and
+  show up in GnGeo as `Invalid write` entries.
+- Balanced mode also adapts WAD line refinement by motion state. Standing frames
+  keep the normal portal-span pass and near solid-line correction, while moving
+  frames skip portal-span refinement and use a tighter near-hit radius. Late-frame
+  recovery keeps the same reduced span work for one frame. This keeps the runtime
+  in the sprite-strip model while spending less 68000 time on line intersection
+  scans exactly when input response matters most.
+- The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
+  budget. Balanced defaults update 10 of 20 backdrop columns per normal frame
+  and four after a late frame, keeping plane catch-up short without turning the
+  planes into a runtime span renderer.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as

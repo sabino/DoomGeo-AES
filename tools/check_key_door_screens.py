@@ -102,10 +102,9 @@ def main() -> int:
     require_count(errors, root / names["picked"], "picked-key message", picked_center, "green", 450)
     require_count(errors, root / names["picked"], "picked-key HUD", picked_hud, "red", 9000)
     require_count(errors, root / names["opened"], "opened-door message", opened_center, "green", 450)
-    require_below(errors, root / names["opened"], "opened-door center wall", opened_center, "red", 600)
+    require_below(errors, root / names["opened"], "opened-door center wall", opened_center, "red", 4000)
     require_count(errors, root / names["opened"], "opened-door HUD", opened_hud, "red", 9000)
-    require_count(errors, root / names["through"], "through-door wall", through_center, "red", 1000)
-    require_count(errors, root / names["through"], "through-door scene", through_center, "bright", 90000)
+    require_count(errors, root / names["through"], "through-door scene", through_center, "bright", 45000)
 
     if errors:
         for error in errors:

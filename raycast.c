@@ -46,6 +46,8 @@ static inline fix recip(fix b) {
 #define FBIG (1 << 28)            
 #define FMIN (FONE >> 6)          /* clamp tiny distances                   */
 #define PLAYER_RADIUS ((FONE / 5) * MAP_RENDER_SCALE)  /* Doom-ish collision body */
+#define PORTAL_SPAN_DRAW_MIN_H 12
+#define PORTAL_SPAN_OCCLUDE_MIN_H 32
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -70,7 +72,7 @@ static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
 static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
 static u8  kindbuf[NUM_COLS];    /* 0 = wall, 1..N = alt wall, N+1 = door   */
 static u8  curkind[NUM_COLS];
-static u8  closebuf[NUM_COLS];   /* point-blank walls use stable coarse art */
+static u8  closebuf[NUM_COLS];   /* reserved for emergency coarse-wall mips */
 static u8  curclose[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
@@ -78,6 +80,10 @@ static u16 wall_alt_tiles[TILE_WALL_ALT_COUNT][TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
+static u8  wall_upload_scan = 0;
+static u8  wall_first_upload = 1;
+static u8  wall_frame_overrun = 0;
+static u8  render_motion_active = 0;
 
 static inline int projected_height_from_inv(fix inv_dist) {
     int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
@@ -86,6 +92,12 @@ static inline int projected_height_from_inv(fix inv_dist) {
 
 static inline int projected_height(fix dist) {
     return projected_height_from_inv(recip(dist));
+}
+
+static inline int projected_span_height(fix dist, u8 span_height) {
+    int full_h = projected_height(dist);
+    int h = (full_h * span_height + 63) / 128;
+    return h < 2 ? 2 : h;
 }
 
 static void update_projection_cache(void) {
@@ -191,18 +203,44 @@ static void try_move(fix dx, fix dy) {
     if (posX != ox || posY != oy) rc_invalidate_view();
 }
 
+static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
+    u8 n = pressed & neg;
+    u8 p = pressed & pos;
+    if (n == p) return 0;
+    return n ? -1 : 1;
+}
+
 void rc_input(u8 pressed) {
     enum { UP=1, DOWN=2, LEFT=4, RIGHT=8, A=16 };
     fix spd = FIX(MOVE_SPEED * MAP_RENDER_SCALE);
-    if (pressed & UP)   try_move(fmul(dirX, spd), fmul(dirY, spd));
-    if (pressed & DOWN) try_move(-fmul(dirX, spd), -fmul(dirY, spd));
+    signed char forward = input_axis(pressed, DOWN, UP);
+    signed char side = 0;
+    signed char turn = 0;
     if (pressed & A) {                              /* strafe with A held    */
-        if (pressed & LEFT)  try_move(-fmul(planeX, spd), -fmul(planeY, spd));
-        if (pressed & RIGHT) try_move( fmul(planeX, spd),  fmul(planeY, spd));
+        side = input_axis(pressed, LEFT, RIGHT);
     } else {
-        if (pressed & LEFT)  rotate(-1);
-        if (pressed & RIGHT) rotate(+1);
+        turn = input_axis(pressed, LEFT, RIGHT);
     }
+    render_motion_active = (u8)((forward || side || turn) ? 1 : 0);
+    if (forward || side) {
+        fix dx = 0;
+        fix dy = 0;
+        if (forward && side) spd = (fix)(((s32)spd * 181) >> 8); /* ~1/sqrt(2) */
+        if (forward) {
+            fix step_x = fmul(dirX, spd);
+            fix step_y = fmul(dirY, spd);
+            if (forward > 0) { dx += step_x; dy += step_y; }
+            else             { dx -= step_x; dy -= step_y; }
+        }
+        if (side) {
+            fix step_x = fmul(planeX, spd);
+            fix step_y = fmul(planeY, spd);
+            if (side > 0) { dx += step_x; dy += step_y; }
+            else          { dx -= step_x; dy -= step_y; }
+        }
+        try_move(dx, dy);
+    }
+    if (turn) rotate(turn);
 }
 
 void rc_player_cell(int *cx, int *cy) {
@@ -265,7 +303,7 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     return 1;
 }
 
-static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, fix *dist, u8 *kind, u8 *tex, int *side) {
+static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, u8 accept_spans, fix *dist, u8 *kind, u8 *tex, int *side, u8 *span, u8 *span_height) {
 #if DOOM_RENDER_LINES
     unsigned char cell_count = g_render_cell_count[cell_y][cell_x];
     unsigned short cell_start;
@@ -282,6 +320,12 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     cell_start = g_render_cell_start[cell_y][cell_x];
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
+        u8 line_span = g_render_lines[i].span;
+        if (accept_spans) {
+            if (!line_span) continue;
+        } else if (line_span) {
+            continue;
+        }
         int x1 = g_render_lines[i].x1_q8 >> 4;
         int y1 = g_render_lines[i].y1_q8 >> 4;
         int x2 = g_render_lines[i].x2_q8 >> 4;
@@ -326,6 +370,8 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         *kind = g_render_lines[best_line].texture;
         *tex = (u8)tex_x;
         *side = (abs_x > abs_y) ? 1 : 0;
+        *span = g_render_lines[best_line].span;
+        *span_height = g_render_lines[best_line].height;
         return 1;
     }
 #else
@@ -333,11 +379,14 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     (void)rayY;
     (void)cell_x;
     (void)cell_y;
+    (void)accept_spans;
 #endif
     (void)dist;
     (void)kind;
     (void)tex;
     (void)side;
+    (void)span;
+    (void)span_height;
     return 0;
 }
 
@@ -346,6 +395,19 @@ void rc_render(void) {
     update_ray_cache();
     int baseMapX = posX >> FBITS;
     int baseMapY = posY >> FBITS;
+    u8 allow_span_refinement = 1;
+    u8 near_refinement_cells = DOOM_NEAR_LINE_REFINEMENT_CELLS;
+#if DOOM_ADAPTIVE_LINE_REFINEMENT
+    if (wall_frame_overrun) {
+        allow_span_refinement = 0;
+        near_refinement_cells = DOOM_OVERRUN_LINE_REFINEMENT_CELLS;
+    } else if (render_motion_active) {
+#if !DOOM_MOVING_SPAN_REFINEMENT
+        allow_span_refinement = 0;
+#endif
+        near_refinement_cells = DOOM_MOVING_LINE_REFINEMENT_CELLS;
+    }
+#endif
     for (int x = 0; x < NUM_COLS; x++) {
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
@@ -359,6 +421,9 @@ void rc_render(void) {
         int stepX = rayStepXbuf[x];
         int stepY = rayStepYbuf[x];
         fix sideX, sideY;
+        fix span_perp = FBIG;
+        u8 span = 0;
+        u8 span_height = 0;
         if (stepX < 0) sideX = fmul(posX - (mapX << FBITS), ddX);
         else           sideX = fmul(((mapX + 1) << FBITS) - posX, ddX);
         if (stepY < 0) sideY = fmul(posY - (mapY << FBITS), ddY);
@@ -372,14 +437,35 @@ void rc_render(void) {
             if (map_at(mapX, mapY)) {
                 hit_cell = map_cell_value(mapX, mapY);
                 break;
+            } else {
+                fix line_perp = FBIG;
+                u8 line_kind = 0;
+                u8 line_tex = 0;
+                int line_side = side;
+                u8 line_span = 0;
+                u8 line_height = 0;
+                if (allow_span_refinement && g_render_cell_count[mapY][mapX] &&
+                    rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 1, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
+                    line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
+                    kindbuf[x] = line_kind;
+                    texbuf[x] = line_tex;
+                    side = line_side;
+                    span_perp = line_perp;
+                    span = line_span;
+                    span_height = line_height;
+                    hit_cell = 0;
+                    break;
+                }
+                continue;
             }
         }
-        kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
+        if (!span) kindbuf[x] = (hit_cell >= 2) ? (TILE_WALL_ALT_COUNT + 1) : map_cell_texture(mapX, mapY);
 
         fix perp = (side == 0) ? (sideX - ddX) : (sideY - ddY);
+        if (span) perp = span_perp;
         if (perp < FMIN) perp = FMIN;
 
-        {
+        if (!span) {
             fix wall = (side == 0) ? posY + fmul(perp, rayY) : posX + fmul(perp, rayX);
             int tex_x = (int)(((wall & (FONE - 1)) * TILE_WALL_ATLAS_COLS) >> FBITS);
             if (tex_x < 0) tex_x = 0;
@@ -387,22 +473,53 @@ void rc_render(void) {
             tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
             texbuf[x] = (u8)tex_x;
         }
-        rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &perp, &kindbuf[x], &texbuf[x], &side);
+#if DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT
+        if (!span && g_render_cell_count[mapY][mapX]) {
+#if DOOM_SOLID_LINE_REFINEMENT
+            rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+#else
+            if (near_refinement_cells && perp <= ((fix)near_refinement_cells << FBITS)) {
+                rc_refine_render_line_hit(rayX, rayY, mapX, mapY, 0, &perp, &kindbuf[x], &texbuf[x], &side, &span, &span_height);
+            }
+#endif
+        }
+#endif
         distbuf[x] = perp;
 
         fix inv_perp = recip(perp);
-        int h = projected_height_from_inv(inv_perp);     /* slice height px */
+        int full_h = projected_height_from_inv(inv_perp);
+        int h = full_h;                                  /* slice height px */
+        if (span && span_height) {
+            h = (full_h * span_height + 63) / 128;
+            if (h < 2) h = 2;
+            if (h < PORTAL_SPAN_DRAW_MIN_H) {
+                span = 0;
+                span_height = 0;
+                h = full_h;
+            }
+        }
         if (h < 1)     h = 1;
         if (h > MAX_H) h = MAX_H;
-        closebuf[x] = (u8)(h >= GAME_H - 4 && kindbuf[x] == 0);
+        /* Keep close walls on the baked Doom texture atlas.  The old coarse
+         * TILE_BRICK fallback avoided shimmer, but it turned nearby E1M1/E1M2
+         * walls into unreadable flat slabs and hid the converted texture cues. */
+        closebuf[x] = 0;
 
         int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
+        if (span == 1) {
+            int bottom = (GAME_H + full_h) / 2;
+            if (bottom > GAME_H) bottom = GAME_H;
+            top = bottom - h;
+        } else if (span == 2) {
+            top = (GAME_H - full_h) / 2;
+        }
+        if (top < 0) top = 0;
+        if (top > GAME_H - 1) top = GAME_H - 1;
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */
         if (vsh < 0)   vsh = 0;
         if (vsh > 255) vsh = 255;
 
         scb2buf[x] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
-		
         scb3buf[x] = scb3_word(top, 0, WALL_WIN);
 
         /* distance shading */
@@ -413,6 +530,10 @@ void rc_render(void) {
     }
     view_dirty = 0;
     wall_upload_dirty = 1;
+}
+
+void rc_set_frame_overrun(u8 overrun) {
+    wall_frame_overrun = (u8)(overrun ? 1 : 0);
 }
 
 void rc_blit(void) {
@@ -455,37 +576,59 @@ void rc_blit(void) {
         }
     }
 
-    /* directional shading */
-    for (int c = 0; c < NUM_COLS; c++) {
-        if (texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]) {
-            u16 spr = WALL_BASE + c;
-            u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
-            if (palbuf[c] != curpal[c]) {
-                u16 attr = (u16)(palbuf[c] << 8);
-                vram_addr(VRAM_SCB1 + spr * 64);
-                vram_mod(1);
-                for (int t = 0; t < WALL_WIN; t++) {
-                    vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
-                    vram_w(attr);
-                }
-                curpal[c] = palbuf[c];
-            } else {
-                vram_addr(VRAM_SCB1 + spr * 64);
-                vram_mod(2);
-                for (int t = 0; t < WALL_WIN; t++) vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
-            }
-            curtex[c] = texbuf[c];
-            curkind[c] = kindbuf[c];
-            curclose[c] = closebuf[c];
-            continue;
+    /* Texture/palette strip writes are much more expensive than SCB2/SCB3
+     * geometry. Spread them across frames so input response is not held
+     * hostage by rewriting every 15-tile wall column while turning. */
+    {
+        u8 budget = wall_first_upload ? NUM_COLS : WALL_TILE_UPLOAD_COLUMNS_PER_FRAME;
+        u8 remaining = 0;
+        u8 start = wall_upload_scan;
+        if (wall_frame_overrun && !wall_first_upload && budget > WALL_TILE_UPLOAD_COLUMNS_OVERRUN) {
+            budget = WALL_TILE_UPLOAD_COLUMNS_OVERRUN;
         }
-        if (palbuf[c] == curpal[c]) continue;
-        u16 spr = WALL_BASE + c;
-        vram_addr(VRAM_SCB1 + spr * 64 + 1);
-        vram_mod(2);                            
-        u16 attr = (u16)(palbuf[c] << 8);
-        for (int t = 0; t < WALL_WIN; t++) vram_w(attr);
-        curpal[c] = palbuf[c];
+        for (int i = 0; i < NUM_COLS; i++) {
+            int c = start + i;
+            u8 texture_changed;
+            u16 spr;
+            if (c >= NUM_COLS) c -= NUM_COLS;
+            spr = WALL_BASE + c;
+            texture_changed = (u8)(texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]);
+            if (!texture_changed && palbuf[c] == curpal[c]) continue;
+            if (!budget) {
+                remaining = 1;
+                break;
+            }
+            budget--;
+            wall_upload_scan = (u8)(c + 1);
+            if (wall_upload_scan >= NUM_COLS) wall_upload_scan = 0;
+            if (texture_changed) {
+                u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
+                if (palbuf[c] != curpal[c]) {
+                    u16 attr = (u16)(palbuf[c] << 8);
+                    vram_addr(VRAM_SCB1 + spr * 64);
+                    vram_mod(1);
+                    for (int t = 0; t < WALL_WIN; t++) {
+                        vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
+                        vram_w(attr);
+                    }
+                    curpal[c] = palbuf[c];
+                } else {
+                    vram_addr(VRAM_SCB1 + spr * 64);
+                    vram_mod(2);
+                    for (int t = 0; t < WALL_WIN; t++) vram_w(closebuf[c] ? TILE_BRICK : tiles[t]);
+                }
+                curtex[c] = texbuf[c];
+                curkind[c] = kindbuf[c];
+                curclose[c] = closebuf[c];
+                continue;
+            }
+            vram_addr(VRAM_SCB1 + spr * 64 + 1);
+            vram_mod(2);
+            u16 attr = (u16)(palbuf[c] << 8);
+            for (int t = 0; t < WALL_WIN; t++) vram_w(attr);
+            curpal[c] = palbuf[c];
+        }
+        wall_upload_dirty = remaining;
+        if (!remaining) wall_first_upload = 0;
     }
-    wall_upload_dirty = 0;
 }

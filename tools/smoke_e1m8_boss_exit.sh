@@ -6,13 +6,10 @@ cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
-WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
+WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
-INITIAL_OUT="${OUT_DIR}/key-door-initial.png"
-MISSING_OUT="${OUT_DIR}/key-door-missing-key.png"
-PICKED_OUT="${OUT_DIR}/key-door-picked-key.png"
-OPENED_OUT="${OUT_DIR}/key-door-opened.png"
-THROUGH_OUT="${OUT_DIR}/key-door-through.png"
+INITIAL_OUT="${OUT_DIR}/e1m8-boss-initial.png"
+COMPLETE_OUT="${OUT_DIR}/e1m8-boss-complete.png"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -43,19 +40,10 @@ capture_window() {
     convert "$xwd_out" "$out"
 }
 
-press_d() {
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown s
-    sleep "${KEY_DOOR_USE_SECS:-0.45}"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup s
-}
-
-hold_up() {
-    local seconds="$1"
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
-    sleep "$seconds"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+press_fire() {
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown x
+    sleep 0.25
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup x
 }
 
 require_cmd xdotool
@@ -65,8 +53,8 @@ require_cmd convert
 
 mkdir -p "$OUT_DIR"
 
-SMOKE_BUILD_TARGET=key-door-test-rom \
-SMOKE_RUN_TARGET=key-door-test-gngeo \
+SMOKE_BUILD_TARGET=e1m8-boss-test-rom \
+SMOKE_RUN_TARGET=e1m8-boss-test-gngeo \
 SMOKE_OUTPUT="$INITIAL_OUT" \
 SMOKE_WAIT_SECS="$WAIT_SECS" \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
@@ -80,31 +68,11 @@ if [ -n "$WORKSPACE" ]; then
 fi
 sleep 0.3
 
-# GnGeo maps Neo Geo D to keyboard "s" in config.mk. The first press should
-# report the missing red key while the second press should open the real E1M2
-# red door after walking forward through the staged red key pickup.
-press_d
-sleep 0.4
-capture_window "$wid" "$MISSING_OUT"
+press_fire
+sleep 1.4
+capture_window "$wid" "$COMPLETE_OUT"
 
-hold_up "${KEY_DOOR_KEY_WALK_SECS:-1.25}"
-sleep 0.5
-capture_window "$wid" "$PICKED_OUT"
-
-press_d
-sleep 0.2
-press_d
-sleep 0.25
-capture_window "$wid" "$OPENED_OUT"
-
-hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-3.0}"
-sleep 0.4
-capture_window "$wid" "$THROUGH_OUT"
-
-tools/check_key_door_screens.py --dir "$OUT_DIR"
+tools/check_exit_screens.py --dir "$OUT_DIR" --initial "$(basename "$INITIAL_OUT")" --complete "$(basename "$COMPLETE_OUT")"
 
 echo "$INITIAL_OUT"
-echo "$MISSING_OUT"
-echo "$PICKED_OUT"
-echo "$OPENED_OUT"
-echo "$THROUGH_OUT"
+echo "$COMPLETE_OUT"
