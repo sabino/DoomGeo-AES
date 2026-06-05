@@ -402,6 +402,12 @@ static void init_palettes(void) {
         u8 b = g_hud_palette_rgb[i][2];
         pal_set(PAL_HUD, (u16)(i + 1), RGB(r, g, b));
     }
+    for (int i = 0; i < TITLE_PALETTE_COLORS; i++) {
+        u8 r = g_title_palette_rgb[i][0];
+        u8 g = g_title_palette_rgb[i][1];
+        u8 b = g_title_palette_rgb[i][2];
+        pal_set(PAL_TITLE, (u16)(i + 1), RGB(r, g, b));
+    }
     restore_counter_palette();
     restore_weapon_palette();
     REG_BACKDROP = RGB(0, 0, 0);
@@ -636,14 +642,12 @@ static void intro_draw_skill_name(u16 col, u16 row, u16 pal) {
 }
 
 static void draw_intro_main_menu(u8 selected, u8 blink_on) {
+    const char *label = "START";
+    if (selected == 1) label = "SKILL";
+    else if (selected == 2) label = "MAP";
+    else if (selected == 3) label = "OPTS";
     clear_fix();
-    intro_draw_rule(6, 2, 28, PAL_MAP_WALL);
-    intro_draw_word(4, 5, "DOOM GEO", PAL_MAP_PLAYER);
-    intro_draw_rule(6, 11, 28, PAL_MAP_WALL);
-    intro_draw_menu_item(14, "START", selected == 0, blink_on);
-    intro_draw_menu_item(18, "SKILL", selected == 1, blink_on);
-    intro_draw_menu_item(22, "MAP", selected == 2, blink_on);
-    intro_draw_menu_item(26, "OPTS", selected == 3, blink_on);
+    intro_draw_menu_item(21, label, 1, blink_on);
 }
 
 static void draw_intro_skill_menu(void) {
@@ -680,6 +684,18 @@ static void draw_intro_options_menu(void) {
     intro_draw_word(4, 24, "A BACK", PAL_MAP_PLAYER);
 }
 
+static void draw_intro_titlepic(void) {
+    for (u16 col = 0; col < TILE_TITLEPIC_COLS; col++) {
+        u16 spr = (u16)(BG_BASE + col);
+        for (u16 row = 0; row < TILE_TITLEPIC_ROWS; row++) {
+            scb1_tile(spr, row, (u16)(TILE_TITLEPIC_BASE + row * TILE_TITLEPIC_COLS + col), PAL_TITLE);
+        }
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, 0, 0, TILE_TITLEPIC_ROWS);
+        scb4(spr, (u16)(col * 16));
+    }
+}
+
 static void run_intro_menu(void) {
     enum { UP = 0x01, DOWN = 0x02, A = 0x10, B = 0x20, D = 0x80 };
     enum { INTRO_MAIN = 0, INTRO_SKILL = 1, INTRO_MAP = 2, INTRO_OPTIONS = 3 };
@@ -690,6 +706,7 @@ static void run_intro_menu(void) {
     u8 dirty = 1;
     init_palettes();
     disable_sprites();
+    draw_intro_titlepic();
     REG_BACKDROP = RGB(0, 0, 0);
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
@@ -729,6 +746,8 @@ static void run_intro_menu(void) {
             dirty = 0;
         }
     }
+    clear_fix();
+    disable_sprites();
 }
 
 static int prev_px = -1, prev_py = -1;
@@ -4468,7 +4487,7 @@ static void update_background_scroll(void) {
     u16 ceiling_direction_base;
     u16 floor_direction_base;
     u32 key;
-    u8 columns_this_frame = 4;
+    u8 columns_this_frame = BG_SCROLL_COLUMNS_PER_FRAME;
 
     rc_player_q8(&px, &py);
     rc_dir_q8(&dir_x, &dir_y);

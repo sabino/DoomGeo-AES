@@ -105,6 +105,9 @@ readable.
   one-line intro prompt. It has Start, skill/build info, compiled-map/next-map
   info, and options placeholder pages. Focused verification ROMs still define
   `DOOM_SKIP_INTRO` and boot directly into their scenario.
+- The normal intro/menu backdrop uses the WAD `TITLEPIC` converted offline into
+  Neo Geo sprite tiles and a generated palette. Those sprites are menu-only and
+  are hidden before the game initializes the playfield renderer.
 - Doom status face frames are baked into a dedicated face bank and switch by
   health, turn direction, pain, evil grin, and death state.
 - Large red Doom-style `STTNUM` digits are rendered on the fix layer for ammo,
@@ -540,6 +543,12 @@ readable.
 ## Map And Level Flow
 
 - Movement uses fixed-point position/direction with a Doom-like body radius.
+  Opposing inputs cancel cleanly, and forward-plus-strafe motion is combined into
+  one normalized move step so diagonal walking does not run faster or spend a
+  second collision pass.
+- `tools/stress_movement.sh` boots the normal ROM, starts gameplay, and captures
+  held forward, turn, and strafe poses. Use it alongside the route/key/powerup
+  smokes when tuning renderer cost or movement feel.
 - The converter flattens non-door two-sided sector transitions into narrow
   bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
   progression traversable in the Neo Geo port's 2D collision grid without

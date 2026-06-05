@@ -88,3 +88,40 @@ License note:
 
 - The official source release is GPL-2.0. Doom game assets/WADs remain separate
   and are not redistributed by this repo.
+
+## DOOM-FX
+
+Repository: https://github.com/RandalLinden/DOOM-FX
+
+Useful ideas:
+
+- The Super FX source is useful as a constrained-console Doom renderer, not as
+  source to paste into the Neo Geo runtime.
+- Its default configuration keeps true floor/ceiling texture mapping disabled
+  and uses cheaper solid/dithered floor drawing, which matches DoomGeo-AES's
+  pre-baked floor/palette cue strategy.
+- Its view build is split into A/B/C screen ranges and gates high/low detail
+  work before tracing, which is a good model for keeping movement responsive
+  when wall fidelity increases.
+- Its BSP pass builds compact area/segment and visible-segment records with
+  clip ranges before drawing. A Neo Geo adaptation should emit compact
+  wall-span/column ownership metadata offline or in a tiny runtime pass, then
+  keep using sprite-strip SCB updates.
+- Its visible-segment metadata tracks normal, upper, and lower wall spans. That
+  is the right conceptual source for future Doom-like windows, ledges, and
+  doors in this port.
+
+Why it cannot be copied directly:
+
+- The code is Super FX assembly with GSU bank/cache/plot instructions, not 68000
+  Neo Geo code.
+- Its drawing path writes pixels; DoomGeo-AES must preserve the offline
+  conversion, C-ROM tile, sprite-strip, and fix-layer architecture.
+- Exact floor span rendering would spend runtime work in the wrong place for
+  this hardware. Wall visibility and input response should keep priority.
+
+License note:
+
+- `DOOM-FX` includes GPL-3.0-or-later text for the Super Nintendo / SuperFX
+  release. Any exact code import would still need explicit attribution and a
+  deliberate license decision, but this branch only adapts architecture notes.

@@ -191,18 +191,43 @@ static void try_move(fix dx, fix dy) {
     if (posX != ox || posY != oy) rc_invalidate_view();
 }
 
+static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
+    u8 n = pressed & neg;
+    u8 p = pressed & pos;
+    if (n == p) return 0;
+    return n ? -1 : 1;
+}
+
 void rc_input(u8 pressed) {
     enum { UP=1, DOWN=2, LEFT=4, RIGHT=8, A=16 };
     fix spd = FIX(MOVE_SPEED * MAP_RENDER_SCALE);
-    if (pressed & UP)   try_move(fmul(dirX, spd), fmul(dirY, spd));
-    if (pressed & DOWN) try_move(-fmul(dirX, spd), -fmul(dirY, spd));
+    signed char forward = input_axis(pressed, DOWN, UP);
+    signed char side = 0;
+    signed char turn = 0;
     if (pressed & A) {                              /* strafe with A held    */
-        if (pressed & LEFT)  try_move(-fmul(planeX, spd), -fmul(planeY, spd));
-        if (pressed & RIGHT) try_move( fmul(planeX, spd),  fmul(planeY, spd));
+        side = input_axis(pressed, LEFT, RIGHT);
     } else {
-        if (pressed & LEFT)  rotate(-1);
-        if (pressed & RIGHT) rotate(+1);
+        turn = input_axis(pressed, LEFT, RIGHT);
     }
+    if (forward || side) {
+        fix dx = 0;
+        fix dy = 0;
+        if (forward && side) spd = (fix)(((s32)spd * 181) >> 8); /* ~1/sqrt(2) */
+        if (forward) {
+            fix step_x = fmul(dirX, spd);
+            fix step_y = fmul(dirY, spd);
+            if (forward > 0) { dx += step_x; dy += step_y; }
+            else             { dx -= step_x; dy -= step_y; }
+        }
+        if (side) {
+            fix step_x = fmul(planeX, spd);
+            fix step_y = fmul(planeY, spd);
+            if (side > 0) { dx += step_x; dy += step_y; }
+            else          { dx -= step_x; dy -= step_y; }
+        }
+        try_move(dx, dy);
+    }
+    if (turn) rotate(turn);
 }
 
 void rc_player_cell(int *cx, int *cy) {

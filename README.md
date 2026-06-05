@@ -164,6 +164,7 @@ tools/smoke_death_drop.sh
 make powerup-test-rom
 make powerup-test-gngeo
 tools/smoke_powerup.sh
+tools/stress_movement.sh
 make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27

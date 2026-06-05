@@ -69,6 +69,13 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   caches. The player cell and a few wall-stopped forward view samples choose a
   representative visible sector class, so hazards/liquids can read before
   contact without introducing runtime floor casting.
+- The floor/ceiling path intentionally follows the same performance trade seen
+  in the Super FX Doom source: spend active runtime budget on wall visibility and
+  control response, while floors remain a cheap solid/palette/pre-baked cue
+  rather than a per-pixel texture-mapped span renderer.
+- The normal menu title backdrop is also WAD-derived: `TITLEPIC` is converted
+  offline into a small sprite-tile block and palette, then drawn only while the
+  fix-layer menu is active.
 - Doom status bar, face frames, weapon psprites, pickups, monsters, corpses,
   projectiles, and effects are pre-baked into C-ROM tiles and palettes.
 - HUD keycards are baked from the WAD keycard patches into their own compact
