@@ -10,6 +10,7 @@ DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
+EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
@@ -96,8 +97,13 @@ fi
 "$MAKE_BIN" "$BUILD_TARGET"
 kill_old_gngeo
 
+run_args=("$RUN_TARGET")
+if [ -n "$EXTRAOPTS_VALUE" ]; then
+    run_args+=("EXTRAOPTS=$EXTRAOPTS_VALUE")
+fi
+
 setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
-    "$MAKE_BIN" "$RUN_TARGET" >"$LOG" 2>&1 < /dev/null &
+    "$MAKE_BIN" "${run_args[@]}" >"$LOG" 2>&1 < /dev/null &
 sleep "$WAIT_SECS"
 
 wid="$(window_for_gngeo)"

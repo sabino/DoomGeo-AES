@@ -549,6 +549,10 @@ readable.
 - `tools/stress_movement.sh` boots the normal ROM, starts gameplay, and captures
   held forward, turn, and strafe poses. Use it alongside the route/key/powerup
   smokes when tuning renderer cost or movement feel.
+- `tools/bench_movement.sh` runs the same movement stress path with GnGeo's FPS
+  overlay enabled and longer holds. This gives a quick frame-pacing visual
+  register under `.tools/screens/latest/movement-bench/` before and after
+  renderer-cost changes.
 - The converter flattens non-door two-sided sector transitions into narrow
   bridge cells after wall rasterization. This keeps Doom lift, stair, and ledge
   progression traversable in the Neo Geo port's 2D collision grid without

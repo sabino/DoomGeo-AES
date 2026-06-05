@@ -8,6 +8,13 @@ DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-2}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-5}"
+FORWARD_SECS="${STRESS_FORWARD_SECS:-2.5}"
+TURN_SECS="${STRESS_TURN_SECS:-2.0}"
+STRAFE_SECS="${STRESS_STRAFE_SECS:-2.5}"
+EXTRAOPTS_VALUE="${STRESS_EXTRAOPTS:-}"
+if [ "${STRESS_SHOWFPS:-0}" = "1" ]; then
+    EXTRAOPTS_VALUE="${EXTRAOPTS_VALUE:+$EXTRAOPTS_VALUE }--showfps"
+fi
 START_OUT="${OUT_DIR}/movement-stress-start.png"
 FORWARD_OUT="${OUT_DIR}/movement-stress-forward.png"
 TURN_OUT="${OUT_DIR}/movement-stress-turn.png"
@@ -71,6 +78,7 @@ SMOKE_WAIT_SECS="$WAIT_SECS" \
 SMOKE_START_GAME=1 \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
+SMOKE_EXTRAOPTS="$EXTRAOPTS_VALUE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
@@ -79,15 +87,15 @@ if [ -n "$WORKSPACE" ]; then
     DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
 fi
 
-hold_keys 2.5 Up
+hold_keys "$FORWARD_SECS" Up
 sleep 0.2
 capture_window "$wid" "$FORWARD_OUT"
 
-hold_keys 2.0 Right
+hold_keys "$TURN_SECS" Right
 sleep 0.2
 capture_window "$wid" "$TURN_OUT"
 
-hold_keys 2.5 z Right
+hold_keys "$STRAFE_SECS" z Right
 sleep 0.2
 capture_window "$wid" "$STRAFE_OUT"
 
