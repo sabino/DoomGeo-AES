@@ -114,12 +114,9 @@ readable.
   classes bias the active flat-plane tint. Preview sectors tint the far floor
   gradient rows first, keeping the near floor neutral while making nukage,
   slime, lava, blood, and water readable before contact, including E1M1's
-  start-window hazard view. The cone scan is palette-only and does not change
-  collision or ray hits.
-- Existing floor backdrop sprites can also switch their lower-row palette to a
-  reserved local liquid/hazard variant when their coarse sampled WAD floor cell
-  carries a water, blood, or damaging-floor class. This adds a cheap spatial
-  cue without new sprites, framebuffer work, or runtime WAD parsing.
+  start-window hazard view. Cone candidates must have a coarse visible path
+  from the player before they can bias the palette; the scan is palette-only
+  and does not change collision or ray hits.
 - Sector floor/ceiling palette preview sampling is cached by coarse player
   position and view vector. Straight movement inside the same coarse pose
   bucket skips the forward ray/cone preview work, while liquid pulse sectors

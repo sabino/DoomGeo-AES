@@ -92,6 +92,6 @@ separate art/readability gap.
 The floor palette preview now also scans a small forward cone, so E1M1's
 start-window hazard/liquid area is immediately recognizable instead of reading
 as the same gray floor as the starting sector.
-The local floor follow-up keeps that E1M1 hazard cue mostly in the far floor
-rows, so the visible liquid band is easier to distinguish from the normal
-near-floor texture while E1M2's start view remains neutral.
+The follow-up keeps that E1M1 hazard cue mostly in the far floor rows, so the
+visible liquid band is easier to distinguish from the normal near-floor texture
+while E1M2's start view remains neutral.

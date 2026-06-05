@@ -124,7 +124,6 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
     u16 light_scale = sector_light_scale(light);
     u8 pulse = sector_floor_pulse(kind);
     u8 base_kind = (kind <= 3) ? kind : 0;
-    u8 local_kind = sector_floor_visual_is_liquid(kind) ? kind : 0;
     for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
         u8 r = shade_channel(g_ceiling_palette_rgb[i][0], light_scale);
         u8 g = shade_channel(g_ceiling_palette_rgb[i][1], light_scale);
@@ -159,10 +158,6 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
                     RGB(sector_floor_tint(r, row_base_kind, 0, pulse),
                         sector_floor_tint(g, row_base_kind, 1, pulse),
                         sector_floor_tint(b, row_base_kind, 2, pulse)));
-            pal_set((u16)(PAL_FLOOR_LOCAL_GRAD_BASE + row), (u16)(i + 1),
-                    RGB(sector_floor_tint(r, local_kind, 0, pulse),
-                        sector_floor_tint(g, local_kind, 1, pulse),
-                        sector_floor_tint(b, local_kind, 2, pulse)));
         }
     }
 }
@@ -498,6 +493,35 @@ static void sample_sector_palette_ray(int px_q8, int py_q8, int ray_x_q8, int ra
     }
 }
 
+static u8 sector_palette_cell_visible(int from_x, int from_y, int to_x, int to_y) {
+    int dx = to_x - from_x;
+    int dy = to_y - from_y;
+    int adx = dx < 0 ? -dx : dx;
+    int ady = dy < 0 ? -dy : dy;
+    int steps = adx > ady ? adx : ady;
+    int x_acc;
+    int y_acc;
+    int x_step;
+    int y_step;
+    u8 wall_peek = 0;
+    if (steps <= 1) return 1;
+    x_acc = (from_x << 8) + 128;
+    y_acc = (from_y << 8) + 128;
+    x_step = (dx << 8) / steps;
+    y_step = (dy << 8) / steps;
+    for (int i = 1; i < steps; i++) {
+        int x;
+        int y;
+        x_acc += x_step;
+        y_acc += y_step;
+        x = x_acc >> 8;
+        y = y_acc >> 8;
+        if (x == to_x && y == to_y) break;
+        if (map_at(x, y) && ++wall_peek > 2) return 0;
+    }
+    return 1;
+}
+
 static void sample_sector_palette_cone(int px_q8, int py_q8, int dir_x_q8, int dir_y_q8,
                                        int plane_x_q8, int plane_y_q8,
                                        u8 *best_kind, u8 *best_light, u8 *best_priority) {
@@ -518,6 +542,7 @@ static void sample_sector_palette_cone(int px_q8, int py_q8, int dir_x_q8, int d
             side = ((long)rel_x_q8 * plane_x_q8 + (long)rel_y_q8 * plane_y_q8) >> 8;
             if (side < 0) side = -side;
             if (side > front + 384) continue;
+            if (!sector_palette_cell_visible(pcx, pcy, x, y)) continue;
             consider_sector_palette_cell(x, y, best_kind, best_light, best_priority);
         }
     }
@@ -4745,29 +4770,6 @@ static u8 wrap_background_scroll(int scroll) {
     return (u8)scroll;
 }
 
-static u8 local_floor_palette_kind(int px_q8, int py_q8, int dir_x_q8, int dir_y_q8,
-                                   int plane_x_q8, int plane_y_q8, u16 col, u16 floor_row) {
-    static const short distances_q8[BG_SPLIT] = {3072, 2560, 2048, 1536, 1024, 640};
-    int camera_q8 = (int)((((long)col * 2 + 1) * 256) / BG_COUNT) - 256;
-    int ray_x_q8 = dir_x_q8 + (int)(((long)plane_x_q8 * camera_q8) >> 8);
-    int ray_y_q8 = dir_y_q8 + (int)(((long)plane_y_q8 * camera_q8) >> 8);
-    int sample_distance = distances_q8[floor_row < BG_SPLIT ? floor_row : BG_SPLIT - 1];
-    u8 peek_blocks = 0;
-    for (u8 step = 0; step < 3; step++) {
-        int distance = sample_distance + (int)step * 384;
-        int cell_x = (px_q8 + (int)(((long)ray_x_q8 * distance) >> 8)) >> 8;
-        int cell_y = (py_q8 + (int)(((long)ray_y_q8 * distance) >> 8)) >> 8;
-        u8 kind;
-        if (map_at(cell_x, cell_y)) {
-            if (++peek_blocks > 1) return 0;
-            continue;
-        }
-        kind = map_cell_floor_visual(cell_x, cell_y);
-        if (kind >= 1 && kind <= 3) return (u8)(kind + 3);
-    }
-    return 0;
-}
-
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
@@ -4843,10 +4845,7 @@ static void update_background_scroll(u8 frame_overrun) {
                 ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
             } else {
                 u16 floor_row = (u16)(row - BG_SPLIT);
-                u8 local_kind = local_floor_palette_kind(px, py, dir_x, dir_y, plane_x, plane_y, col, floor_row);
-                pal = sector_floor_visual_is_liquid(local_kind)
-                    ? (u16)(PAL_FLOOR_LOCAL_GRAD_BASE + floor_row)
-                    : (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
+                pal = (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
                 tile = floor_tile;
                 floor_tile = (u16)(floor_tile + TILE_PLANE_PERSPECTIVE_COLS);
             }

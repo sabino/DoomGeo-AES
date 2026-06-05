@@ -270,14 +270,13 @@
 #define PAL_MAP_WALL  5             /* minimap wall block (fix tile, idx 15) */
 #define PAL_MAP_PLAYER 6            /* minimap player marker                 */
 #define PAL_HUD       7
-#define PAL_FLOOR_LOCAL_GRAD_BASE 30 /* local liquid/hazard floor-strip cue   */
 #define PAL_CEILING_GRAD_BASE 50
 #define PAL_FLOOR_GRAD_BASE   56
 #define PAL_DOOR_DEPTH_BASE   62
 #define PAL_WALL_ALT_DEPTH_BASE 90
 #define PAL_WALL_ALT_DEPTH_STRIDE (DEPTH_BANDS * 2)
 #define PAL_WEAPON    36
-#define PAL_TITLE     84
+#define PAL_TITLE     35
 #define PAL_ENEMY_BASE 37
 #define PAL_AMMO_COUNTER_SHADOW 45
 #define PAL_HUD_KEY_BASE 46
