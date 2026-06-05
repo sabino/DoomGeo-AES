@@ -44,6 +44,9 @@ DOOM_MAP_HEIGHT?=54
 DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=balanced
+DOOM_FRAME_STATS?=0
+DOOM_WALL_UPLOAD_COLUMNS?=
+DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
 EPISODE_MAP?=E1M1
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
@@ -67,6 +70,15 @@ else
 $(error DOOM_DETAIL must be clarity, quality, balanced, or speed)
 endif
 override CFLAGS += $(DOOM_DETAIL_DEFINE)
+ifeq ($(DOOM_FRAME_STATS),1)
+override CFLAGS += -DDOOM_FRAME_STATS=1
+endif
+ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
+override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
+endif
+ifneq ($(strip $(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)),)
+override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_OVERRUN=$(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)
+endif
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)

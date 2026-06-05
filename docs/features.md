@@ -87,6 +87,10 @@ readable.
   flat-plane tint. Nukage, slime, lava, blood, and water therefore read with a
   restrained preview tint before the player steps into them, while the renderer
   still avoids runtime floor casting.
+- Sector floor/ceiling palette preview sampling is cached by coarse player
+  position and view vector. Straight movement inside the same coarse pose
+  bucket skips the three forward preview rays, while liquid pulse sectors still
+  advance their low-cost palette phase.
 - Water, blood, and hazardous liquid classes also apply a slow four-phase
   palette pulse to the already-baked floor gradients. This is a low-cost
   substitute for Doom's animated flats that keeps liquid sectors visibly active
@@ -565,6 +569,16 @@ readable.
   overlay enabled and longer holds. This gives a quick frame-pacing visual
   register under `.tools/screens/latest/movement-bench/` before and after
   renderer-cost changes.
+- Movement bench builds an isolated `DOOM_FRAME_STATS=1` ROM by default. That
+  ROM draws a compact green marker plus an `NN` fix-layer register in the playfield, where
+  `NN` is the number of frames in the latest 64-frame window that reached
+  `wait_vblank_status()` after vblank had already started. The checker rejects
+  captures where the register is missing.
+- The default balanced wall-strip upload budget refreshes 16 of its 32 columns
+  per frame instead of letting texture/palette updates trail movement for up to
+  four frames. The overrun budget still backs off when a frame reaches vblank
+  late, and `DOOM_WALL_UPLOAD_COLUMNS` / `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`
+  let movement benches test alternate budgets without hand-editing `CFLAGS`.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement

@@ -37,6 +37,10 @@ static u8 sector_floor_visual_kind = 0xFF;
 static u8 sector_light_band = 0xFF;
 static u8 sector_liquid_phase = 0;
 static u8 sector_liquid_tick = 0;
+static int sector_palette_px_key = 0x7FFFFFFF;
+static int sector_palette_py_key = 0x7FFFFFFF;
+static int sector_palette_dir_x = 0x7FFFFFFF;
+static int sector_palette_dir_y = 0x7FFFFFFF;
 static u8 face_pain_timer = 0;
 static u8 face_evil_timer = 0;
 static u8 face_turn_timer = 0;
@@ -477,15 +481,32 @@ static void sample_sector_palette_ray(int px_q8, int py_q8, int ray_x_q8, int ra
 static void update_sector_flat_palette(void) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
+    int px_key;
+    int py_key;
     u8 kind;
     u8 light;
     u8 priority;
     u8 phase_dirty = 0;
     rc_player_q8(&px, &py);
+    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
+    px_key = px >> 6;
+    py_key = py >> 6;
+    if (px_key == sector_palette_px_key && py_key == sector_palette_py_key
+        && dir_x == sector_palette_dir_x && dir_y == sector_palette_dir_y) {
+        if (!sector_floor_visual_is_liquid(sector_floor_visual_kind)) return;
+        if (++sector_liquid_tick < 12) return;
+        sector_liquid_tick = 0;
+        sector_liquid_phase = (u8)((sector_liquid_phase + 1) & 3);
+        if (palette_effect == 0) restore_flat_palettes();
+        return;
+    }
+    sector_palette_px_key = px_key;
+    sector_palette_py_key = py_key;
+    sector_palette_dir_x = dir_x;
+    sector_palette_dir_y = dir_y;
     kind = map_cell_floor_visual(px >> 8, py >> 8);
     light = map_cell_light(px >> 8, py >> 8);
     priority = sector_floor_visual_priority(kind);
-    rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
     sample_sector_palette_ray(px, py, dir_x, dir_y, &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x + (plane_x >> 1), dir_y + (plane_y >> 1), &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x - (plane_x >> 1), dir_y - (plane_y >> 1), &kind, &light, &priority);
@@ -920,6 +941,11 @@ static u16 shown_counter_current[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 static u16 shown_counter_max[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 static u8 shown_keys = 0xFF;
 static u16 shown_weapon_status = 0xFFFF;
+#ifdef DOOM_FRAME_STATS
+static u8 frame_stats_frames = 0;
+static u8 frame_stats_overruns = 0;
+static u8 frame_stats_shown = 0xFF;
+#endif
 
 enum {
     PLAYER_MAX_BULLETS = 200,
@@ -3626,6 +3652,30 @@ static void draw_stat3(u16 col, u16 row, u16 label, u16 value) {
     fix_poke((u16)(col + 3), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + capped % 10));
 }
 
+#ifdef DOOM_FRAME_STATS
+enum { FRAME_STATS_COL = 28, FRAME_STATS_ROW = (GAME_H / 16) - 2 };
+
+static void draw_frame_stats_overlay(u8 overruns) {
+    fix_poke(FRAME_STATS_COL, FRAME_STATS_ROW, PAL_MAP_PLAYER, FIX_SOLID);
+    fix_poke((u16)(FRAME_STATS_COL + 1), FRAME_STATS_ROW, PAL_MAP_PLAYER,
+             (u16)(FIX_DIGIT_BASE + (overruns / 10) % 10));
+    fix_poke((u16)(FRAME_STATS_COL + 2), FRAME_STATS_ROW, PAL_MAP_PLAYER,
+             (u16)(FIX_DIGIT_BASE + overruns % 10));
+}
+
+static void update_frame_stats_overlay(u8 frame_overrun) {
+    enum { FRAME_STATS_WINDOW = 64 };
+    if (frame_overrun && frame_stats_overruns < 99) frame_stats_overruns++;
+    if (++frame_stats_frames < FRAME_STATS_WINDOW) return;
+    frame_stats_frames = 0;
+    if (frame_stats_overruns != frame_stats_shown) {
+        draw_frame_stats_overlay(frame_stats_overruns);
+        frame_stats_shown = frame_stats_overruns;
+    }
+    frame_stats_overruns = 0;
+}
+#endif
+
 static void draw_fix_map_code(u16 col, u16 row, u8 episode, u8 mission) {
     fix_poke(col, row, PAL_MAP_PLAYER, FIX_EXIT_BASE);
     fix_poke((u16)(col + 1), row, PAL_MAP_PLAYER, (u16)(FIX_DIGIT_BASE + episode));
@@ -4233,6 +4283,10 @@ static void force_fix_hud_redraw(void) {
     hud_face_frame = 0xFF;
     update_status_numbers(0);
     clear_crosshair();
+#ifdef DOOM_FRAME_STATS
+    draw_frame_stats_overlay(0);
+    frame_stats_shown = 0;
+#endif
     update_center_message();
 }
 
@@ -5435,6 +5489,11 @@ static void restart_level(void) {
     hurt_timer = 0;
     floor_damage_timer = 0;
     input_catchup_pending = 0;
+#ifdef DOOM_FRAME_STATS
+    frame_stats_frames = 0;
+    frame_stats_overruns = 0;
+    frame_stats_shown = 0xFF;
+#endif
     level_complete = 0;
     level_next_episode = DOOM_NEXT_MAP_EPISODE;
     level_next_mission = DOOM_NEXT_MAP_MISSION;
@@ -5519,6 +5578,10 @@ static void restart_level(void) {
     sector_light_band = 0xFF;
     sector_liquid_phase = 0;
     sector_liquid_tick = 0;
+    sector_palette_px_key = 0x7FFFFFFF;
+    sector_palette_py_key = 0x7FFFFFFF;
+    sector_palette_dir_x = 0x7FFFFFFF;
+    sector_palette_dir_y = 0x7FFFFFFF;
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
@@ -5647,6 +5710,9 @@ int main(void) {
             u8 frame_overrun = wait_vblank_status();
             rc_set_frame_overrun(frame_overrun);
             input_catchup_pending = frame_overrun;
+#ifdef DOOM_FRAME_STATS
+            update_frame_stats_overlay(frame_overrun);
+#endif
             watchdog_kick();
             update_sector_flat_palette();
             update_hurt_flash();

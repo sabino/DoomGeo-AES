@@ -14,6 +14,7 @@ EXPECTED_SIZE = (960, 672)
 PLAYFIELD_BOX = (0, 40, 960, 560)
 HUD_BOX = (0, 560, 960, 672)
 FPS_BOX = (0, 0, 220, 90)
+FRAME_STATS_BOX = (660, 230, 760, 285)
 
 
 def pixels(image: Image.Image, box: tuple[int, int, int, int]) -> list[tuple[int, int, int]]:
@@ -68,6 +69,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", default=".tools/screens/latest/movement-bench", help="Directory containing movement stress PNGs")
     parser.add_argument("--expect-fps", action="store_true", help="Require GnGeo --showfps overlay evidence")
+    parser.add_argument("--expect-frame-stats", action="store_true", help="Require the DoomGeo frame-stats register")
     parser.add_argument("--min-diff-mean", type=float, default=8.0, help="Minimum mean playfield difference between poses")
     parser.add_argument("--min-diff-pixels", type=int, default=80000, help="Minimum changed playfield pixels between poses")
     args = parser.parse_args()
@@ -93,6 +95,7 @@ def main() -> int:
         play = image_counts(image, PLAYFIELD_BOX)
         hud = image_counts(image, HUD_BOX)
         fps = image_counts(image, FPS_BOX)
+        frame_stats = image_counts(image, FRAME_STATS_BOX)
         if play["varied"] < 24:
             errors.append(f"{path}: weak playfield color variation {play['varied']} < 24")
         if play["colored"] < 100000:
@@ -101,6 +104,8 @@ def main() -> int:
             errors.append(f"{path}: weak HUD/status evidence {hud['bright']} < 30000")
         if args.expect_fps and fps["magenta"] < 250:
             errors.append(f"{path}: weak FPS overlay evidence {fps['magenta']} < 250")
+        if args.expect_frame_stats and frame_stats["colored"] < 120:
+            errors.append(f"{path}: weak frame-stats register evidence {frame_stats['colored']} < 120")
 
     if len(images) == len(names):
         for before_name, after_name, before, after in zip(names, names[1:], images, images[1:]):

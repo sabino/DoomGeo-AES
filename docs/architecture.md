@@ -136,7 +136,10 @@ current runtime accepts several compromises:
 - Wall strip geometry updates every dirty frame, but texture/palette SCB1
   rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
   controller response and wall height motion from stalling behind a full
-  15-tile rewrite of every wall column while turning.
+  15-tile rewrite of every wall column while turning. Balanced mode refreshes
+  16 of its 32 wall columns per frame during normal movement, so texture changes
+  settle in roughly two frames; the overrun path clamps the budget back down
+  when `wait_vblank_status()` reports late frames.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as
