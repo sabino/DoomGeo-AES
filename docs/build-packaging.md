@@ -86,13 +86,13 @@ COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
 
 Supported waypoint names are `start`, `e1m1-start`, `e1m2-start`,
 `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Start waypoints use the same
-map spawn on both sides. Non-start native captures are approximate scripted
-movement from the native spawn; the Neo Geo side uses the matching focused ROM
-target when available, so these captures are useful visual registers but not
-pixel-exact camera matching.
-Focused Neo Geo captures wait briefly before grabbing the window and reject
-all-black frames, so startup/transient captures do not silently become the
-side-by-side evidence.
+map spawn on both sides. By default, non-start route waypoints drive both native
+Doom and the Neo Geo ROM with the same timed input script from that map spawn,
+which makes the side-by-side more useful for judging equivalent route views.
+Set `COMPARE_ROUTE_MODE=focused` to use the older focused Neo Geo verification
+ROMs for `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Focused captures
+wait briefly before grabbing the window and reject all-black frames, so
+startup/transient captures do not silently become the side-by-side evidence.
 
 For a broader Episode 1 conversion baseline, run `make episode-route-report`.
 It converts `E1M1` through `E1M9` into `build/episode-route/` and reports

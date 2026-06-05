@@ -26,6 +26,7 @@ neo_make_args=()
 neo_press_start="1"
 neo_settle_secs="${COMPARE_NEO_SETTLE_SECS:-}"
 waypoint_note=""
+route_mode="${COMPARE_ROUTE_MODE:-scripted}"
 
 mkdir -p "$SCREENDIR" "$LOGDIR" "$(dirname "$LOCKDIR")"
 
@@ -183,6 +184,35 @@ tap_key() {
     sleep 0.15
 }
 
+drive_waypoint_script() {
+    local wid="$1"
+    local use_key="$2"
+    case "$WAYPOINT" in
+        start|e1m1-start|e1m2-start)
+            return 0
+            ;;
+        e1m1-encounter)
+            hold_key "$wid" Up 1.0
+            hold_key "$wid" Right 0.35
+            ;;
+        e1m1-scout)
+            hold_key "$wid" Up 1.8
+            hold_key "$wid" Left 0.85
+            hold_key "$wid" Up 0.55
+            ;;
+        e1m2-keydoor)
+            hold_key "$wid" Up 1.2
+            hold_key "$wid" Left 0.45
+            hold_key "$wid" Up 0.8
+            tap_key "$wid" "$use_key"
+            ;;
+        *)
+            echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
+            exit 1
+            ;;
+    esac
+}
+
 drive_native_waypoint() {
     local pid="$1"
     local title="$2"
@@ -193,30 +223,19 @@ drive_native_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "$title")"
+    drive_waypoint_script "$wid" space
+}
+
+drive_neo_waypoint() {
+    local pid="$1"
+    local wid=""
     case "$WAYPOINT" in
-        e1m1-encounter)
-            waypoint_note="native waypoint is approximate: scripted movement from the E1M1 start"
-            hold_key "$wid" Up 1.0
-            hold_key "$wid" Right 0.35
-            ;;
-        e1m1-scout)
-            waypoint_note="native waypoint is approximate: scripted movement from the E1M1 start"
-            hold_key "$wid" Up 1.8
-            hold_key "$wid" Left 0.85
-            hold_key "$wid" Up 0.55
-            ;;
-        e1m2-keydoor)
-            waypoint_note="native waypoint is approximate: scripted movement from the E1M2 start"
-            hold_key "$wid" Up 1.2
-            hold_key "$wid" Left 0.45
-            hold_key "$wid" Up 0.8
-            tap_key "$wid" space
-            ;;
-        *)
-            echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
-            exit 1
+        start|e1m1-start|e1m2-start)
+            return 0
             ;;
     esac
+    wid="$(window_for_pid_or_name "$pid" "")"
+    drive_waypoint_script "$wid" s
 }
 
 configure_waypoint() {
@@ -237,20 +256,44 @@ configure_waypoint() {
             ;;
         e1m1-encounter)
             MAP="E1M1"
-            neo_make_target="encounter-test-gngeo"
-            neo_press_start="0"
+            if [ "$route_mode" = "focused" ]; then
+                neo_make_target="encounter-test-gngeo"
+                neo_press_start="0"
+                waypoint_note="focused mode uses scripted native movement and a staged Neo Geo verification ROM; camera poses are not exact"
+            else
+                neo_make_target="episode-map-gngeo"
+                neo_make_args=("EPISODE_MAP=E1M1")
+                neo_press_start="1"
+                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines"
+            fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         e1m1-scout)
             MAP="E1M1"
-            neo_make_target="scout-test-gngeo"
-            neo_press_start="0"
+            if [ "$route_mode" = "focused" ]; then
+                neo_make_target="scout-test-gngeo"
+                neo_press_start="0"
+                waypoint_note="focused mode uses scripted native movement and a staged Neo Geo verification ROM; camera poses are not exact"
+            else
+                neo_make_target="episode-map-gngeo"
+                neo_make_args=("EPISODE_MAP=E1M1")
+                neo_press_start="1"
+                waypoint_note="route waypoint uses the same timed input script from the E1M1 start in both engines"
+            fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         e1m2-keydoor)
             MAP="E1M2"
-            neo_make_target="key-door-test-gngeo"
-            neo_press_start="0"
+            if [ "$route_mode" = "focused" ]; then
+                neo_make_target="key-door-test-gngeo"
+                neo_press_start="0"
+                waypoint_note="focused mode uses scripted native movement and a staged Neo Geo verification ROM; camera poses are not exact"
+            else
+                neo_make_target="episode-map-gngeo"
+                neo_make_args=("EPISODE_MAP=E1M2")
+                neo_press_start="1"
+                waypoint_note="route waypoint uses the same timed input script from the E1M2 start in both engines"
+            fi
             neo_settle_secs="${neo_settle_secs:-1.5}"
             ;;
         *)
@@ -337,6 +380,9 @@ if [ -n "$neo_wid" ]; then
         hold_key "$neo_wid" x 0.25
         hold_key "$neo_wid" s 0.25
         sleep 2.0
+    fi
+    if [ "$route_mode" != "focused" ]; then
+        drive_neo_waypoint "$neo_pid"
     fi
 fi
 if [ -n "$neo_settle_secs" ]; then

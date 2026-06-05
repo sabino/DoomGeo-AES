@@ -374,9 +374,10 @@ readable.
 - `tools/capture_compare.sh` can now capture named native-vs-NeoGeo comparison
   waypoints under `.tools/screens/`: `start`, `e1m1-start`, `e1m2-start`,
   `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. The start waypoints use
-  native and Neo Geo map spawns; non-start native views are approximate scripted
-  movement from the native spawn while the Neo Geo side uses the corresponding
-  focused verification ROM target when available.
+  native and Neo Geo map spawns; non-start route waypoints now drive both
+  engines with the same timed input script from the map spawn by default.
+  `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
+  visual registers when that is the useful evidence.
 - The wall atlas keeps seven alternate texture banks but now spends two of
   those banks on high-coverage Episode 1 textures (`SLADWALL` and `COMPTALL`)
   instead of lower-impact slots. The converter maps related stone, tech,
