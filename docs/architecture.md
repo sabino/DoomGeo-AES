@@ -144,6 +144,10 @@ current runtime accepts several compromises:
   all 32 wall columns during normal movement, so texture changes settle in the
   same frame as wall geometry in the common case; the overrun path clamps the
   budget back down when `wait_vblank_status()` reports late frames.
+- Wall depth shading uses 11 bands per side. With the primary wall, door, and
+  seven alternate wall texture palettes, this keeps every wall-depth palette
+  below Neo Geo palette index 256. Higher band counts overflow palette RAM and
+  show up in GnGeo as `Invalid write` entries.
 - Balanced mode also adapts WAD line refinement by motion state. Standing frames
   keep the normal portal-span pass and near solid-line correction, while moving
   frames skip portal-span refinement and use a tighter near-hit radius. Late-frame

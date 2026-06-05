@@ -283,8 +283,12 @@
 #define PAL_AMMO_COUNTER 49
 
  
-#define DEPTH_BANDS    14
-#define PAL_DEPTH_BASE 8            /* lit: 8..13, dark: 14..19              */
+#define DEPTH_BANDS    11
+#define PAL_DEPTH_BASE 8            /* lit + dark depth bands                 */
+#define PAL_LAST_WALL_ALT_DEPTH (PAL_WALL_ALT_DEPTH_BASE + TILE_WALL_ALT_COUNT * PAL_WALL_ALT_DEPTH_STRIDE - 1)
+#if PAL_LAST_WALL_ALT_DEPTH > 255
+#error "wall alt depth palettes exceed Neo Geo palette RAM"
+#endif
 
 /* ---- movement feel --------------------------------------------------- */
 #define MOVE_SPEED 0.16

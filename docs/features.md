@@ -105,7 +105,9 @@ readable.
   closer to Doom's sober floor tone and avoids stray green speckles being read
   as a missing sprite or palette glitch.
 - Depth palettes and directional shading give walls/planes distance cues without
-  runtime pixel drawing.
+  runtime pixel drawing. The wall depth budget is capped to fit the primary
+  wall, door, and seven alternate wall palette ranges inside the Neo Geo's
+  256 palette slots; GnGeo movement benches now reject invalid palette writes.
 - Point-blank wall fallback is limited to the primary wall atlas. Alternate
   walls and doors keep their own baked columns at close range, avoiding the
   wrong-palette block artifacts that could look like red/green missing sprites.
