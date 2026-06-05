@@ -47,7 +47,7 @@ static inline fix recip(fix b) {
 #define FMIN (FONE >> 6)          /* clamp tiny distances                   */
 #define PLAYER_RADIUS ((FONE / 5) * MAP_RENDER_SCALE)  /* Doom-ish collision body */
 #define PORTAL_SPAN_DRAW_MIN_H 12
-#define PORTAL_SPAN_OCCLUDE_MIN_H 32
+#define PORTAL_SPAN_OCCLUDE_MIN_H 96
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -321,6 +321,8 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
     for (unsigned char n = 0; n < cell_count; n++) {
         int i = g_render_cell_lines[cell_start + n];
         u8 line_span = g_render_lines[i].span;
+        u8 line_kind = g_render_lines[i].texture;
+        if (line_kind > TILE_WALL_ALT_COUNT && !map_at(cell_x, cell_y)) continue;
         if (accept_spans) {
             if (!line_span) continue;
         } else if (line_span) {

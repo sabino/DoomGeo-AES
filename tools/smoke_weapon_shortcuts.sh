@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 BEFORE_OUT="${OUT_DIR}/weapon-shortcut-before.png"
@@ -52,20 +52,19 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
 sleep 0.3
 
 # GnGeo maps Neo Geo C to the keyboard "a" key in config.mk. In shareware
 # builds the arsenal ROM starts on rocket because plasma/BFG psprites are
 # unavailable, so Down+C should stay on rocket. Hold the chord long enough for
 # GnGeo's input polling to sample it across a frame.
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Down
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Down
 sleep 0.1
-DISPLAY="$DISPLAY_VALUE" xdotool keydown a
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" a
 sleep 0.25
-DISPLAY="$DISPLAY_VALUE" xdotool keyup a
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" a
 sleep 0.1
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Down
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Down
 sleep 0.8
 
 xwd -silent -id "$wid" -out "$AFTER_XWD"
@@ -73,13 +72,13 @@ convert "$AFTER_XWD" "$AFTER_OUT"
 
 # Keep C held first, then press a direction. This catches the documented
 # "hold C + D-pad" flow instead of only the opposite keydown ordering.
-DISPLAY="$DISPLAY_VALUE" xdotool keydown a
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" a
 sleep 0.15
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Right
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Right
 sleep 0.25
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Right
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Right
 sleep 0.1
-DISPLAY="$DISPLAY_VALUE" xdotool keyup a
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" a
 sleep 0.8
 
 xwd -silent -id "$wid" -out "$HELD_XWD"

@@ -7,7 +7,8 @@ cd "$ROOT"
 BUILD_TARGET="${SMOKE_BUILD_TARGET:-cart}"
 RUN_TARGET="${SMOKE_RUN_TARGET:-gngeo}"
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
+TILE_WINDOWS="${SMOKE_TILE_WINDOWS:-0}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
 EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
@@ -50,6 +51,21 @@ window_for_gngeo() {
 
 kill_old_gngeo() {
     pgrep -af 'ngdevkit-gngeo|gngeo' | awk '$0 !~ /pgrep/ {print $1}' | xargs -r kill -9 || true
+}
+
+tile_window() {
+    local wid="$1"
+    local floating="enable"
+    if [ "$TILE_WINDOWS" = "1" ]; then
+        floating="disable"
+    fi
+    if [ -n "$WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+        i3-msg "[id=\"$wid\"] move container to workspace number $WORKSPACE, floating $floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ] && command -v swaymsg >/dev/null 2>&1; then
+        swaymsg '[class="ngdevkit-gngeo"] move container to workspace number '"$WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
+    fi
 }
 
 smoke_lock_is_stale() {
@@ -122,16 +138,12 @@ setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
 sleep "$WAIT_SECS"
 
 wid="$(window_for_gngeo)"
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
-DISPLAY="$DISPLAY_VALUE" xdotool windowraise "$wid" >/dev/null 2>&1 || true
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+tile_window "$wid"
 if [ "$START_GAME" = "1" ]; then
     sleep 0.2
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown x
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" x
     sleep 0.25
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup x
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" x
     sleep 1.5
 fi
 sleep 0.5

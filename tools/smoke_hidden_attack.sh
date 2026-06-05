@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 AFTER_WAIT_SECS="${HIDDEN_ATTACK_AFTER_WAIT_SECS:-3.0}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
@@ -57,10 +57,6 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
 sleep "$AFTER_WAIT_SECS"
 capture_window "$wid" "$AFTER_OUT"
 

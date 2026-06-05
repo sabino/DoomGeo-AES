@@ -16,7 +16,7 @@ drawing pixels.
 | Area | Status |
 | --- | --- |
 | WAD conversion | Converts E1M1 map lumps, player start, doors, exits, secrets, damaging sectors, texture classes, and runtime things into a higher-resolution Neo Geo grid. |
-| Rendering | Default 32-column wall raycaster tuned for playable movement response, with WAD-derived portal/span hits, Doom wall/door atlases, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity` enable heavier visual comparison modes, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
+| Rendering | Default 40-column wall raycaster tuned for readable navigation, with WAD-derived portal/span hits, denser Doom wall/door atlases, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_DETAIL=balanced` and `DOOM_DETAIL=speed` remain lower-cost stress tiers, `DOOM_DETAIL=clarity` spends more sprites on walls, and `DOOM_FLAT_PLANES=1` switches back to static solid planes for debugging. Failed/missing sprite draws no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths when the selected IWAD supplies the matching psprite art. The default shareware build masks unavailable plasma/BFG psprites instead of drawing fake placeholders; explicit Freedoom builds exercise the full redistributable weapon-art path. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
@@ -136,8 +136,8 @@ SDL_VIDEODRIVER=x11 make gngeo
 Useful variants:
 
 ```sh
-make cart                         # default DOOM_DETAIL=balanced
-make cart DOOM_DETAIL=clarity     # 64 wall columns, four world thing strips
+make cart                         # default DOOM_DETAIL=quality
+make cart DOOM_DETAIL=clarity     # 64 wall columns, one visible world thing
 make cart DOOM_DETAIL=quality     # 40 wall columns, seven world things
 make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
 make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things
@@ -181,6 +181,7 @@ make smoke-screenshot
 DOOM_MAP=E1M1 tools/capture_compare.sh
 COMPARE_WAYPOINT=e1m1-scout tools/capture_compare.sh
 COMPARE_WAYPOINT=e1m2-start tools/capture_compare.sh
+python3 tools/inspect_map_specials.py --map E1M2
 ```
 
 You must provide your own Neo Geo BIOS for local emulation. The browser package

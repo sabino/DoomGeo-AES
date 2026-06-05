@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 
 mkdir -p "$OUT_DIR"

@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 INITIAL_OUT="${OUT_DIR}/e1m1-exit-initial.png"
@@ -56,17 +56,13 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
 sleep 0.3
 
 # The focused ROM starts two converted cells left of the real E1M1 exit trigger
 # and faces right. Holding forward should cross the real generated exit point.
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Up
 sleep 1.2
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Up
 sleep 0.6
 capture_window "$wid" "$COMPLETE_OUT"
 

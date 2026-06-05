@@ -368,6 +368,103 @@ def carve_flat_bridges(
     return carved
 
 
+def cleanup_protected_cells(
+    grid: list[list[int]],
+    linedefs: list[LineDef],
+    vertices: list[Vertex],
+    things: list[Thing],
+    player: Thing,
+    min_x: int,
+    max_y: int,
+    scale: float,
+    margin: int,
+) -> set[tuple[int, int]]:
+    width = len(grid[0])
+    height = len(grid)
+    protected: set[tuple[int, int]] = set()
+
+    for x in range(width):
+        protected.add((x, 0))
+        protected.add((x, height - 1))
+    for y in range(height):
+        protected.add((0, y))
+        protected.add((width - 1, y))
+
+    for x, y, _special in runtime_doors(linedefs, vertices, grid, min_x, max_y, scale, margin):
+        protected.add((x, y))
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                protected.add((x + dx, y + dy))
+
+    for x_q8, y_q8, _special, _next_episode, _next_mission in runtime_exits(
+        linedefs, vertices, grid, min_x, max_y, scale, margin, ""
+    ):
+        x = x_q8 >> 8
+        y = y_q8 >> 8
+        protected.add((x, y))
+
+    for thing in things:
+        if thing.type not in RUNTIME_THING_TYPES and thing.type != 1:
+            continue
+        gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
+        cell_x = int(math.floor(gx))
+        cell_y = int(math.floor(gy))
+        if 0 <= cell_y < height and 0 <= cell_x < width and grid[cell_y][cell_x] == 0:
+            pass
+        else:
+            cell_x, cell_y = nearest_open(grid, cell_x, cell_y)
+            if abs((cell_x + 0.5) - gx) > 2.5 or abs((cell_y + 0.5) - gy) > 2.5:
+                continue
+        protected.add((cell_x, cell_y))
+
+    start_x, start_y = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
+    base_x = int(math.floor(start_x))
+    base_y = int(math.floor(start_y))
+    for y in range(base_y - 1, base_y + 2):
+        for x in range(base_x - 1, base_x + 2):
+            protected.add((x, y))
+
+    return protected
+
+
+def cleanup_wall_specks(
+    grid: list[list[int]],
+    texture_grid: list[list[int]],
+    texture_phase_grid: list[list[int]],
+    texture_priority_grid: list[list[int]],
+    protected: set[tuple[int, int]],
+) -> int:
+    # Doom's small diagonal/orthogonal linedef details often rasterize into
+    # one-cell wall stubs at this Neo Geo grid scale. The sprite-strip raycaster
+    # magnifies those stubs into false full-height walls, so remove only
+    # isolated, weakly-connected wall cells while preserving doors, exits,
+    # things, start clearance, and map borders.
+    width = len(grid[0])
+    height = len(grid)
+    remove: list[tuple[int, int]] = []
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            if grid[y][x] == 0 or (x, y) in protected:
+                continue
+            cardinals = 0
+            diagonals = 0
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                if grid[y + dy][x + dx] != 0:
+                    cardinals += 1
+            for dx, dy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                if grid[y + dy][x + dx] != 0:
+                    diagonals += 1
+            if cardinals <= 1 and diagonals <= 2:
+                remove.append((x, y))
+
+    for x, y in remove:
+        grid[y][x] = 0
+        texture_grid[y][x] = 0
+        texture_phase_grid[y][x] = 0
+        texture_priority_grid[y][x] = 0
+    return len(remove)
+
+
 def line_cells(grid: list[list[int]], x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
     width = len(grid[0])
     height = len(grid)
@@ -433,14 +530,15 @@ def visual_line_span(line: LineDef, sidedefs: list[SideDef], sectors: list[Secto
 
     floor_delta = abs(front.floor_height - back.floor_height)
     ceiling_delta = abs(front.ceiling_height - back.ceiling_height)
+    span_cap = 72
     if floor_delta and front_side.bottom_texture and front_side.bottom_texture != "-":
-        return 1, front_side.bottom_texture, front_side.texture_x, min(128, max(8, floor_delta))
+        return 1, front_side.bottom_texture, front_side.texture_x, min(span_cap, max(8, floor_delta))
     if floor_delta and back_side.bottom_texture and back_side.bottom_texture != "-":
-        return 1, back_side.bottom_texture, back_side.texture_x, min(128, max(8, floor_delta))
+        return 1, back_side.bottom_texture, back_side.texture_x, min(span_cap, max(8, floor_delta))
     if ceiling_delta and front_side.top_texture and front_side.top_texture != "-":
-        return 2, front_side.top_texture, front_side.texture_x, min(128, max(8, ceiling_delta))
+        return 2, front_side.top_texture, front_side.texture_x, min(span_cap, max(8, ceiling_delta))
     if ceiling_delta and back_side.top_texture and back_side.top_texture != "-":
-        return 2, back_side.top_texture, back_side.texture_x, min(128, max(8, ceiling_delta))
+        return 2, back_side.top_texture, back_side.texture_x, min(span_cap, max(8, ceiling_delta))
     if front_side.mid_texture and front_side.mid_texture != "-":
         return 0, front_side.mid_texture, front_side.texture_x, 0
     if back_side.mid_texture and back_side.mid_texture != "-":
@@ -1212,6 +1310,7 @@ def emit_header(
         f.write(f"#define DOOM_CONVERTED_SOLID_LINEDEFS {stats['solid_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_CULLED_LINEDEFS {stats['culled_linedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_FLAT_BRIDGE_CELLS {stats['flat_bridge_cells']}\n")
+        f.write(f"#define DOOM_CONVERTED_READABILITY_CELLS {stats['readability_cells']}\n")
         f.write(f"#define DOOM_CONVERTED_SIDEDEFS {stats['sidedefs']}\n")
         f.write(f"#define DOOM_CONVERTED_SECTORS {stats['sectors']}\n")
         f.write(f"#define DOOM_CONVERTED_SEGS {stats['segs']}\n")
@@ -1615,11 +1714,22 @@ def convert(args: argparse.Namespace) -> None:
                 texture_phase_grid[cell_y][cell_x] = texture_phase_for_cell(texture_x, texture_width, step, cell_count)
                 texture_priority_grid[cell_y][cell_x] = texture_priority
 
-    flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, vertices, min_x, max_y, scale, margin)
-
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
         raise ValueError("map has no player 1 start thing")
+
+    flat_bridge_cells = carve_flat_bridges(grid, linedefs, sidedefs, vertices, min_x, max_y, scale, margin)
+    readability_cells = 0
+    if args.readability_cleanup:
+        protected_cells = cleanup_protected_cells(grid, linedefs, vertices, things, player, min_x, max_y, scale, margin)
+        readability_cells = cleanup_wall_specks(
+            grid,
+            texture_grid,
+            texture_phase_grid,
+            texture_priority_grid,
+            protected_cells,
+        )
+
     sx, sy = grid_coord(player.x, player.y, min_x, max_y, scale, margin)
     sx, sy = carve_start_clearance(grid, sx, sy, player.angle)
     sx, sy = choose_start_pose(grid, sx, sy, player.angle)
@@ -1663,6 +1773,7 @@ def convert(args: argparse.Namespace) -> None:
             "solid_linedefs": solid_count,
             "culled_linedefs": culled_count,
             "flat_bridge_cells": flat_bridge_cells,
+            "readability_cells": readability_cells,
             "sidedefs": len(sidedefs),
             "sectors": len(sectors),
             "segs": len(segs),
@@ -1703,6 +1814,7 @@ def convert(args: argparse.Namespace) -> None:
     print(
         f"{args.map.upper()}: {len(vertices)} vertices, {solid_count}/{len(linedefs)} solid lines "
         f"({culled_count} detail culled), "
+        f"{readability_cells} readability cells, "
         f"{len(things)} things -> {args.width}x{args.height} grid at {args.out}"
     )
 
@@ -1723,6 +1835,11 @@ def main() -> int:
         type=float,
         default=0.20,
         help="Cull solid linedefs shorter than this fraction of one output cell",
+    )
+    parser.add_argument(
+        "--readability-cleanup",
+        action="store_true",
+        help="Experimentally open isolated coarse-grid wall specks for Neo Geo readability",
     )
     args = parser.parse_args()
     if bool(args.assets_header) != bool(args.assets_source):

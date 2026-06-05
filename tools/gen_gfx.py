@@ -161,11 +161,13 @@ def recompute_layout() -> None:
 def apply_detail_layout(detail: str) -> None:
     global WALL_ATLAS_COLS, PLANE_PERSPECTIVE_DIRS
 
-    if detail == "clarity":
+    if detail in ("clarity", "quality"):
         WALL_ATLAS_COLS = 32
-        PLANE_PERSPECTIVE_DIRS = 4
     else:
         WALL_ATLAS_COLS = 16
+    if detail == "clarity":
+        PLANE_PERSPECTIVE_DIRS = 4
+    else:
         PLANE_PERSPECTIVE_DIRS = 16
     recompute_layout()
 
@@ -1305,7 +1307,7 @@ def main():
     ap.add_argument("--wall-texture", default=WALL_TEXTURE, help="Doom wall texture to precompose into C-ROM tiles")
     ap.add_argument("--wall-alt-textures", default=",".join(WALL_ALT_TEXTURES), help="Comma-separated extra Doom wall atlases for per-cell map texture classes")
     ap.add_argument("--door-texture", default=DOOR_TEXTURE, help="Doom door texture to precompose into the second wall atlas")
-    ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="balanced", help="Tile layout tier; clarity doubles wall atlas sampling and trims plane direction cache")
+    ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="quality", help="Tile layout tier; quality/clarity double wall atlas sampling, clarity also trims the plane direction cache")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")

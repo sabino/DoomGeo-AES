@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-5}"
 FORWARD_SECS="${STRESS_FORWARD_SECS:-2.5}"
@@ -58,11 +58,11 @@ hold_keys() {
     local seconds="$1"
     shift
     for key in "$@"; do
-        DISPLAY="$DISPLAY_VALUE" xdotool keydown "$key"
+        DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"
     done
     sleep "$seconds"
     for key in "$@"; do
-        DISPLAY="$DISPLAY_VALUE" xdotool keyup "$key"
+        DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
     done
 }
 
@@ -82,10 +82,6 @@ SMOKE_EXTRAOPTS="$EXTRAOPTS_VALUE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
 
 hold_keys "$FORWARD_SECS" Up
 sleep 0.2

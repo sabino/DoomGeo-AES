@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
 DEATH_WAIT_SECS="${COMBAT_DEATH_WAIT_SECS:-2.5}"
 REVEAL_STEP_SECS="${COMBAT_DEATH_REVEAL_STEP_SECS:-0.45}"
@@ -44,9 +44,9 @@ capture_window() {
 }
 
 press_fire() {
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown x
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" x
     sleep 0.25
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup x
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" x
 }
 
 require_cmd xdotool
@@ -65,10 +65,6 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
 sleep 0.3
 
 # GnGeo maps Neo Geo B to keyboard "x" in config.mk. The combat ROM starts
@@ -79,9 +75,9 @@ sleep 0.15
 capture_window "$wid" "$FIRED_OUT"
 
 sleep "$DEATH_WAIT_SECS"
-DISPLAY="$DISPLAY_VALUE" xdotool keydown Down
+DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Down
 sleep "$REVEAL_STEP_SECS"
-DISPLAY="$DISPLAY_VALUE" xdotool keyup Down
+DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Down
 sleep 0.2
 capture_window "$wid" "$DEATH_OUT"
 

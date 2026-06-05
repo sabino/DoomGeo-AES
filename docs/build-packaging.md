@@ -76,7 +76,14 @@ For native Doom visual comparisons, run `tools/capture_compare.sh`. By default
 it captures the compiled map start view and writes native, Neo Geo, and
 side-by-side PNGs under `.tools/screens/`. The helper uses the same capture lock
 as smoke screenshots, so native and GnGeo windows cannot be cross-captured by a
-parallel comparison run. Set `COMPARE_WAYPOINT` to capture a named view:
+parallel comparison run. The smoke and comparison helpers place emulator windows
+on workspace 4 by default and send targeted key events instead of activating the
+window, so captures do not take focus from the desktop. Direct i3/sway tiling of
+`ngdevkit-gngeo` is disabled by default because forcing `floating disable`
+resizes the SDL window and reliably crashes GnGeo on this host; set
+`SMOKE_TILE_WINDOWS=1` or `COMPARISON_TILE_WINDOWS=1` only when intentionally
+rechecking that behavior or when running under a wrapper that tolerates resize.
+Set `COMPARE_WAYPOINT` to capture a named view:
 
 ```sh
 DOOM_MAP=E1M1 tools/capture_compare.sh
@@ -251,7 +258,8 @@ evidence.
 launches with an owner-tracked lock under `.tools/locks/` so parallel screenshot
 refreshes do not capture the wrong native or GnGeo window. If a previous aborted
 run left a directory-only or dead-PID lock, the helpers clear it automatically
-before starting the next capture.
+before starting the next capture. Set `SMOKE_WORKSPACE=` or
+`COMPARISON_WORKSPACE=` to override the default workspace 4 placement.
 
 Fast weapon shortcut input can be smoke-checked with:
 

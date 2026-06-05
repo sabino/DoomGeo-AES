@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
-WORKSPACE="${SMOKE_WORKSPACE:-2}"
+WORKSPACE="${SMOKE_WORKSPACE:-4}"
+TILE_WINDOWS="${SMOKE_TILE_WINDOWS:-0}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 INITIAL_OUT="${OUT_DIR}/key-door-initial.png"
@@ -43,19 +44,32 @@ capture_window() {
     convert "$xwd_out" "$out"
 }
 
+tile_window() {
+    local wid="$1"
+    local floating="enable"
+    if [ "$TILE_WINDOWS" = "1" ]; then
+        floating="disable"
+    fi
+    if [ -n "$WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+        i3-msg "[id=\"$wid\"] move container to workspace number $WORKSPACE, floating $floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ] && command -v swaymsg >/dev/null 2>&1; then
+        swaymsg '[class="ngdevkit-gngeo"] move container to workspace number '"$WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+    elif [ -n "$WORKSPACE" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
+    fi
+}
+
 press_d() {
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown s
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" s
     sleep "${KEY_DOOR_USE_SECS:-0.45}"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup s
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" s
 }
 
 hold_up() {
     local seconds="$1"
-    DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    DISPLAY="$DISPLAY_VALUE" xdotool keydown Up
+    DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" Up
     sleep "$seconds"
-    DISPLAY="$DISPLAY_VALUE" xdotool keyup Up
+    DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" Up
 }
 
 require_cmd xdotool
@@ -74,10 +88,7 @@ SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null
 
 wid="$(window_for_gngeo)"
-DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-if [ -n "$WORKSPACE" ]; then
-    DISPLAY="$DISPLAY_VALUE" xdotool set_desktop_for_window "$wid" "$WORKSPACE" >/dev/null 2>&1 || true
-fi
+tile_window "$wid"
 sleep 0.3
 
 # GnGeo maps Neo Geo D to keyboard "s" in config.mk. The first press should
@@ -97,7 +108,7 @@ press_d
 sleep 0.25
 capture_window "$wid" "$OPENED_OUT"
 
-hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-3.0}"
+hold_up "${KEY_DOOR_THROUGH_WALK_SECS:-0.85}"
 sleep 0.4
 capture_window "$wid" "$THROUGH_OUT"
 

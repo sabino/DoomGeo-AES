@@ -17,7 +17,7 @@
  * budget on walls first because navigation readability is the main bottleneck.
  */
 #if !defined(DOOM_DETAIL_CLARITY) && !defined(DOOM_DETAIL_QUALITY) && !defined(DOOM_DETAIL_BALANCED) && !defined(DOOM_DETAIL_SPEED)
-#define DOOM_DETAIL_BALANCED 1
+#define DOOM_DETAIL_QUALITY 1
 #endif
 
 #if defined(DOOM_DETAIL_CLARITY) && (defined(DOOM_DETAIL_QUALITY) || defined(DOOM_DETAIL_BALANCED) || defined(DOOM_DETAIL_SPEED))
@@ -129,7 +129,7 @@
 #define WALL_BASE (BG_BASE + BG_COUNT)   
 /*
  * Runtime sprite budget on active playfield scanlines depends on DOOM_DETAIL.
- * The default clarity tier uses 20 backdrop + 64 wall columns + 4 thing strips
+ * The default quality tier uses 20 backdrop + 40 wall columns + 28 thing strips
  * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
  * tier keeps the weapon in front while staying inside the practical budget.
  */
@@ -180,7 +180,7 @@
 #define TILE_BRICK 1                /* mipmapped Doom wall texture tile      */
 #define TILE_SOLID 2                /* all pixels = palette index 1          */
 #define TILE_WALL_ATLAS_BASE 3
-#if defined(DOOM_DETAIL_CLARITY)
+#if defined(DOOM_DETAIL_CLARITY) || defined(DOOM_DETAIL_QUALITY)
 #define TILE_WALL_ATLAS_COLS 32     /* denser texture phase sampling for close walls */
 #else
 #define TILE_WALL_ATLAS_COLS 16

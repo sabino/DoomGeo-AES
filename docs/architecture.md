@@ -66,8 +66,9 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   each offline tile now preserves the horizontal source band for that phase
   instead of flattening it to one repeated texel column.
 - The graphics converter follows the same `DOOM_DETAIL` tier as the C build:
-  clarity mode emits 32-phase wall/door atlases and a four-direction plane
-  cache, while balanced/quality/speed keep the 16-phase wall atlases and
+  the quality default and clarity mode emit 32-phase wall/door atlases for
+  close-wall readability, while balanced/speed keep the 16-phase wall atlases.
+  Clarity also uses a four-direction plane cache; the other tiers keep the
   16-direction plane cache. The runtime defaults to the cached perspective plane
   upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
 - Doom flats are sampled into tile banks and perspective plane caches at build
@@ -120,13 +121,17 @@ current runtime accepts several compromises:
   of true multiple clipped subsector spans. Small open-cell spans are allowed to
   pass through so openings can show the farther space, but the renderer still
   cannot draw a near lower/upper span and a far wall in the same column.
+  Converted lower/upper spans are capped before they reach the runtime, and a
+  span must project as a large visible strip before it terminates the ray. This
+  avoids scout-route cases where a 128-unit sector delta becomes a fake
+  full-height wall.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
-  The default balanced runtime uses a 32-column wall pass with nine visible
+  The default quality runtime uses a 40-column wall pass with seven visible
   world things so walls, backdrop, weapon, and HUD stay inside the practical
-  96-sprites-per-scanline limit. `DOOM_DETAIL=quality` and `DOOM_DETAIL=clarity`
-  keep heavier visual comparison paths, while `speed` spends fewer sprites on
-  walls and more on visible world things.
+  96-sprites-per-scanline limit. `DOOM_DETAIL=balanced` and `DOOM_DETAIL=speed`
+  spend fewer sprites on walls and more on visible world things, while
+  `DOOM_DETAIL=clarity` is the heavier wall-readability comparison tier.
 - Runtime wall projection still uses one sprite strip per wall column. In the
   balanced/speed tiers, solid grid-cell hits use the rasterized map wall
   directly and skip solid-line refinement; open-cell WAD render-line spans stay
@@ -140,10 +145,10 @@ current runtime accepts several compromises:
 - Wall strip geometry updates every dirty frame, but texture/palette SCB1
   rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
   controller response and wall height motion from stalling behind a full
-  15-tile rewrite of every wall column while turning. Balanced mode refreshes
-  all 32 wall columns during normal movement, so texture changes settle in the
-  same frame as wall geometry in the common case; the overrun path clamps the
-  budget back down when `wait_vblank_status()` reports late frames.
+  15-tile rewrite of every wall column while turning. The quality default now
+  accepts a bounded texture-settle delay in exchange for 40 wall columns and
+  32-phase wall atlases; the overrun path clamps the budget back down when
+  `wait_vblank_status()` reports late frames.
 - Wall depth shading uses 11 bands per side. With the primary wall, door, and
   seven alternate wall texture palettes, this keeps every wall-depth palette
   below Neo Geo palette index 256. Higher band counts overflow palette RAM and

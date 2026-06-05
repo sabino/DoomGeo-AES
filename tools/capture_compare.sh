@@ -10,7 +10,8 @@ WAYPOINT="${COMPARE_WAYPOINT:-start}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 SCREENDIR=".tools/screens"
 LOGDIR=".tools/logs"
-COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-}"
+COMPARISON_WORKSPACE="${COMPARISON_WORKSPACE:-4}"
+COMPARISON_TILE_WINDOWS="${COMPARISON_TILE_WINDOWS:-0}"
 LOCKDIR="${COMPARE_LOCKDIR:-${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}}"
 LOCK_OWNER="$LOCKDIR/pid"
 LOCK_ACQUIRED=0
@@ -134,8 +135,27 @@ acquire_capture_lock() {
 }
 
 switch_workspace() {
-    if [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+    if [ "${COMPARE_FOCUS_WORKSPACE:-0}" = "1" ] && [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
         i3-msg workspace "$COMPARISON_WORKSPACE" >/dev/null 2>&1 || true
+    fi
+}
+
+tile_window() {
+    local wid="$1"
+    local floating="enable"
+    if [ "$COMPARISON_TILE_WINDOWS" = "1" ]; then
+        floating="disable"
+    fi
+    if [ -n "$COMPARISON_WORKSPACE" ] && command -v i3-msg >/dev/null 2>&1; then
+        i3-msg "[id=\"$wid\"] move container to workspace number $COMPARISON_WORKSPACE, floating $floating" >/dev/null 2>&1 || true
+    elif [ -n "$COMPARISON_WORKSPACE" ] && command -v swaymsg >/dev/null 2>&1; then
+        local title=""
+        title="$(xdotool getwindowname "$wid" 2>/dev/null || true)"
+        if printf '%s' "$title" | grep -qi 'Gngeo'; then
+            swaymsg '[class="ngdevkit-gngeo"] move container to workspace number '"$COMPARISON_WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+        elif [ -n "$title" ]; then
+            swaymsg '[title="'"$title"'"] move container to workspace number '"$COMPARISON_WORKSPACE"', floating '"$floating" >/dev/null 2>&1 || true
+        fi
     fi
 }
 
@@ -149,7 +169,7 @@ capture_window() {
     for _ in $(seq 1 10); do
         wid="$(window_for_pid_or_name "$pid" "$name" || true)"
         if [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1; then
-            xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+            tile_window "$wid"
             sleep 0.3
             rm -f "$xwd_out"
             if xwd -silent -id "$wid" -out "$xwd_out" >/dev/null 2>&1 && [ -s "$xwd_out" ]; then
@@ -170,10 +190,9 @@ hold_key() {
     local wid="$1"
     local key="$2"
     local secs="$3"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    xdotool keydown "$key"
+    xdotool keydown --window "$wid" "$key"
     sleep "$secs"
-    xdotool keyup "$key"
+    xdotool keyup --window "$wid" "$key"
     sleep 0.15
 }
 
@@ -182,15 +201,14 @@ hold_move_key() {
     local key="$2"
     local secs="$3"
     local modifier="${4:-}"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
     if [ -n "$modifier" ]; then
-        xdotool keydown "$modifier"
+        xdotool keydown --window "$wid" "$modifier"
     fi
-    xdotool keydown "$key"
+    xdotool keydown --window "$wid" "$key"
     sleep "$secs"
-    xdotool keyup "$key"
+    xdotool keyup --window "$wid" "$key"
     if [ -n "$modifier" ]; then
-        xdotool keyup "$modifier"
+        xdotool keyup --window "$wid" "$modifier"
     fi
     sleep 0.15
 }
@@ -198,8 +216,7 @@ hold_move_key() {
 tap_key() {
     local wid="$1"
     local key="$2"
-    xdotool windowactivate "$wid" >/dev/null 2>&1 || true
-    xdotool key "$key"
+    xdotool key --window "$wid" "$key"
     sleep 0.15
 }
 
@@ -394,7 +411,7 @@ if [ -z "$neo_pid" ]; then
 fi
 neo_wid="$(window_for_pid_or_name "$neo_pid" "" || true)"
 if [ -n "$neo_wid" ]; then
-    xdotool windowactivate "$neo_wid" >/dev/null 2>&1 || true
+    tile_window "$neo_wid"
     if [ "$neo_press_start" = "1" ]; then
         sleep 1.5
         hold_key "$neo_wid" x 0.25

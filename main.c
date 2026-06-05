@@ -159,9 +159,9 @@ static void restore_flat_palettes(void) {
 
 static void set_depth_palette_range(u16 base, const u8 rgb[][3], u16 colors) {
     for (int b = 0; b < DEPTH_BANDS; b++) {
-        int fn = 256 - (b * 136) / (DEPTH_BANDS - 1);
+        int fn = 256 - (b * 112) / (DEPTH_BANDS - 1);
         for (int s = 0; s < 2; s++) {
-            int sf = s ? 190 : 256;
+            int sf = s ? 204 : 256;
             u16 pal = (u16)(base + s * DEPTH_BANDS + b);
             for (u16 i = 0; i < colors; i++) {
                 int r = rgb[i][0] * fn / 256 * sf / 256;
@@ -2972,6 +2972,8 @@ static void configure_key_door_test(void) {
     u8 door_count = 0;
     u8 door_x = 27;
     u8 door_y = 32;
+    u8 player_x = 30;
+    u8 key_x = 29;
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         enemy_dead[i] = 1;
         enemy_hp[i] = 0;
@@ -2993,9 +2995,22 @@ static void configure_key_door_test(void) {
     if (door_count) door_y = (u8)((door_y_sum + door_count / 2) / door_count);
 #endif
 
-    /* Stage beside the generated E1M2 red locked-door group. */
-    rc_set_pose_q8((short)(((door_x + 3) << 8) + 128), (short)((door_y << 8) + 128), -256, 0);
-    thing_x_q8[0] = (short)(((door_x + 2) << 8) + 128);
+    /* Stage far enough back that the focused smoke reads as a doorway, not a
+     * wall close-up. The E1M2 red door has a shallow wall behind it in the
+     * converted grid, so the verification pose must favor readable framing. */
+    for (u8 offset = 6; offset >= 3; offset--) {
+        u8 candidate_x = (u8)(door_x + offset);
+        u8 candidate_key_x = (u8)(candidate_x - 1);
+        if (!map_at(candidate_x, door_y) && !map_at(candidate_key_x, door_y)) {
+            player_x = candidate_x;
+            key_x = candidate_key_x;
+            break;
+        }
+        if (offset == 3) break;
+    }
+
+    rc_set_pose_q8((short)((player_x << 8) + 128), (short)((door_y << 8) + 128), -256, 0);
+    thing_x_q8[0] = (short)((key_x << 8) + 128);
     thing_y_q8[0] = (short)((door_y << 8) + 128);
     thing_type_override[0] = 13; /* red keycard */
     enemy_dead[0] = 0;
