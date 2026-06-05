@@ -98,7 +98,9 @@ Doom and the Neo Geo ROM with the same timed input script from that map spawn,
 with native Doom holding its speed modifier during forward movement. This makes
 the side-by-side more useful for judging equivalent route views; set
 `COMPARE_NATIVE_MOVE_MODIFIER=` to disable the native speed modifier when
-checking walk-speed captures.
+checking walk-speed captures. When the engines drift to different places, tune
+the route per side with `COMPARE_NATIVE_ROUTE_*` and `COMPARE_NEO_ROUTE_*`
+variables such as `COMPARE_NEO_ROUTE_E1M1_SCOUT_FORWARD1=0.9`.
 Set `COMPARE_ROUTE_MODE=focused` to use the older focused Neo Geo verification
 ROMs for `e1m1-encounter`, `e1m1-scout`, and `e1m2-keydoor`. Focused captures
 wait briefly before grabbing the window and reject all-black frames, so

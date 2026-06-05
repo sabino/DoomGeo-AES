@@ -103,6 +103,11 @@ readable.
   columns incrementally so strafing moves the planes while keeping the tile bank
   inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
   solid planes for debugging.
+- Wall projection is intentionally a little taller than the original NGRayEx
+  baseline. `DOOM_WALL_PROJECTION_NUM` / `DOOM_WALL_PROJECTION_DEN` tune the
+  projection constant at compile time, keeping more of the view occupied by
+  walls and less by the approximate floor/ceiling backdrop without changing the
+  sprite-strip architecture.
 - The converter also emits a compact per-cell sector floor visual class and
   light band derived from `SECTORS` floor flat names, specials, and light
   levels. The runtime uses those generated cells to tint floor/ceiling palettes
@@ -411,6 +416,8 @@ readable.
   engines with the same timed input script from the map spawn by default, with
   native Doom holding its speed modifier during forward movement.
   `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
+  `COMPARE_NATIVE_ROUTE_*` / `COMPARE_NEO_ROUTE_*` can override individual
+  route timings when matching exact views for visual investigation.
   `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
   visual registers when that is the useful evidence.
 - Smoke and comparison captures default to workspace 4 and targeted X11 key

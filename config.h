@@ -50,7 +50,13 @@
 #define BG_SPLIT  (BG_WIN / 2)
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
-#define WALLH    ((GAME_H * 3) / 2) /* projection scale: wall height @ dist 1 */
+#ifndef DOOM_WALL_PROJECTION_NUM
+#define DOOM_WALL_PROJECTION_NUM 2  /* taller walls reduce floor-dominated views */
+#endif
+#ifndef DOOM_WALL_PROJECTION_DEN
+#define DOOM_WALL_PROJECTION_DEN 1
+#endif
+#define WALLH    ((GAME_H * DOOM_WALL_PROJECTION_NUM) / DOOM_WALL_PROJECTION_DEN)
 #define MAX_H    GAME_H             /* clamp so top>=0 (avoids Y-wrap bug)    */
 #define DOOM_RENDER_LINES 1         /* visual ray hits use WAD-derived lines  */
 #ifndef DOOM_SOLID_LINE_REFINEMENT

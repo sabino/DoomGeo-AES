@@ -224,23 +224,32 @@ drive_waypoint_script() {
     local wid="$1"
     local use_key="$2"
     local move_modifier="${3:-}"
+    local route_prefix="${4:-COMPARE_ROUTE}"
+    local e1m1_encounter_forward="${route_prefix}_E1M1_ENCOUNTER_FORWARD"
+    local e1m1_encounter_turn="${route_prefix}_E1M1_ENCOUNTER_TURN"
+    local e1m1_scout_forward1="${route_prefix}_E1M1_SCOUT_FORWARD1"
+    local e1m1_scout_turn="${route_prefix}_E1M1_SCOUT_TURN"
+    local e1m1_scout_forward2="${route_prefix}_E1M1_SCOUT_FORWARD2"
+    local e1m2_keydoor_forward1="${route_prefix}_E1M2_KEYDOOR_FORWARD1"
+    local e1m2_keydoor_turn="${route_prefix}_E1M2_KEYDOOR_TURN"
+    local e1m2_keydoor_forward2="${route_prefix}_E1M2_KEYDOOR_FORWARD2"
     case "$WAYPOINT" in
         start|e1m1-start|e1m2-start)
             return 0
             ;;
         e1m1-encounter)
-            hold_move_key "$wid" Up 1.0 "$move_modifier"
-            hold_key "$wid" Right 0.35
+            hold_move_key "$wid" Up "${!e1m1_encounter_forward:-1.0}" "$move_modifier"
+            hold_key "$wid" Right "${!e1m1_encounter_turn:-0.35}"
             ;;
         e1m1-scout)
-            hold_move_key "$wid" Up 1.8 "$move_modifier"
-            hold_key "$wid" Left 0.85
-            hold_move_key "$wid" Up 0.55 "$move_modifier"
+            hold_move_key "$wid" Up "${!e1m1_scout_forward1:-1.8}" "$move_modifier"
+            hold_key "$wid" Left "${!e1m1_scout_turn:-0.85}"
+            hold_move_key "$wid" Up "${!e1m1_scout_forward2:-0.55}" "$move_modifier"
             ;;
         e1m2-keydoor)
-            hold_move_key "$wid" Up 1.2 "$move_modifier"
-            hold_key "$wid" Left 0.45
-            hold_move_key "$wid" Up 0.8 "$move_modifier"
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward1:-1.2}" "$move_modifier"
+            hold_key "$wid" Left "${!e1m2_keydoor_turn:-0.45}"
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward2:-0.8}" "$move_modifier"
             tap_key "$wid" "$use_key"
             ;;
         *)
@@ -260,7 +269,7 @@ drive_native_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "$title")"
-    drive_waypoint_script "$wid" space "$native_move_modifier"
+    drive_waypoint_script "$wid" space "$native_move_modifier" COMPARE_NATIVE_ROUTE
 }
 
 drive_neo_waypoint() {
@@ -272,7 +281,7 @@ drive_neo_waypoint() {
             ;;
     esac
     wid="$(window_for_pid_or_name "$pid" "")"
-    drive_waypoint_script "$wid" s
+    drive_waypoint_script "$wid" s "" COMPARE_NEO_ROUTE
 }
 
 configure_waypoint() {

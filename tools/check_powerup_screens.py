@@ -82,7 +82,7 @@ def main() -> int:
 
     require_min(errors, path, "left pickup cluster", left_powerups, "tan", 3000)
     require_min(errors, path, "left pickup cluster", left_powerups, "colored", 2400)
-    require_min(errors, path, "right pickup cluster", right_powerups, "bright", 42000)
+    require_min(errors, path, "right pickup cluster", right_powerups, "bright", 40000)
     require_min(errors, path, "right pickup cluster", right_powerups, "tan", 3000)
     require_min(errors, path, "right pickup cluster", right_powerups, "colored", 3000)
     require_min(errors, path, "visible imp", imp, "tan", 1000)

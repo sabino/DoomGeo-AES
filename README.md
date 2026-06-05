@@ -89,9 +89,9 @@ gap: the native start room is not yet visually matched by the Neo Geo wall and
 plane approximation even though the converted map and Player 1 start are loaded.
 Set `COMPARE_WAYPOINT` to capture additional known views: `e1m1-start`,
 `e1m2-start`, `e1m1-encounter`, `e1m1-scout`, or `e1m2-keydoor`. Non-start
-native waypoints are driven by approximate scripted input from the native Doom
-spawn, while the Neo Geo side uses the matching focused ROM target when one
-exists.
+route waypoints are driven by timed input from each engine's spawn. Use
+`COMPARE_NATIVE_ROUTE_*` and `COMPARE_NEO_ROUTE_*` timing overrides when a route
+capture needs tighter exact-position alignment before judging renderer changes.
 
 ## Controls
 
