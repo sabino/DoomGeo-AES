@@ -39,8 +39,10 @@ readable.
 - In addition to solid linedefs, the converter now emits selected two-sided
   lower, upper, and mid-texture visual lines. The runtime can draw one
   top- or bottom-aligned partial wall span per column when that span projects
-  large enough to be readable. Far partial spans are skipped so they do not
-  collapse into dark horizontal fences.
+  large enough to be readable. Small open-cell spans no longer stop the ray, so
+  window/opening views prefer the farther room or wall instead of collapsing
+  into dark horizontal fences. Nearby larger spans still occlude as ledge/step
+  cues.
 - The renderer caches each column's ray vector, DDA reciprocal deltas, and step
   signs for the current angle/FOV, rebuilding that cache only when the view
   direction changes. Movement-only frames reuse those values before running

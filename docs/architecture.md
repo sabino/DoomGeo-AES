@@ -105,8 +105,10 @@ current runtime accepts several compromises:
 
 - Grid/coarse collision representation with per-cell visual render-line
   refinement instead of a full BSP/seg traversal.
-- At most one projected wall or two-sided partial span per column instead of
-  true multiple clipped subsector spans.
+- At most one projected wall or large two-sided partial span per column instead
+  of true multiple clipped subsector spans. Small open-cell spans are allowed to
+  pass through so openings can show the farther space, but the renderer still
+  cannot draw a near lower/upper span and a far wall in the same column.
 - Pre-baked floor/ceiling tile views instead of true per-pixel floor casting.
 - A limited number of visible world-sprite slots for monsters/pickups/projectiles.
   The default clarity runtime uses a 64-column wall pass with one 4-strip world

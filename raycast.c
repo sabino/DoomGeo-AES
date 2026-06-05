@@ -46,6 +46,8 @@ static inline fix recip(fix b) {
 #define FBIG (1 << 28)            
 #define FMIN (FONE >> 6)          /* clamp tiny distances                   */
 #define PLAYER_RADIUS ((FONE / 5) * MAP_RENDER_SCALE)  /* Doom-ish collision body */
+#define PORTAL_SPAN_DRAW_MIN_H 12
+#define PORTAL_SPAN_OCCLUDE_MIN_H 32
  
 static fix posX, posY;           /* world position (1.0 == one map cell)    */
 static fix dirX, dirY;           /* facing direction (unit)                 */
@@ -419,7 +421,7 @@ void rc_render(void) {
                 u8 line_height = 0;
                 if (g_render_cell_count[mapY][mapX] &&
                     rc_refine_render_line_hit(rayX, rayY, mapX, mapY, &line_perp, &line_kind, &line_tex, &line_side, &line_span, &line_height) &&
-                    line_span && projected_span_height(line_perp, line_height) >= 12) {
+                    line_span && projected_span_height(line_perp, line_height) >= PORTAL_SPAN_OCCLUDE_MIN_H) {
                     kindbuf[x] = line_kind;
                     texbuf[x] = line_tex;
                     side = line_side;
@@ -455,7 +457,7 @@ void rc_render(void) {
         if (span && span_height) {
             h = (full_h * span_height + 63) / 128;
             if (h < 2) h = 2;
-            if (h < 12) {
+            if (h < PORTAL_SPAN_DRAW_MIN_H) {
                 span = 0;
                 span_height = 0;
                 h = full_h;
