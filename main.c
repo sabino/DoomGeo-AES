@@ -90,19 +90,25 @@ static u8 sector_floor_tint(u8 value, u8 kind, u8 component, u8 pulse) {
     int out = value;
     switch (kind) {
     case 1: /* water */
-        out = (component == 2) ? value + 7 + pulse : value * 3 / 4;
+        out = (component == 2) ? value + 8 + pulse : (component == 1 ? value + 2 : value * 2 / 3);
         break;
     case 2: /* nukage/slime/lava/hazard */
-        out = (component == 1) ? value + 9 + pulse : value * 2 / 3;
+        if (component == 1) out = value + 10 + pulse;
+        else if (component == 2) out = value + 4 + (pulse >> 1);
+        else out = value * 2 / 3;
         break;
     case 3: /* blood */
         out = (component == 0) ? value + 8 + pulse : value * 2 / 3;
         break;
     case 4: /* water visible ahead */
-        out = (component == 2) ? value + 2 + pulse : value;
+        if (component == 2) out = value + 7 + pulse;
+        else if (component == 1) out = value + 2;
+        else out = value * 3 / 4;
         break;
     case 5: /* hazard visible ahead */
-        out = (component == 1) ? value + 2 + pulse : value;
+        if (component == 1) out = value + 8 + pulse;
+        else if (component == 2) out = value + 4 + (pulse >> 1);
+        else out = value * 3 / 4;
         break;
     case 6: /* blood visible ahead */
         out = (component == 0) ? value + 2 + pulse : value;
@@ -469,13 +475,42 @@ static void consider_sector_palette_cell(int cell_x, int cell_y, u8 *best_kind, 
 static void sample_sector_palette_ray(int px_q8, int py_q8, int ray_x_q8, int ray_y_q8,
                                       u8 *best_kind, u8 *best_light, u8 *best_priority) {
     static const short distances_q8[] = {192, 448, 768, 1152, 1536, 1920};
+    u8 peek_blocks = 0;
     for (u8 i = 0; i < (u8)(sizeof(distances_q8) / sizeof(distances_q8[0])); i++) {
         int sample_x_q8 = px_q8 + (int)(((long)ray_x_q8 * distances_q8[i]) >> 8);
         int sample_y_q8 = py_q8 + (int)(((long)ray_y_q8 * distances_q8[i]) >> 8);
         int cell_x = sample_x_q8 >> 8;
         int cell_y = sample_y_q8 >> 8;
-        if (map_at(cell_x, cell_y)) break;
+        if (map_at(cell_x, cell_y)) {
+            if (++peek_blocks > 2) break;
+            continue;
+        }
         consider_sector_palette_cell(cell_x, cell_y, best_kind, best_light, best_priority);
+    }
+}
+
+static void sample_sector_palette_cone(int px_q8, int py_q8, int dir_x_q8, int dir_y_q8,
+                                       int plane_x_q8, int plane_y_q8,
+                                       u8 *best_kind, u8 *best_light, u8 *best_priority) {
+    int pcx = px_q8 >> 8;
+    int pcy = py_q8 >> 8;
+    for (int y = pcy - 16; y <= pcy + 16; y++) {
+        for (int x = pcx - 16; x <= pcx + 16; x++) {
+            int rel_x_q8;
+            int rel_y_q8;
+            long front;
+            long side;
+            if (map_at(x, y)) continue;
+            if (!map_cell_floor_visual(x, y)) continue;
+            rel_x_q8 = ((x << 8) + 128) - px_q8;
+            rel_y_q8 = ((y << 8) + 128) - py_q8;
+            front = ((long)rel_x_q8 * dir_x_q8 + (long)rel_y_q8 * dir_y_q8) >> 8;
+            if (front < 512 || front > 4096) continue;
+            side = ((long)rel_x_q8 * plane_x_q8 + (long)rel_y_q8 * plane_y_q8) >> 8;
+            if (side < 0) side = -side;
+            if (side > front + 384) continue;
+            consider_sector_palette_cell(x, y, best_kind, best_light, best_priority);
+        }
     }
 }
 
@@ -511,6 +546,7 @@ static void update_sector_flat_palette(void) {
     sample_sector_palette_ray(px, py, dir_x, dir_y, &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x + (plane_x >> 1), dir_y + (plane_y >> 1), &kind, &light, &priority);
     sample_sector_palette_ray(px, py, dir_x - (plane_x >> 1), dir_y - (plane_y >> 1), &kind, &light, &priority);
+    sample_sector_palette_cone(px, py, dir_x, dir_y, plane_x, plane_y, &kind, &light, &priority);
     if (sector_floor_visual_is_liquid(kind)) {
         if (++sector_liquid_tick >= 12) {
             sector_liquid_tick = 0;

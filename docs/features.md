@@ -109,15 +109,16 @@ readable.
   when the player enters water-like, damaging nukage/slime/lava, blood, or
   darker/brighter sectors. This keeps sector identity visible without runtime
   WAD parsing or extra floor-casting work.
-- The floor palette selector also samples a few wall-stopped view rays ahead of
-  the player and lets visible higher-priority sector classes bias the active
-  flat-plane tint. Nukage, slime, lava, blood, and water therefore read with a
-  restrained preview tint before the player steps into them, while the renderer
-  still avoids runtime floor casting.
+- The floor palette selector samples a few wall-stopped view rays plus a small
+  forward cone ahead of the player, then lets visible higher-priority sector
+  classes bias the active flat-plane tint. The cone scan is palette-only and
+  does not change collision or ray hits; it makes nukage, slime, lava, blood,
+  and water read with a stronger preview tint before the player steps into them,
+  including E1M1's start-window hazard view.
 - Sector floor/ceiling palette preview sampling is cached by coarse player
   position and view vector. Straight movement inside the same coarse pose
-  bucket skips the three forward preview rays, while liquid pulse sectors still
-  advance their low-cost palette phase.
+  bucket skips the forward ray/cone preview work, while liquid pulse sectors
+  still advance their low-cost palette phase.
 - Water, blood, and hazardous liquid classes also apply a slow four-phase
   palette pulse to the already-baked floor gradients. This is a low-cost
   substitute for Doom's animated flats that keeps liquid sectors visibly active
