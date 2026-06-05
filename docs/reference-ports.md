@@ -65,6 +65,35 @@ License note:
 - `PureDOOM` ships with GPL-2.0 license text and a historical Doom source
   license notice. Treat exact code copying as a separate licensing decision.
 
+## DOOM-FX / SNES Doom
+
+Repository: https://github.com/RandalLinden/DOOM-FX
+
+Useful ideas:
+
+- Player movement, turning, sector motion, doors, lights, weapons, and object
+  state timing are adjusted from a vblank/FPS count through `FPSRatio` and
+  `FPSCount` rather than assuming every rendered frame costs the same.
+- The renderer traces and clips generated visible segment lists instead of
+  drawing a generic framebuffer.
+- Floor and wall assets are converted ahead of time, with runtime code using
+  compact engine data.
+
+Neo Geo adaptation:
+
+- DoomGeo-AES keeps its generated-data, sprite/fix-layer model. It now uses a
+  small Neo Geo-specific equivalent of the timing idea: the main loop detects a
+  missed vblank window and gives the following active gameplay frame one capped
+  extra player movement tick. This keeps walking and turning closer to real time
+  without advancing the full game simulation twice or importing SNES assembly.
+- Future sector/door/lift work should follow the same pattern: generated compact
+  metadata first, then bounded runtime updates.
+
+License note:
+
+- `DOOM-FX` is GPL-2.0-or-later. This repo can study and adapt ideas under the
+  same license family, but this branch does not import SNES assembly code.
+
 ## id Software DOOM Source
 
 Repository: https://github.com/id-Software/DOOM

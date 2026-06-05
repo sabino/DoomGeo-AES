@@ -5546,6 +5546,7 @@ int main(void) {
 #endif
     restart_level();
 
+    u8 player_frame_ticks = 1;
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
         if (game_active()) {
@@ -5556,7 +5557,7 @@ int main(void) {
             if ((pressed & C) && !(pressed & A) && (pressed & dpad)) {
                 move_pressed = (u8)(move_pressed & ~dpad);
             }
-            rc_input(move_pressed);
+            for (u8 tick = 0; tick < player_frame_ticks; tick++) rc_input(move_pressed);
             update_floor_damage();
             check_secret_reached();
             update_monster_ai();
@@ -5572,9 +5573,10 @@ int main(void) {
             if (restart_now && !restart_prev) restart_level();
             restart_prev = restart_now;
             pressed = 0;
+            player_frame_ticks = 1;
         }
         rc_render();                    /* DDA during active display          */
-        wait_vblank();
+        player_frame_ticks = wait_vblank_status() ? 2 : 1;
         watchdog_kick();
         update_sector_flat_palette();
         update_hurt_flash();

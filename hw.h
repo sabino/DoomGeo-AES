@@ -93,9 +93,15 @@ static inline void scb4(u16 spr, u16 x) {
  
 static inline int in_vblank(void) { return (REG_LSPCMODE & 0x8000) == 0; }
 
-static inline void wait_vblank(void) {
+static inline u8 wait_vblank_status(void) {
+    u8 overrun = (u8)in_vblank();
     while (in_vblank())  { }   /* finish any current vblank   */
     while (!in_vblank()) { }   /* wait for the next one        */
+    return overrun;
+}
+
+static inline void wait_vblank(void) {
+    (void)wait_vblank_status();
 }
 
 #endif /* HW_H */

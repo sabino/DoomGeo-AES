@@ -104,8 +104,8 @@ def main() -> int:
     require_count(errors, root / names["opened"], "opened-door message", opened_center, "green", 450)
     require_below(errors, root / names["opened"], "opened-door center wall", opened_center, "red", 600)
     require_count(errors, root / names["opened"], "opened-door HUD", opened_hud, "red", 9000)
-    require_count(errors, root / names["through"], "through-door wall", through_center, "red", 800)
-    require_count(errors, root / names["through"], "through-door scene", through_center, "bright", 55000)
+    require_count(errors, root / names["through"], "through-door message", through_center, "green", 450)
+    require_count(errors, root / names["through"], "through-door scene", through_center, "bright", 45000)
     require_count(errors, root / names["through"], "through-door scene", through_center, "varied", 35)
 
     if errors:

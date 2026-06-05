@@ -549,6 +549,11 @@ readable.
   Opposing inputs cancel cleanly, and forward-plus-strafe motion is combined into
   one normalized move step so diagonal walking does not run faster or spend a
   second collision pass.
+- The main loop records whether it reached `wait_vblank_status()` after the
+  vblank window had already started. The following active gameplay frame gives
+  player movement/turning one extra capped input tick in that case, keeping
+  walking responsiveness closer to real time after an over-budget frame without
+  moving the whole game simulation twice.
 - `tools/stress_movement.sh` boots the normal ROM, starts gameplay, and captures
   held forward, turn, and strafe poses. Use it alongside the route/key/powerup
   smokes when tuning renderer cost or movement feel.
