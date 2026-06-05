@@ -537,6 +537,10 @@ def nearest_open(grid: list[list[int]], sx: int, sy: int) -> tuple[int, int]:
     return 1, 1
 
 
+def clamp_to_cell(raw: float, cell: int, inset: float = 0.25) -> float:
+    return max(cell + inset, min(cell + 1.0 - inset, raw))
+
+
 def carve_start_clearance(grid: list[list[int]], sx: float, sy: float, angle: int) -> tuple[float, float]:
     width = len(grid[0])
     height = len(grid)
@@ -974,6 +978,8 @@ def runtime_things(
             continue
         if (thing.flags & skill_mask) == 0:
             continue
+        thing_class = runtime_thing_class(thing.type)
+        thing_info = runtime_thing_info(thing.type)
         gx, gy = grid_coord(thing.x, thing.y, min_x, max_y, scale, margin)
         raw_gx = gx
         raw_gy = gy
@@ -985,8 +991,12 @@ def runtime_things(
             cell_x, cell_y = nearest_open(grid, cell_x, cell_y)
             if abs((cell_x + 0.5) - raw_gx) > 2.5 or abs((cell_y + 0.5) - raw_gy) > 2.5:
                 continue
-            gx = cell_x + 0.5
-            gy = cell_y + 0.5
+            if thing_class == THING_CLASS_PICKUP:
+                gx = clamp_to_cell(raw_gx, cell_x)
+                gy = clamp_to_cell(raw_gy, cell_y)
+            else:
+                gx = cell_x + 0.5
+                gy = cell_y + 0.5
         if gx < 1.0 or gy < 1.0 or gx >= len(grid[0]) - 1 or gy >= len(grid) - 1:
             continue
         dx = gx - start_x
@@ -1003,8 +1013,8 @@ def runtime_things(
                 int(round(gy * 256)),
                 thing.type,
                 thing.flags,
-                runtime_thing_class(thing.type),
-                runtime_thing_info(thing.type),
+                thing_class,
+                thing_info,
             )
         )
     rows.sort(key=lambda row: row[0])

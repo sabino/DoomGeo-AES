@@ -23,6 +23,11 @@ readable.
   reports E1M4. The intro menu shows the compiled map instead of a hard-coded
   E1M1 label, and the completion overlay can show the reached exit's next
   standalone map code.
+- Pickup/key runtime positions preserve the original WAD fractional placement
+  when possible. If the coarse wall grid makes the exact WAD point solid, the
+  converter moves the pickup into the nearest open cell but clamps it toward
+  the original point instead of snapping it to the cell center. This keeps E1M2
+  key/weapon placements closer to native Doom while staying collectible.
 
 ## Rendering
 
@@ -205,6 +210,9 @@ readable.
 - Runtime things include common E1M1 pickups, keys, bullet/shell/rocket/cell
   ammo, armor, health, backpack, standard Doom powerups, weapons, barrels,
   monsters, projectiles, corpses, and explosions.
+- Converted pickups keep sub-cell placement after coarse-grid correction, so
+  keys and weapons no longer drift as far from their original WAD locations when
+  a nearby wall line occupies the raw grid cell.
 - Visible thing selection uses one priority-ranked projection pass for
   monsters, barrels/explosions, collectible pickups, corpses, and spent pickups.
   This preserves the previous Doom-like visibility priority while avoiding the
@@ -574,11 +582,12 @@ readable.
   `NN` is the number of frames in the latest 64-frame window that reached
   `wait_vblank_status()` after vblank had already started. The checker rejects
   captures where the register is missing.
-- The default balanced wall-strip upload budget refreshes 16 of its 32 columns
-  per frame instead of letting texture/palette updates trail movement for up to
-  four frames. The overrun budget still backs off when a frame reaches vblank
-  late, and `DOOM_WALL_UPLOAD_COLUMNS` / `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`
-  let movement benches test alternate budgets without hand-editing `CFLAGS`.
+- The default balanced wall-strip upload budget refreshes all 32 wall columns
+  on normal movement frames, so texture/palette changes settle with geometry
+  instead of smearing across later frames. The overrun budget still backs off
+  when a frame reaches vblank late, and `DOOM_WALL_UPLOAD_COLUMNS` /
+  `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS` let movement benches test alternate
+  budgets without hand-editing `CFLAGS`.
 - Balanced movement frames skip portal-span refinement and tighten near-line
   refinement to a smaller radius, so held input spends less CPU time on
   WAD-line intersection scans. Standing frames keep the richer portal-span pass

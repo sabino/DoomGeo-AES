@@ -72,6 +72,7 @@ def main() -> int:
     parser.add_argument("--expect-frame-stats", action="store_true", help="Require the DoomGeo frame-stats register")
     parser.add_argument("--min-diff-mean", type=float, default=8.0, help="Minimum mean playfield difference between poses")
     parser.add_argument("--min-diff-pixels", type=int, default=80000, help="Minimum changed playfield pixels between poses")
+    parser.add_argument("--min-play-colored", type=int, default=100000, help="Minimum colored playfield pixels per capture")
     args = parser.parse_args()
 
     root = Path(args.dir)
@@ -98,8 +99,8 @@ def main() -> int:
         frame_stats = image_counts(image, FRAME_STATS_BOX)
         if play["varied"] < 24:
             errors.append(f"{path}: weak playfield color variation {play['varied']} < 24")
-        if play["colored"] < 100000:
-            errors.append(f"{path}: weak playfield colored evidence {play['colored']} < 100000")
+        if play["colored"] < args.min_play_colored:
+            errors.append(f"{path}: weak playfield colored evidence {play['colored']} < {args.min_play_colored}")
         if hud["bright"] < 30000:
             errors.append(f"{path}: weak HUD/status evidence {hud['bright']} < 30000")
         if args.expect_fps and fps["magenta"] < 250:

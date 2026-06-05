@@ -125,6 +125,10 @@ GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
 `.tools/logs/movement-bench-gngeo.log`. The bench finishes with
 `tools/check_movement_screens.py`, which rejects missing, blank, static, or
 obviously wrong movement captures before treating the run as useful evidence.
+The default color threshold targets the bright E1M1 start-room path; darker
+maps such as E1M2 can pass a lower `--min-play-colored` value to
+`tools/check_movement_screens.py` while still requiring FPS, frame-stat, and
+pose-delta evidence.
 By default the bench uses an isolated `DOOM_FRAME_STATS=1` build under
 `build/frame-stats/`. Its green marker plus `NN` playfield register reports how many
 frames in the latest 64-frame window reached `wait_vblank_status()` after

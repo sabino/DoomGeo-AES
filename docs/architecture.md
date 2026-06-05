@@ -141,9 +141,9 @@ current runtime accepts several compromises:
   rewrites are budgeted by `WALL_TILE_UPLOAD_COLUMNS_PER_FRAME`. This keeps
   controller response and wall height motion from stalling behind a full
   15-tile rewrite of every wall column while turning. Balanced mode refreshes
-  16 of its 32 wall columns per frame during normal movement, so texture changes
-  settle in roughly two frames; the overrun path clamps the budget back down
-  when `wait_vblank_status()` reports late frames.
+  all 32 wall columns during normal movement, so texture changes settle in the
+  same frame as wall geometry in the common case; the overrun path clamps the
+  budget back down when `wait_vblank_status()` reports late frames.
 - Balanced mode also adapts WAD line refinement by motion state. Standing frames
   keep the normal portal-span pass and near solid-line correction, while moving
   frames skip portal-span refinement and use a tighter near-hit radius. Late-frame
