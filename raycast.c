@@ -362,12 +362,16 @@ static u8 player_can_occupy(fix x, fix y) {
     return 1;
 }
 
-static void try_move(fix dx, fix dy) {
+static u8 try_move(fix dx, fix dy) {
     fix nx = posX + dx, ny = posY + dy;
     fix ox = posX, oy = posY;
     if (player_can_occupy(nx, posY)) posX = nx;
     if (player_can_occupy(posX, ny)) posY = ny;
-    if (posX != ox || posY != oy) rc_invalidate_view();
+    if (posX != ox || posY != oy) {
+        rc_invalidate_view();
+        return 1;
+    }
+    return 0;
 }
 
 static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
@@ -377,18 +381,18 @@ static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
     return n ? -1 : 1;
 }
 
-void rc_input(u8 pressed) {
+u8 rc_input(u8 pressed) {
     enum { UP=1, DOWN=2, LEFT=4, RIGHT=8, A=16 };
     fix spd = FIX(MOVE_SPEED * MAP_RENDER_SCALE);
     signed char forward = input_axis(pressed, DOWN, UP);
     signed char side = 0;
     signed char turn = 0;
+    u8 camera_changed = 0;
     if (pressed & A) {                              /* strafe with A held    */
         side = input_axis(pressed, LEFT, RIGHT);
     } else {
         turn = input_axis(pressed, LEFT, RIGHT);
     }
-    render_motion_active = (u8)((forward || side || turn) ? 1 : 0);
     if (forward || side) {
         fix dx = 0;
         fix dy = 0;
@@ -405,9 +409,14 @@ void rc_input(u8 pressed) {
             if (side > 0) { dx += step_x; dy += step_y; }
             else          { dx -= step_x; dy -= step_y; }
         }
-        try_move(dx, dy);
+        camera_changed |= try_move(dx, dy);
     }
-    if (turn) rotate(turn);
+    if (turn) {
+        rotate(turn);
+        camera_changed = 1;
+    }
+    render_motion_active = camera_changed;
+    return camera_changed;
 }
 
 void rc_player_cell(int *cx, int *cy) {

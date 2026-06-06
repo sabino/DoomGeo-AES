@@ -5892,11 +5892,9 @@ static void set_weapon_position(signed char bob_x, signed char bob_y) {
     weapon_bob_y = bob_y;
 }
 
-static void update_weapon_bob(u8 pressed) {
-    enum { UP = 0x01, DOWN = 0x02, LEFT = 0x04, RIGHT = 0x08, A = 0x10 };
+static void update_weapon_bob(u8 moving) {
     static const signed char bx[8] = { 0, 1, 1, 0, 0, -1, -1, 0 };
     static const signed char by[8] = { 0, 1, 2, 1, 0, 1, 2, 1 };
-    u8 moving = (pressed & (UP | DOWN)) || ((pressed & A) && (pressed & (LEFT | RIGHT)));
     if (moving) {
         weapon_bob_phase = (u8)((weapon_bob_phase + 1) & 7);
         set_weapon_position(bx[weapon_bob_phase], by[weapon_bob_phase]);
@@ -5906,7 +5904,7 @@ static void update_weapon_bob(u8 pressed) {
     }
 }
 
-static void update_weapon(u8 pressed) {
+static void update_weapon(u8 pressed, u8 camera_changed) {
     enum { B = 0x20 };
     u8 b_now = pressed & B;
     if (!weapon_asset_available(current_weapon)) switch_to_ready_weapon();
@@ -6020,7 +6018,7 @@ static void update_weapon(u8 pressed) {
         fire_timer--;
     }
     if (frame != weapon_frame) set_weapon_frame(frame);
-    update_weapon_bob(fire_timer ? 0 : pressed);
+    update_weapon_bob((u8)(!fire_timer && camera_changed));
 }
 
 static void init_weapon(void) {
@@ -6904,6 +6902,7 @@ int main(void) {
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
+        u8 camera_changed = 0;
 #if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
         pressed = chunk_movement_test_pressed(pressed);
 #endif
@@ -6917,9 +6916,9 @@ int main(void) {
             if ((pressed & C) && !(pressed & A) && (pressed & dpad)) {
                 move_pressed = (u8)(move_pressed & ~dpad);
             }
-            rc_input(move_pressed);
+            camera_changed |= rc_input(move_pressed);
             if (catchup_input && (move_pressed & dpad)) {
-                rc_input(move_pressed);
+                camera_changed |= rc_input(move_pressed);
             }
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
             update_chunk_streaming();
@@ -6981,7 +6980,7 @@ int main(void) {
          * advancing from stale visibility after the source leaves view. */
         update_projectile();
         update_monster_damage();
-        update_weapon(pressed);
+        update_weapon(pressed, camera_changed);
         update_enemy_hit_flash();
         update_power_timers();
         update_status_numbers(pressed);
