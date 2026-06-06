@@ -11,6 +11,7 @@ typedef struct NgRipRayHit {
     unsigned short flags;
     unsigned short texture;
     unsigned short distance_q8;
+    unsigned char texture_kind;
     unsigned char tex_u;
     unsigned char side;
 } NgRipRayHit;

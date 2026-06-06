@@ -92,8 +92,11 @@ and emits generated C headers/sources under `build/`:
   runtime-facing query helpers for BSP point-to-subsector/sector lookup,
   blockmap cell line counts, local line/seg collection, and nearest local ray
   hits; `make ripdoom-runtime-check` compiles those helpers as a host probe,
-  and `DOOM_RIPDOOM_RUNTIME=1` includes them in a Neo Geo ROM. The wall
-  renderer still ignores these tables until the table contract is stable.
+  and `make ripdoom-render-check` verifies start-view ray coverage. With
+  `DOOM_RIPDOOM_RENDER=1`, the sprite-strip wall renderer can use those local
+  ray hits for an experimental WAD-native wall view while preserving the
+  existing simple-map collision/gameplay path. This render mode is not the
+  default gameplay path yet.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

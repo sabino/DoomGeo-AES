@@ -119,6 +119,19 @@
 #define DOOM_OVERRUN_LINE_REFINEMENT_CELLS 2
 #endif
 
+#ifndef DOOM_RIPDOOM_RENDER
+#define DOOM_RIPDOOM_RENDER 0
+#endif
+#if DOOM_RIPDOOM_RENDER && !DOOM_RIPDOOM_RUNTIME
+#error "DOOM_RIPDOOM_RENDER requires DOOM_RIPDOOM_RUNTIME"
+#endif
+#ifndef DOOM_RIPDOOM_RENDER_UNITS_PER_CELL
+#define DOOM_RIPDOOM_RENDER_UNITS_PER_CELL 64
+#endif
+#ifndef DOOM_RIPDOOM_RENDER_BLOCK_RADIUS
+#define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 8
+#endif
+
 /* Floor/ceiling tiles are whole-row Neo Geo backdrop sprites, not Doom's
  * per-pixel visplanes. Keep sector preview local so a distant hazard sector
  * cannot recolor the entire current room through coarse-map openings. */

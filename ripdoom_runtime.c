@@ -227,14 +227,20 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
     {
         const NgRipSeg *seg = &g_rip_segs[best_seg];
         unsigned short texture = seg->mid_texture;
+        unsigned char texture_kind = seg->mid_kind;
         if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture = seg->lower_texture;
-        else if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) texture = seg->upper_texture;
+        if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture_kind = seg->lower_kind;
+        else if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) {
+            texture = seg->upper_texture;
+            texture_kind = seg->upper_kind;
+        }
         out_hit->seg = (unsigned short)best_seg;
         out_hit->linedef = (unsigned short)seg->linedef;
         out_hit->sector = seg->front_sector;
         out_hit->flags = seg->flags;
         out_hit->texture = texture;
         out_hit->distance_q8 = best_t_q8 > 0xffff ? 0xffff : (unsigned short)best_t_q8;
+        out_hit->texture_kind = texture_kind;
         out_hit->tex_u = (unsigned char)(best_u_q8 > 255 ? 255 : best_u_q8);
         out_hit->side = (unsigned char)best_side;
     }

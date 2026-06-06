@@ -98,7 +98,7 @@ def seg_flags(line: dc.LineDef, seg: dc.Seg, sidedefs: list[dc.SideDef], sectors
     return flags
 
 
-def seg_textures(line: dc.LineDef, seg: dc.Seg, sidedefs: list[dc.SideDef], tex_ids: dict[str, int]) -> tuple[int, int, int]:
+def seg_textures(line: dc.LineDef, seg: dc.Seg, sidedefs: list[dc.SideDef], tex_ids: dict[str, int]) -> tuple[int, int, int, int, int, int]:
     front_side_index, back_side_index = front_back_sides(line, seg)
     sides: list[dc.SideDef] = []
     for side_index_value in (front_side_index, back_side_index):
@@ -110,7 +110,17 @@ def seg_textures(line: dc.LineDef, seg: dc.Seg, sidedefs: list[dc.SideDef], tex_
     mid = next((clean_texture(side.mid_texture) for side in sides if clean_texture(side.mid_texture)), "")
     if not mid:
         mid = upper or lower or dc.solid_line_texture(line, sidedefs)
-    return texture_id(tex_ids, upper), texture_id(tex_ids, lower), texture_id(tex_ids, mid)
+    upper_kind = 8 if line.special in dc.DOOR_SPECIALS else dc.wall_texture_class(upper)
+    lower_kind = 8 if line.special in dc.DOOR_SPECIALS else dc.wall_texture_class(lower)
+    mid_kind = 8 if line.special in dc.DOOR_SPECIALS else dc.wall_texture_class(mid)
+    return (
+        texture_id(tex_ids, upper),
+        texture_id(tex_ids, lower),
+        texture_id(tex_ids, mid),
+        upper_kind,
+        lower_kind,
+        mid_kind,
+    )
 
 
 def subsector_sector(index: int, subsector: dc.Subsector, segs: list[dc.Seg], linedefs: list[dc.LineDef], sidedefs: list[dc.SideDef]) -> int:
@@ -231,7 +241,7 @@ def emit(
         front_sector = sector_for_side(sidedefs, front_side_index)
         back_sector = sector_for_side(sidedefs, back_side_index)
         flags = seg_flags(line, seg, sidedefs, sectors)
-        upper, lower, mid = seg_textures(line, seg, sidedefs, tex_ids)
+        upper, lower, mid, upper_kind, lower_kind, mid_kind = seg_textures(line, seg, sidedefs, tex_ids)
         seg_flag_counts["solid"] += 1 if flags & SEG_SOLID else 0
         seg_flag_counts["two_sided"] += 1 if flags & SEG_TWO_SIDED else 0
         seg_flag_counts["passable"] += 1 if flags & SEG_PASSABLE else 0
@@ -242,7 +252,8 @@ def emit(
         seg_rows.append(
             "{"
             f"{seg.v1},{seg.v2},{seg.linedef},{side_index(front_sector)},{side_index(back_sector)},"
-            f"0x{flags:04x},{upper},{lower},{mid},{seg.offset},{seg.angle}"
+            f"0x{flags:04x},{upper},{lower},{mid},{seg.offset},{seg.angle},"
+            f"{upper_kind},{lower_kind},{mid_kind}"
             "}"
         )
     line_seg_indices = [seg_index for line_segs in segs_by_line for seg_index in line_segs]
@@ -296,7 +307,7 @@ def emit(
         f.write("typedef struct NgRipLine { uint16_t v1; uint16_t v2; int16_t front_side; int16_t back_side; uint16_t flags; uint16_t special; uint16_t tag; } NgRipLine;\n")
         f.write("typedef struct NgRipSide { int16_t texture_x; int16_t texture_y; uint16_t top_texture; uint16_t bottom_texture; uint16_t mid_texture; uint16_t sector; } NgRipSide;\n")
         f.write("typedef struct NgRipSector { int16_t floor_height; int16_t ceiling_height; uint16_t floor_flat; uint16_t ceiling_flat; uint8_t light; uint8_t floor_visual; uint8_t damage; uint8_t special; uint16_t tag; } NgRipSector;\n")
-        f.write("typedef struct NgRipSeg { uint16_t v1; uint16_t v2; int16_t linedef; int16_t front_sector; int16_t back_sector; uint16_t flags; uint16_t upper_texture; uint16_t lower_texture; uint16_t mid_texture; int16_t offset; int16_t angle; } NgRipSeg;\n")
+        f.write("typedef struct NgRipSeg { uint16_t v1; uint16_t v2; int16_t linedef; int16_t front_sector; int16_t back_sector; uint16_t flags; uint16_t upper_texture; uint16_t lower_texture; uint16_t mid_texture; int16_t offset; int16_t angle; uint8_t upper_kind; uint8_t lower_kind; uint8_t mid_kind; } NgRipSeg;\n")
         f.write("typedef struct NgRipLineSegSpan { uint16_t firstseg; uint16_t numsegs; } NgRipLineSegSpan;\n")
         f.write("typedef struct NgRipSubsector { uint16_t numsegs; uint16_t firstseg; int16_t sector; } NgRipSubsector;\n")
         f.write("typedef struct NgRipNode { int16_t x; int16_t y; int16_t dx; int16_t dy; int16_t bbox[8]; uint16_t child[2]; } NgRipNode;\n")

@@ -3,6 +3,9 @@
 #include "raycast.h"
 #include "config.h"
 #include "map.h"
+#if DOOM_RIPDOOM_RENDER
+#include "ripdoom_runtime.h"
+#endif
 
 /* ---- 16.16 fixed point ---------------------------------------------- */
 typedef s32 fix;
@@ -95,6 +98,11 @@ static u8  wall_upload_scan = 0;
 static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
 static u8  render_motion_active = 0;
+#if DOOM_RIPDOOM_RENDER
+static short ripdoom_view_start_x = 0;
+static short ripdoom_view_start_y = 0;
+static u8 ripdoom_view_ready = 0;
+#endif
 
 static inline int projected_height_from_inv(fix inv_dist) {
     int h = (int)((((s32)WALLH * MAP_RENDER_SCALE) * inv_dist) >> FBITS);
@@ -121,6 +129,82 @@ static inline u8 depth_palette(u8 kind, int side, int h) {
         + (side ? DEPTH_BANDS : 0) + band);
 }
 
+#if DOOM_RIPDOOM_RENDER
+static void ripdoom_init_view_anchor(void) {
+    int i;
+    ripdoom_view_ready = 0;
+    for (i = 0; i < NG_RIP_THING_COUNT; i++) {
+        if (g_rip_things[i].type == 1) {
+            ripdoom_view_start_x = g_rip_things[i].x;
+            ripdoom_view_start_y = g_rip_things[i].y;
+            ripdoom_view_ready = 1;
+            return;
+        }
+    }
+}
+
+static void ripdoom_visual_pose(short *x, short *y) {
+    long dx = ((long)(posX - FIX(DOOM_START_X)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
+    long dy = ((long)(posY - FIX(DOOM_START_Y)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
+    *x = (short)(ripdoom_view_start_x - dy);
+    *y = (short)(ripdoom_view_start_y + dx);
+}
+
+static u8 ripdoom_kind_for_hit(const NgRipRayHit *hit) {
+    if (hit->flags & NG_RIP_SEG_DOOR) return (u8)(TILE_WALL_ALT_COUNT + 1);
+    if (hit->texture_kind >= 1 && hit->texture_kind <= TILE_WALL_ALT_COUNT) return hit->texture_kind;
+    return 0;
+}
+
+static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
+    NgRipRayHit hit;
+    short rip_x;
+    short rip_y;
+    short rip_dir_x;
+    short rip_dir_y;
+    fix perp;
+    int h;
+    int top;
+    int vsh;
+    int view_h;
+    if (!ripdoom_view_ready) return 0;
+
+    ripdoom_visual_pose(&rip_x, &rip_y);
+    rip_dir_x = (short)(-ray_y >> (FBITS - 8));
+    rip_dir_y = (short)(ray_x >> (FBITS - 8));
+    if (!ripdoom_cast_local_ray(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) return 0;
+
+    perp = (fix)((((long)hit.distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
+    if (perp < FMIN) perp = FMIN;
+    h = projected_height(perp);
+    if (h < 1) h = 1;
+    if (h > MAX_H) h = MAX_H;
+    kindbuf[column] = ripdoom_kind_for_hit(&hit);
+    texbuf[column] = (u8)(((int)hit.tex_u * TILE_WALL_ATLAS_COLS) >> 8);
+    texbuf[column] &= (TILE_WALL_ATLAS_COLS - 1);
+    closebuf[column] = 0;
+    distbuf[column] = perp;
+
+#if DOOM_SIMPLE_MAP
+    view_h = SCRH;
+#else
+    view_h = GAME_H;
+#endif
+    top = (view_h - h) / 2;
+    if (top < 0) top = 0;
+    if (top > view_h - 1) top = view_h - 1;
+    vsh = h - 1;
+    if (vsh < 0) vsh = 0;
+    if (vsh > 255) vsh = 255;
+
+    scb2buf[column] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
+    scb3buf[column] = scb3_word(top, 0, WALL_WIN);
+    wall_full_cover[column] = (u8)(top <= 0 && h >= view_h);
+    palbuf[column] = depth_palette(kindbuf[column], hit.side, h);
+    return 1;
+}
+#endif
+
 static void update_projection_cache(void) {
     fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
     if (det > -FMIN && det < FMIN) invDet = 0;
@@ -146,6 +230,9 @@ static void update_ray_cache(void) {
 
 void rc_init(void) {
     init_recip_lut();
+#if DOOM_RIPDOOM_RENDER
+    ripdoom_init_view_anchor();
+#endif
     for (int tx = 0; tx < TILE_WALL_ATLAS_COLS; tx++) {
         for (int row = 0; row < WALL_WIN; row++) {
             int ty = (row * TILE_WALL_ATLAS_ROWS) / WALL_WIN;
@@ -519,6 +606,9 @@ void rc_render(void) {
     for (int x = 0; x < NUM_COLS; x++) {
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
+#if DOOM_RIPDOOM_RENDER
+        if (rc_render_ripdoom_column(x, rayX, rayY)) continue;
+#endif
 
         int mapX = baseMapX;
         int mapY = baseMapY;
