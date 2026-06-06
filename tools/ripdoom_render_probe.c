@@ -20,6 +20,17 @@ unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 
 #endif
 
 static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first);
+static int sample_view_columns(
+    int start_x,
+    int start_y,
+    short view_x,
+    short view_y,
+    unsigned int *out_min,
+    unsigned int *out_max,
+    int *out_first,
+    unsigned short *out_dist,
+    unsigned short *out_seg
+);
 
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 enum {
@@ -28,6 +39,9 @@ enum {
     MOVE_SPEED_Q8 = 31,
     MOVEMENT_RENDER_TICKS = 70,
     MIN_RENDER_MOVE_PROGRESS_Q8 = 256,
+    MIN_RENDER_CHANGED_COLUMNS = 8,
+    MIN_RENDER_COLUMN_DELTA_Q8 = 32,
+    MIN_RENDER_TOTAL_DELTA_Q8 = 512,
     ROUTE_WAYPOINTS = 8,
     ROUTE_MIN_HITS = 40,
     MAX_ROUTE_CELLS = DOOM_CHUNK_COUNT * DOOM_CHUNK_CELLS
@@ -524,6 +538,20 @@ static int simulate_forward_movement(unsigned short *active_chunk, int *x_q8, in
 #endif
 
 static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first) {
+    return sample_view_columns(start_x, start_y, view_x, view_y, out_min, out_max, out_first, NULL, NULL);
+}
+
+static int sample_view_columns(
+    int start_x,
+    int start_y,
+    short view_x,
+    short view_y,
+    unsigned int *out_min,
+    unsigned int *out_max,
+    int *out_first,
+    unsigned short *out_dist,
+    unsigned short *out_seg
+) {
     enum { COLUMNS = 80, PLANE_Q8 = 169 };
     short plane_x = (short)((-(int)view_y * PLANE_Q8) >> 8);
     short plane_y = (short)(((int)view_x * PLANE_Q8) >> 8);
@@ -537,6 +565,8 @@ static int sample_view(int start_x, int start_y, short view_x, short view_y, uns
         short ray_x = (short)(view_x + (((int)plane_x * camera_q8) >> 8));
         short ray_y = (short)(view_y + (((int)plane_y * camera_q8) >> 8));
         NgRipRayHit hit;
+        if (out_dist) out_dist[column] = 0xffff;
+        if (out_seg) out_seg[column] = 0xffff;
         if (!ripdoom_cast_local_ray((short)start_x, (short)start_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) {
             continue;
         }
@@ -544,9 +574,45 @@ static int sample_view(int start_x, int start_y, short view_x, short view_y, uns
         hits++;
         if (hit.distance_q8 < *out_min) *out_min = hit.distance_q8;
         if (hit.distance_q8 > *out_max) *out_max = hit.distance_q8;
+        if (out_dist) out_dist[column] = hit.distance_q8 > 0xfffe ? 0xfffe : (unsigned short)hit.distance_q8;
+        if (out_seg) out_seg[column] = hit.seg;
     }
     return hits;
 }
+
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+static int count_changed_render_columns(
+    const unsigned short *before_dist,
+    const unsigned short *before_seg,
+    const unsigned short *after_dist,
+    const unsigned short *after_seg,
+    unsigned int *out_total_delta
+) {
+    enum { COLUMNS = 80 };
+    int changed = 0;
+    unsigned int total_delta = 0;
+
+    for (int column = 0; column < COLUMNS; column++) {
+        int before_hit = before_dist[column] != 0xffff;
+        int after_hit = after_dist[column] != 0xffff;
+        unsigned int delta = 0;
+        if (before_hit != after_hit) {
+            changed++;
+            total_delta += 1024;
+            continue;
+        }
+        if (!before_hit) continue;
+        delta = before_dist[column] > after_dist[column]
+            ? before_dist[column] - after_dist[column]
+            : after_dist[column] - before_dist[column];
+        total_delta += delta;
+        if (before_seg[column] != after_seg[column] || delta >= MIN_RENDER_COLUMN_DELTA_Q8) changed++;
+    }
+
+    *out_total_delta = total_delta;
+    return changed;
+}
+#endif
 
 int main(void) {
     enum { COLUMNS = 80 };
@@ -672,6 +738,16 @@ int main(void) {
             unsigned int moved_max = 0;
             int moved_first = -1;
             int moved_hits;
+            unsigned int start_columns_min = 0xffff;
+            unsigned int start_columns_max = 0;
+            int start_columns_first = -1;
+            int start_columns_hits;
+            unsigned short start_dist_columns[COLUMNS];
+            unsigned short start_seg_columns[COLUMNS];
+            unsigned short moved_dist_columns[COLUMNS];
+            unsigned short moved_seg_columns[COLUMNS];
+            int changed_columns = 0;
+            unsigned int total_column_delta = 0;
             int route_waypoints = 0;
             int route_steps = 0;
             int door_skip = 0;
@@ -711,7 +787,40 @@ int main(void) {
                 );
                 return 1;
             }
-            moved_hits = sample_view(moved_rip_x, moved_rip_y, view_x, view_y, &moved_min, &moved_max, &moved_first);
+            start_columns_hits = sample_view_columns(
+                start_x,
+                start_y,
+                view_x,
+                view_y,
+                &start_columns_min,
+                &start_columns_max,
+                &start_columns_first,
+                start_dist_columns,
+                start_seg_columns
+            );
+            if (start_columns_hits < COLUMNS / 2) {
+                fprintf(
+                    stderr,
+                    "RIPDOOM render probe failed: start column sample degraded hits=%d/%d first=%d dist=%u..%u\n",
+                    start_columns_hits,
+                    COLUMNS,
+                    start_columns_first,
+                    start_columns_min,
+                    start_columns_max
+                );
+                return 1;
+            }
+            moved_hits = sample_view_columns(
+                moved_rip_x,
+                moved_rip_y,
+                view_x,
+                view_y,
+                &moved_min,
+                &moved_max,
+                &moved_first,
+                moved_dist_columns,
+                moved_seg_columns
+            );
             if (moved_hits < COLUMNS / 2) {
                 fprintf(
                     stderr,
@@ -729,6 +838,28 @@ int main(void) {
                 );
                 return 1;
             }
+            changed_columns = count_changed_render_columns(
+                start_dist_columns,
+                start_seg_columns,
+                moved_dist_columns,
+                moved_seg_columns,
+                &total_column_delta
+            );
+            if (changed_columns < MIN_RENDER_CHANGED_COLUMNS || total_column_delta < MIN_RENDER_TOTAL_DELTA_Q8) {
+                fprintf(
+                    stderr,
+                    "RIPDOOM render probe failed: accepted movement barely changed render columns changed=%d/%d total_delta=%u progress_q8=%d start_dist=%u..%u moved_dist=%u..%u\n",
+                    changed_columns,
+                    COLUMNS,
+                    total_column_delta,
+                    progress_q8,
+                    start_columns_min,
+                    start_columns_max,
+                    moved_min,
+                    moved_max
+                );
+                return 1;
+            }
             if (!validate_route_waypoints(start_x, start_y, start_global_x_q8, start_global_y_q8, &route_waypoints, &route_steps)) {
                 fprintf(
                     stderr,
@@ -743,7 +874,7 @@ int main(void) {
             lift_skip = validate_opened_lift_ray_skip();
             if (!lift_skip) return 1;
             printf(
-                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d\n",
+                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_changed_cols=%d moved_total_delta=%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d\n",
                 start_angle,
                 mode,
                 hits,
@@ -759,6 +890,8 @@ int main(void) {
                 COLUMNS,
                 moved_min,
                 moved_max,
+                changed_columns,
+                total_column_delta,
                 progress_q8,
                 moved_ticks,
                 route_waypoints,

@@ -64,8 +64,9 @@ readable.
   In chunked builds it also simulates accepted forward movement through the
   `16x16` collision/streaming rules and verifies the moved RIPDOOM pose still
   renders after the same 70-tick movement span used by `chunk-movement-check`,
-  covering regressions where the weapon bobs but the world appears fixed in
-  place.
+  then compares per-column wall distance/seg samples so the harness catches
+  regressions where the weapon bobs but the rendered wall state appears fixed
+  in place.
 - RIPDOOM ray casting keeps the fast local blockmap search first, then falls
   back to sampling blockmap cells along a missed ray. This fills long corridor
   or chunk-edge columns without raising the local line/seg caps for every
