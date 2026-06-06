@@ -496,6 +496,10 @@ chunk-stream-check: $(DOOM_CHUNK_HEADER)
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) tools/chunk_stream_probe.c -o $(BUILDDIR)/chunk_stream_probe
 	$(BUILDDIR)/chunk_stream_probe
 
+chunk-movement-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) tools/chunk_movement_probe.c $(DOOM_CHUNK_SOURCE) -o $(BUILDDIR)/chunk_movement_probe
+	$(BUILDDIR)/chunk_movement_probe
+
 ripdoom-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(PYTHON) tools/check_ripdoom_assets.py --header $(DOOM_RIPDOOM_HEADER) --source $(DOOM_RIPDOOM_SOURCE)
 
@@ -507,7 +511,7 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

@@ -43,8 +43,10 @@ readable.
   chunk-route-check` verifies the generated chunk start-to-exit route, treating
   generated doors and lift cells as interactive pass-through cells, and also
   runs a key-aware route pass so locked door cells require a reachable matching
-  key first. `make chunk-visibility-check` verifies generated
-  monster/pickup/weapon coverage.
+  key first. `make chunk-movement-check` mirrors the runtime player-radius
+  collision and chunk-stream update enough to prove the generated start can
+  walk forward instead of spawning wedged against a wall. `make
+  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated
@@ -426,6 +428,10 @@ readable.
   header and the same inline streaming helper used by the 68000 runtime. It
   verifies that local player coordinates wrap by full `16x16` q8 pages when the
   active chunk changes, guarding against tiny-shift chunk drift.
+- `make chunk-movement-check` compiles a host probe against the generated chunk
+  header/source and runs the same start pose, player-radius solid checks, and
+  chunk-stream wrapping convention used by the runtime. It fails if the player
+  cannot occupy the generated start or cannot make useful forward progress.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. `make episode-route-check` runs the same pass in strict
