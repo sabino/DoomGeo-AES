@@ -198,9 +198,10 @@ def chunk_start_view(
 ) -> tuple[float, float, float, float]:
     angle_rad = math.radians(start_angle)
     base_x = math.cos(angle_rad)
+    base_y = -math.sin(angle_rad)
     candidates = (
-        (base_x, math.sin(angle_rad)),
-        (base_x, -math.sin(angle_rad)),
+        (base_x, base_y),
+        (base_x, -base_y),
         (1.0, 0.0),
         (-1.0, 0.0),
         (0.0, 1.0),

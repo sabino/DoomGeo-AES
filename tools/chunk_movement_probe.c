@@ -117,12 +117,22 @@ static int mul_q8(int a, int b) {
     return (a * b) / 256;
 }
 
+static int chunk_global_x_q8(unsigned short active_chunk, int x_q8) {
+    int chunk_x = active_chunk % DOOM_CHUNK_COLS;
+    return chunk_x * SIMPLE_MAP_W * 256 + x_q8;
+}
+
+static int chunk_global_y_q8(unsigned short active_chunk, int y_q8) {
+    int chunk_y = active_chunk / DOOM_CHUNK_COLS;
+    return chunk_y * SIMPLE_MAP_H * 256 + y_q8;
+}
+
 int main(void) {
     unsigned short active_chunk = DOOM_CHUNK_START_CHUNK;
     int x_q8 = DOOM_CHUNK_START_X_Q8;
     int y_q8 = DOOM_CHUNK_START_Y_Q8;
-    const int start_x_q8 = x_q8;
-    const int start_y_q8 = y_q8;
+    const int start_global_x_q8 = chunk_global_x_q8(active_chunk, x_q8);
+    const int start_global_y_q8 = chunk_global_y_q8(active_chunk, y_q8);
     const int dir_x_q8 = (int)(DOOM_CHUNK_START_DIR_X * 256.0);
     const int dir_y_q8 = (int)(DOOM_CHUNK_START_DIR_Y * 256.0);
     const int dx_q8 = mul_q8(dir_x_q8, MOVE_SPEED_Q8);
@@ -178,25 +188,29 @@ int main(void) {
     }
 
     {
-        int progress_x = x_q8 - start_x_q8;
-        int progress_y = y_q8 - start_y_q8;
+        int final_global_x_q8 = chunk_global_x_q8(active_chunk, x_q8);
+        int final_global_y_q8 = chunk_global_y_q8(active_chunk, y_q8);
+        int progress_x = final_global_x_q8 - start_global_x_q8;
+        int progress_y = final_global_y_q8 - start_global_y_q8;
         int forward_progress = mul_q8(progress_x, dir_x_q8) + mul_q8(progress_y, dir_y_q8);
         if (forward_progress < MIN_FORWARD_PROGRESS_Q8) {
             fprintf(
                 stderr,
-                "%s movement failed: forward progress %d q8 after %d ticks, moved_ticks=%d chunk=%u local=(%d,%d)\n",
+                "%s movement failed: forward progress %d q8 after %d ticks, moved_ticks=%d chunk=%u local=(%d,%d) global=(%d,%d)\n",
                 DOOM_CHUNK_MAP_NAME,
                 forward_progress,
                 FORWARD_TICKS,
                 moved_ticks,
                 active_chunk,
                 x_q8,
-                y_q8
+                y_q8,
+                final_global_x_q8,
+                final_global_y_q8
             );
             return 1;
         }
         printf(
-            "%s chunk movement OK: start_chunk=%u final_chunk=%u progress_q8=%d moved_ticks=%d transitions=%d dynamic_blockers=%d start=(%d,%d) final=(%d,%d)\n",
+            "%s chunk movement OK: start_chunk=%u final_chunk=%u progress_q8=%d moved_ticks=%d transitions=%d dynamic_blockers=%d start_global=(%d,%d) final_global=(%d,%d) final_local=(%d,%d)\n",
             DOOM_CHUNK_MAP_NAME,
             DOOM_CHUNK_START_CHUNK,
             active_chunk,
@@ -204,8 +218,10 @@ int main(void) {
             moved_ticks,
             transitions,
             dynamic_blocker_count,
-            start_x_q8,
-            start_y_q8,
+            start_global_x_q8,
+            start_global_y_q8,
+            final_global_x_q8,
+            final_global_y_q8,
             x_q8,
             y_q8
         );
