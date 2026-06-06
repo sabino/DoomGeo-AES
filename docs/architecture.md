@@ -86,8 +86,11 @@ and emits generated C headers/sources under `build/`:
   `SSECTORS`, `NODES`, `REJECT`, `BLOCKMAP`, and `THINGS`. Generated segs carry
   preclassified flags for one-sided/two-sided walls, solid/passable spans,
   doors, lower/upper wall deltas, and mid textures. This data is validated by
-  `make ripdoom-check` and is intentionally not wired into the renderer until
-  the table contract is stable.
+  `make ripdoom-check`. `ripdoom_runtime.c` adds the first runtime-facing query
+  helpers for BSP point-to-subsector/sector lookup and blockmap cell line
+  counts; `make ripdoom-runtime-check` compiles those helpers as a host probe,
+  and `DOOM_RIPDOOM_RUNTIME=1` includes them in a Neo Geo ROM. The wall renderer
+  still ignores these tables until the table contract is stable.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

@@ -43,11 +43,12 @@ readable.
   chunk-route-check` verifies the generated chunk start-to-exit route, treating
   generated doors and lift cells as interactive pass-through cells, and `make
   chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
-- `make ripdoom-map ripdoom-check` runs the RIPDOOM-lite geometry converter.
+- `make ripdoom-map ripdoom-check ripdoom-runtime-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
-  tables with SNES-style hard caps and semantic wall-span flags. It is currently
-  a validated data contract for the next renderer iteration, not active
-  gameplay rendering.
+  tables with SNES-style hard caps and semantic wall-span flags. It also
+  validates the C query layer for point-to-sector and blockmap lookup. It is
+  currently a validated data contract for the next renderer iteration, not
+  active gameplay rendering.
 - In simple-map play, pickups are given a foreground/readability bias and a
   larger minimum projected size so ammo, armor, health, and weapons remain
   visible among monsters and barrels.

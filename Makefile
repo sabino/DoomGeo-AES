@@ -73,6 +73,11 @@ DOOM_CHUNK_CELL_UNITS?=64
 DOOM_RIPDOOM_HEADER=$(BUILDDIR)/doom_ripdoom_generated.h
 DOOM_RIPDOOM_SOURCE=$(BUILDDIR)/doom_ripdoom_generated.c
 DOOM_RIPDOOM_REPORT=$(BUILDDIR)/doom_ripdoom_report.txt
+DOOM_RIPDOOM_RUNTIME?=0
+DOOM_RIPDOOM_OBJECT=
+DOOM_RIPDOOM_RUNTIME_OBJECT=
+DOOM_RIPDOOM_DEP=
+HOSTCC?=gcc
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
@@ -113,6 +118,12 @@ endif
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
+endif
+ifeq ($(DOOM_RIPDOOM_RUNTIME),1)
+override CFLAGS += -DDOOM_RIPDOOM_RUNTIME=1
+DOOM_RIPDOOM_OBJECT=$(BUILDDIR)/doom_ripdoom_generated.o
+DOOM_RIPDOOM_RUNTIME_OBJECT=$(BUILDDIR)/ripdoom_runtime.o
+DOOM_RIPDOOM_DEP=$(DOOM_RIPDOOM_HEADER)
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_OVERRUN=$(DOOM_WALL_UPLOAD_OVERRUN_COLUMNS)
@@ -159,15 +170,19 @@ CROMSIZE=4194304
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_CHUNK_OBJECT) $(DOOM_ASSETS_OBJECT)
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_CHUNK_OBJECT) $(DOOM_RIPDOOM_OBJECT) $(DOOM_RIPDOOM_RUNTIME_OBJECT) $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_RIPDOOM_DEP) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
 $(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER)
 $(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
 $(BUILDDIR)/doom_chunks_generated.o: $(DOOM_CHUNK_SOURCE) $(DOOM_CHUNK_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_CHUNK_SOURCE) -o $@
+$(BUILDDIR)/doom_ripdoom_generated.o: $(DOOM_RIPDOOM_SOURCE) $(DOOM_RIPDOOM_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_RIPDOOM_SOURCE) -o $@
+$(BUILDDIR)/ripdoom_runtime.o: ripdoom_runtime.c ripdoom_runtime.h $(DOOM_RIPDOOM_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c ripdoom_runtime.c -o $@
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 
@@ -456,7 +471,11 @@ chunk-visibility-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 ripdoom-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(PYTHON) tools/check_ripdoom_assets.py --header $(DOOM_RIPDOOM_HEADER) --source $(DOOM_RIPDOOM_SOURCE)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check
+ripdoom-runtime-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_runtime_probe.c -o $(BUILDDIR)/ripdoom_runtime_probe
+	$(BUILDDIR)/ripdoom_runtime_probe
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check ripdoom-runtime-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
