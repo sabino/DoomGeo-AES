@@ -3406,6 +3406,26 @@ static void configure_key_door_test(void) {
         thing_type_override[i] = 0;
     }
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    thing_monster_count = 0;
+    thing_shootable_count = 0;
+    thing_render_count = 0;
+    thing_pickup_count = 0;
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) {
+        if (g_chunk_doors[i].special != 28) continue;
+        if (!door_found || g_chunk_doors[i].x < door_x) {
+            g_simple_active_chunk = g_chunk_doors[i].chunk;
+            door_x = (u8)(g_chunk_doors[i].x - (g_simple_active_chunk % DOOM_CHUNK_COLS) * SIMPLE_MAP_W);
+        }
+        door_y_sum = (u16)(door_y_sum + (u8)(g_chunk_doors[i].y - (g_simple_active_chunk / DOOM_CHUNK_COLS) * SIMPLE_MAP_H));
+        door_count++;
+        door_found = 1;
+    }
+    if (door_count) door_y = (u8)((door_y_sum + door_count / 2) / door_count);
+    for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) g_chunk_door_open[i] = 0;
+    for (u16 i = 0; i < DOOM_CHUNK_LIFT_COUNT; i++) g_chunk_lift_open[i] = 0;
+#else
 #if NG_RUNTIME_DOOR_COUNT > 0
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         if (g_runtime_doors[i].special != 28) continue;
@@ -3416,6 +3436,7 @@ static void configure_key_door_test(void) {
     }
     if (door_count) door_y = (u8)((door_y_sum + door_count / 2) / door_count);
 #endif
+#endif
 
     /* Stage far enough back that the focused smoke reads as a doorway, not a
      * wall close-up. The E1M2 red door has a shallow wall behind it in the
@@ -3423,7 +3444,8 @@ static void configure_key_door_test(void) {
     for (u8 offset = 6; offset >= 3; offset--) {
         u8 candidate_x = (u8)(door_x + offset);
         u8 candidate_key_x = (u8)(candidate_x - 1);
-        if (!map_at(candidate_x, door_y) && !map_at(candidate_key_x, door_y)) {
+        if (candidate_x < ACTIVE_MAP_W && candidate_key_x < ACTIVE_MAP_W
+            && !map_at(candidate_x, door_y) && !map_at(candidate_key_x, door_y)) {
             player_x = candidate_x;
             key_x = candidate_key_x;
             break;
@@ -6048,7 +6070,7 @@ static u8 candidate_is_threat(const ThingCandidate *candidate) {
 }
 
 static void reserve_visible_pickups(ThingCandidate *candidates, int count, int selected) {
-    enum { PICKUP_RESERVE_MAX = 3, PICKUP_RESERVE_DIST_Q8 = WORLD_Q8(4096) };
+    enum { PICKUP_RESERVE_MAX = ENEMY_VISIBLE_COUNT, PICKUP_RESERVE_DIST_Q8 = WORLD_Q8(8192) };
     u8 selected_pickups = 0;
 
     if (selected <= 0) return;
@@ -6070,7 +6092,7 @@ static void reserve_visible_pickups(ThingCandidate *candidates, int count, int s
                 break;
             }
         }
-        if (replace < 0 && selected > 4) {
+        if (replace < 0) {
             for (int inside = selected - 1; inside >= 0; inside--) {
                 if (candidate_is_collectible_pickup(&candidates[inside])) continue;
                 if (candidates[outside].dist_q8 <= candidates[inside].dist_q8 || selected_pickups == 0) {
@@ -6196,7 +6218,11 @@ static int thing_candidate_score(u8 bucket, u16 thing_type, int sx, int h, int d
     int score = dist_q8 + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
     if (bucket == 1) score += runtime_threat_priority_bias(thing_type);
 #if DOOM_SIMPLE_MAP
-    if (bucket == 3 || bucket == 5) score -= (2 << 15);
+    if (bucket == 3 || bucket == 5) {
+        int pickup_score = (dist_q8 >> 2) + (iabs16(sx - SCRW / 2) >> 1) - (h >> 2);
+        if (!pickup_is_collectible(thing_type)) pickup_score += (1 << 13);
+        return pickup_score - (1 << 20);
+    }
 #endif
     return score + ((int)bucket << 15);
 }
