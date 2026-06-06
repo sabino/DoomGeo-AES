@@ -5,6 +5,10 @@
 #include "doom_chunks_generated.h"
 #endif
 
+#define FBITS 8
+#define FONE 256
+#define FIX(v) ((int)((v) * FONE))
+
 static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first) {
     enum { COLUMNS = 80, PLANE_Q8 = 169 };
     short plane_x = (short)((-(int)view_y * PLANE_Q8) >> 8);
@@ -34,6 +38,9 @@ int main(void) {
     enum { COLUMNS = 80 };
     int start_x = 0;
     int start_y = 0;
+    int forward_x = 0;
+    int forward_y = 0;
+    int have_forward = 0;
     int start_angle = 0;
     short view_x = 256;
     short view_y = 0;
@@ -53,6 +60,11 @@ int main(void) {
         start_x = (int)(DOOM_CHUNK_ORIGIN_X + ((global_x_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
         start_y = (int)(DOOM_CHUNK_ORIGIN_Y - ((global_y_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
         start_angle = DOOM_CHUNK_START_ANGLE;
+        view_x = (short)FIX(DOOM_CHUNK_START_DIR_X);
+        view_y = (short)FIX(-DOOM_CHUNK_START_DIR_Y);
+        forward_x = start_x + (int)(DOOM_CHUNK_START_DIR_X * DOOM_CHUNK_CELL_DOOM_UNITS * 4.0);
+        forward_y = start_y + (int)(-DOOM_CHUNK_START_DIR_Y * DOOM_CHUNK_CELL_DOOM_UNITS * 4.0);
+        have_forward = 1;
         player_seen = 1;
         mode = "chunk";
     }
@@ -66,18 +78,17 @@ int main(void) {
             break;
         }
     }
-#endif
-    if (!player_seen) {
-        fprintf(stderr, "RIPDOOM render probe failed: no player start thing\n");
-        return 1;
-    }
-
     switch (start_angle) {
     case 0: view_x = 256; view_y = 0; break;
     case 90: view_x = 0; view_y = 256; break;
     case 180: view_x = -256; view_y = 0; break;
     case 270: view_x = 0; view_y = -256; break;
     default: view_x = 256; view_y = 0; break;
+    }
+#endif
+    if (!player_seen) {
+        fprintf(stderr, "RIPDOOM render probe failed: no player start thing\n");
+        return 1;
     }
 
     hits = sample_view(start_x, start_y, view_x, view_y, &min_dist, &max_dist, &first_hit_column);
@@ -98,6 +109,7 @@ int main(void) {
                 best_min = candidate_min;
                 best_max = candidate_max;
                 mode = "cardinal";
+                have_forward = 0;
             }
         }
         hits = best_hits;
@@ -109,6 +121,45 @@ int main(void) {
     if (hits < COLUMNS / 2) {
         fprintf(stderr, "RIPDOOM render probe failed: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u\n", start_angle, mode, hits, COLUMNS, first_hit_column, min_dist, max_dist);
         return 1;
+    }
+
+    if (have_forward) {
+        unsigned int forward_min = 0xffff;
+        unsigned int forward_max = 0;
+        int forward_first = -1;
+        int forward_hits = sample_view(forward_x, forward_y, view_x, view_y, &forward_min, &forward_max, &forward_first);
+        if (forward_hits < COLUMNS / 2) {
+            fprintf(
+                stderr,
+                "RIPDOOM render probe failed: forward mode=%s hits=%d/%d first=%d dist=%u..%u start=(%d,%d) forward=(%d,%d)\n",
+                mode,
+                forward_hits,
+                COLUMNS,
+                forward_first,
+                forward_min,
+                forward_max,
+                start_x,
+                start_y,
+                forward_x,
+                forward_y
+            );
+            return 1;
+        }
+        printf(
+            "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u\n",
+            start_angle,
+            mode,
+            hits,
+            COLUMNS,
+            first_hit_column,
+            min_dist,
+            max_dist,
+            forward_hits,
+            COLUMNS,
+            forward_min,
+            forward_max
+        );
+        return 0;
     }
 
     printf("RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u\n", start_angle, mode, hits, COLUMNS, first_hit_column, min_dist, max_dist);

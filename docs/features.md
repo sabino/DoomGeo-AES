@@ -56,6 +56,11 @@ readable.
   linedefs. This keeps the E1M1 playable start from being pushed into a coarse
   cell that looks open in the `16x16` grid while the RIPDOOM wall renderer is
   actually too close to the front wall.
+- The RIPDOOM wall renderer now maps chunk/grid movement directly back to WAD
+  coordinates with the expected Y inversion. `ripdoom-render-check` compiles
+  with the same chunk/RIPDOOM flags as the ROM and samples both the generated
+  chunk start and a short forward pose for E1M1, so movement cannot silently
+  rotate the real-Doom geometry out from under the simple grid collision.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
   player input. `make chunk-movement-test-rom` uses the same scale but replaces

@@ -197,8 +197,8 @@ static void ripdoom_visual_pose(short *x, short *y) {
     long dx = ((long)(posX - FIX(DOOM_START_X)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
     long dy = ((long)(posY - FIX(DOOM_START_Y)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
 #endif
-    *x = (short)(ripdoom_view_start_x - dy);
-    *y = (short)(ripdoom_view_start_y + dx);
+    *x = (short)(ripdoom_view_start_x + dx);
+    *y = (short)(ripdoom_view_start_y - dy);
 }
 
 static u8 ripdoom_kind_for_hit(const NgRipRayHit *hit) {
@@ -221,8 +221,8 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     if (!ripdoom_view_ready) return 0;
 
     ripdoom_visual_pose(&rip_x, &rip_y);
-    rip_dir_x = (short)(-ray_y >> (FBITS - 8));
-    rip_dir_y = (short)(ray_x >> (FBITS - 8));
+    rip_dir_x = (short)(ray_x >> (FBITS - 8));
+    rip_dir_y = (short)((-ray_y) >> (FBITS - 8));
     if (!ripdoom_cast_local_ray(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) return 0;
 
     perp = (fix)((((long)hit.distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
