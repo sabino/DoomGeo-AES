@@ -39,8 +39,14 @@ DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
 DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
+DOOM_SIMPLE_MAP?=0
+ifeq ($(DOOM_SIMPLE_MAP),1)
+DOOM_MAP_WIDTH?=16
+DOOM_MAP_HEIGHT?=16
+else
 DOOM_MAP_WIDTH?=48
 DOOM_MAP_HEIGHT?=36
+endif
 DOOM_MAP_DETAIL_CULL?=0.5
 DOOM_RENDER_DETAIL_CULL?=1.5
 DOOM_MAP_READABILITY_CLEANUP?=1
@@ -48,6 +54,7 @@ DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=quality
 DOOM_FRAME_STATS?=0
+DOOM_SKIP_INTRO?=0
 DOOM_WALL_UPLOAD_COLUMNS?=
 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
@@ -59,6 +66,7 @@ DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
 DOOM_MAP_CLEANUP_ARGS=$(if $(filter 1 yes true,$(DOOM_MAP_READABILITY_CLEANUP)),--readability-cleanup,)
+GFX_SIMPLE_MAP_ARG=$(if $(filter 1 yes true,$(DOOM_SIMPLE_MAP)),--simple-map,)
 GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
@@ -78,6 +86,12 @@ endif
 override CFLAGS += $(DOOM_DETAIL_DEFINE)
 ifeq ($(DOOM_FRAME_STATS),1)
 override CFLAGS += -DDOOM_FRAME_STATS=1
+endif
+ifeq ($(DOOM_SKIP_INTRO),1)
+override CFLAGS += -DDOOM_SKIP_INTRO=1
+endif
+ifeq ($(DOOM_SIMPLE_MAP),1)
+override CFLAGS += -DDOOM_SIMPLE_MAP=1
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
@@ -126,8 +140,8 @@ ELF=$(BUILDDIR)/rom.elf
 $(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
-$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
 $(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
@@ -220,7 +234,6 @@ hud-test-gngeo: $(HUD_TEST_CART)
 
 key-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
-	cp $(ROM)/neogeo.zip build/key-test-rom/neogeo.zip
 
 key-test-gngeo:
 	$(MAKE) key-test-rom
@@ -228,7 +241,6 @@ key-test-gngeo:
 
 key-door-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-door-test ROM=build/key-door-test-rom GFX_ROM_DIR=build/key-door-test-assets CFLAGS="-Ibuild/key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
-	cp $(ROM)/neogeo.zip build/key-door-test-rom/neogeo.zip
 
 key-door-test-gngeo:
 	$(MAKE) key-door-test-rom
@@ -236,7 +248,6 @@ key-door-test-gngeo:
 
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
-	cp $(ROM)/neogeo.zip build/combat-test-rom/neogeo.zip
 
 combat-test-gngeo:
 	$(MAKE) combat-test-rom
@@ -244,7 +255,6 @@ combat-test-gngeo:
 
 encounter-test-rom:
 	$(MAKE) cart BUILDDIR=build/encounter-test ROM=build/encounter-test-rom GFX_ROM_DIR=build/encounter-test-assets CFLAGS="-Ibuild/encounter-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_ENCOUNTER_TEST"
-	cp $(ROM)/neogeo.zip build/encounter-test-rom/neogeo.zip
 
 encounter-test-gngeo:
 	$(MAKE) encounter-test-rom
@@ -252,7 +262,6 @@ encounter-test-gngeo:
 
 scout-test-rom:
 	$(MAKE) cart BUILDDIR=build/scout-test ROM=build/scout-test-rom GFX_ROM_DIR=build/scout-test-assets CFLAGS="-Ibuild/scout-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_SCOUT_TEST"
-	cp $(ROM)/neogeo.zip build/scout-test-rom/neogeo.zip
 
 scout-test-gngeo:
 	$(MAKE) scout-test-rom
@@ -260,7 +269,6 @@ scout-test-gngeo:
 
 exit-test-rom:
 	$(MAKE) cart BUILDDIR=build/exit-test ROM=build/exit-test-rom GFX_ROM_DIR=build/exit-test-assets CFLAGS="-Ibuild/exit-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_EXIT_TEST"
-	cp $(ROM)/neogeo.zip build/exit-test-rom/neogeo.zip
 
 exit-test-gngeo:
 	$(MAKE) exit-test-rom
@@ -268,7 +276,6 @@ exit-test-gngeo:
 
 e1m8-boss-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M8 DOOM_DETAIL=quality BUILDDIR=build/e1m8-boss-test ROM=build/e1m8-boss-test-rom GFX_ROM_DIR=build/e1m8-boss-test-assets CFLAGS="-Ibuild/e1m8-boss-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M8_BOSS_TEST"
-	cp $(ROM)/neogeo.zip build/e1m8-boss-test-rom/neogeo.zip
 
 e1m8-boss-test-gngeo:
 	$(MAKE) e1m8-boss-test-rom
@@ -276,7 +283,6 @@ e1m8-boss-test-gngeo:
 
 episode-map-rom:
 	$(MAKE) cart DOOM_MAP=$(EPISODE_MAP) BUILDDIR=build/episode-roms/$(EPISODE_MAP) ROM=build/episode-roms/$(EPISODE_MAP)-rom GFX_ROM_DIR=build/episode-roms/$(EPISODE_MAP)-assets
-	cp $(ROM)/neogeo.zip build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip
 
 episode-map-gngeo:
 	$(MAKE) episode-map-rom
@@ -290,7 +296,6 @@ episode-roms:
 
 hidden-attack-test-rom:
 	$(MAKE) cart BUILDDIR=build/hidden-attack-test ROM=build/hidden-attack-test-rom GFX_ROM_DIR=build/hidden-attack-test-assets CFLAGS="-Ibuild/hidden-attack-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_HIDDEN_ATTACK_TEST"
-	cp $(ROM)/neogeo.zip build/hidden-attack-test-rom/neogeo.zip
 
 hidden-attack-test-gngeo:
 	$(MAKE) hidden-attack-test-rom
@@ -298,7 +303,6 @@ hidden-attack-test-gngeo:
 
 melee-test-rom:
 	$(MAKE) cart BUILDDIR=build/melee-test ROM=build/melee-test-rom GFX_ROM_DIR=build/melee-test-assets CFLAGS="-Ibuild/melee-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MELEE_TEST"
-	cp $(ROM)/neogeo.zip build/melee-test-rom/neogeo.zip
 
 melee-test-gngeo:
 	$(MAKE) melee-test-rom
@@ -306,7 +310,6 @@ melee-test-gngeo:
 
 monster-gallery-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
-	cp $(ROM)/neogeo.zip build/monster-gallery-rom/neogeo.zip
 
 monster-gallery-gngeo:
 	$(MAKE) monster-gallery-rom
@@ -314,7 +317,6 @@ monster-gallery-gngeo:
 
 arsenal-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
-	cp $(ROM)/neogeo.zip build/arsenal-test-rom/neogeo.zip
 
 arsenal-test-gngeo:
 	$(MAKE) arsenal-test-rom
@@ -322,7 +324,6 @@ arsenal-test-gngeo:
 
 death-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
-	cp $(ROM)/neogeo.zip build/death-test-rom/neogeo.zip
 
 death-test-gngeo:
 	$(MAKE) death-test-rom
@@ -330,7 +331,6 @@ death-test-gngeo:
 
 powerup-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
-	cp $(ROM)/neogeo.zip build/powerup-test-rom/neogeo.zip
 
 powerup-test-gngeo:
 	$(MAKE) powerup-test-rom
@@ -448,7 +448,7 @@ $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) $(GFX_SIMPLE_MAP_ARG) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
 
 $(GFX_ROM_DIR):

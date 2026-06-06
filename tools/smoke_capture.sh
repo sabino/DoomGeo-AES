@@ -146,9 +146,6 @@ fi
 if [ -z "$MAKE_ROM_DIR" ] && [ -n "$MAKE_BUILD_DIR" ]; then
     MAKE_ROM_DIR="$MAKE_BUILD_DIR/rom"
 fi
-if [ -n "$MAKE_ROM_DIR" ] && [ ! -f "$MAKE_ROM_DIR/neogeo.zip" ] && [ -f build/rom/neogeo.zip ]; then
-    cp build/rom/neogeo.zip "$MAKE_ROM_DIR/neogeo.zip"
-fi
 kill_old_gngeo
 
 if [ "$USE_XVFB" = "1" ]; then

@@ -67,6 +67,15 @@ and emits generated C headers/sources under `build/`:
   collision cell. `DOOM_MAP_DETAIL_CULL`,
   `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
   overridden for exact-conversion or higher-resolution experiments.
+- Simple/chunk-shaped renderer baseline. `DOOM_SIMPLE_MAP=1` keeps the
+  NGRayEx-style `16x16` authored active map and asks the WAD converter for only
+  a `16x16` support grid. In that mode the renderer ignores generated
+  render-line refinement and uses pure grid DDA columns, while Doom sprites,
+  weapons, HUD, and baked floor/ceiling assets still come from the normal
+  offline asset path. This is the intended shape for the next converter pass:
+  split a WAD map into connected `16x16` Neo Geo chunks, then load/swap compact
+  generated chunk data around the player instead of scaling the whole WAD map
+  into one large runtime grid.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

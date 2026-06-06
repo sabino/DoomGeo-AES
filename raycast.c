@@ -85,6 +85,7 @@ static u8  curkind[NUM_COLS];
 static u8  closebuf[NUM_COLS];   /* reserved for emergency coarse-wall mips */
 static u8  curclose[NUM_COLS];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
+static u8  wall_full_cover[NUM_COLS]; /* wall column fully hides backdrop    */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 wall_alt_tiles[TILE_WALL_ALT_COUNT][TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
@@ -172,6 +173,7 @@ void rc_init(void) {
         curclose[c] = 0xFF;
         curscb2[c] = 0xFFFF;
         curscb3[c] = 0xFFFF;
+        wall_full_cover[c] = 0;
     }
     rc_invalidate_view();
 }
@@ -321,6 +323,48 @@ int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height,
     *screen_x = sx;
     *height = h;
     *dist_q8 = (int)(transformY >> (FBITS - 8));
+    return 1;
+}
+
+u8 rc_sprite_strip_visible(int left, int right, int dist_q8) {
+    fix sprite_dist;
+    int first_col;
+    int last_col;
+
+    if (right < 0 || left >= SCRW) return 0;
+    if (left < 0) left = 0;
+    if (right >= SCRW) right = SCRW - 1;
+    if (right < left) return 0;
+
+    first_col = left / COLW;
+    last_col = right / COLW;
+    if (first_col < 0) first_col = 0;
+    if (last_col >= NUM_COLS) last_col = NUM_COLS - 1;
+
+    sprite_dist = ((fix)dist_q8) << (FBITS - 8);
+    for (int c = first_col; c <= last_col; c++) {
+        if (sprite_dist <= distbuf[c] + (FONE >> 3)) return 1;
+    }
+    return 0;
+}
+
+u8 rc_background_column_hidden(u8 col) {
+    int left;
+    int right;
+    int first_col;
+    int last_col;
+
+    if (col >= BG_COUNT) return 0;
+    left = (int)col * 16;
+    right = left + 15;
+    first_col = left / COLW;
+    last_col = right / COLW;
+    if (first_col < 0) first_col = 0;
+    if (last_col >= NUM_COLS) last_col = NUM_COLS - 1;
+
+    for (int c = first_col; c <= last_col; c++) {
+        if (!wall_full_cover[c]) return 0;
+    }
     return 1;
 }
 
@@ -478,6 +522,7 @@ void rc_render(void) {
                 int line_side = side;
                 u8 line_span = 0;
                 u8 line_height = 0;
+#if !DOOM_SIMPLE_MAP
                 if (allow_span_refinement && g_render_cell_count[mapY][mapX] &&
                     rc_refine_render_line_hit(
                         rayX, rayY, mapX, mapY,
@@ -496,6 +541,7 @@ void rc_render(void) {
                         visual_line = 1;
                     }
                 }
+#endif
                 continue;
             }
         }
@@ -511,7 +557,7 @@ void rc_render(void) {
         tex_x = (tex_x + map_cell_texture_phase(mapX, mapY)) & (TILE_WALL_ATLAS_COLS - 1);
         texbuf[x] = (u8)tex_x;
         u8 solid_height = 0;
-#if DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT
+#if !DOOM_SIMPLE_MAP && (DOOM_SOLID_LINE_REFINEMENT || DOOM_NEAR_LINE_REFINEMENT)
         if (g_render_cell_count[mapY][mapX]) {
             u8 solid_span = 0;
             u8 solid_span_height = 0;
@@ -570,22 +616,28 @@ void rc_render(void) {
          * walls into unreadable flat slabs and hid the converted texture cues. */
         closebuf[x] = 0;
 
-        int top = (GAME_H - h) / 2;         /* >=0 because h<=GAME_H         */
+#if DOOM_SIMPLE_MAP
+        int view_h = SCRH;
+#else
+        int view_h = GAME_H;
+#endif
+        int top = (view_h - h) / 2;         /* >=0 because h<=view_h         */
         if (span == 1) {
-            int bottom = (GAME_H + full_h) / 2;
-            if (bottom > GAME_H) bottom = GAME_H;
+            int bottom = (view_h + full_h) / 2;
+            if (bottom > view_h) bottom = view_h;
             top = bottom - h;
         } else if (span == 2) {
-            top = (GAME_H - full_h) / 2;
+            top = (view_h - full_h) / 2;
         }
         if (top < 0) top = 0;
-        if (top > GAME_H - 1) top = GAME_H - 1;
+        if (top > view_h - 1) top = view_h - 1;
         int vsh = h - 1;                    /* on-screen px = vshrink+1      */
         if (vsh < 0)   vsh = 0;
         if (vsh > 255) vsh = 255;
 
         scb2buf[x] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
         scb3buf[x] = scb3_word(top, 0, WALL_WIN);
+        wall_full_cover[x] = (u8)(top <= 0 && h >= view_h);
 
         /* distance shading */
         palbuf[x] = depth_palette(kindbuf[x], side, h);

@@ -61,6 +61,8 @@ PLANE_PERSPECTIVE_TILES = (
     * PLANE_PERSPECTIVE_COLS
 )
 PLANE_TEXEL_Q8_DIV = 1
+PLANE_HORIZON = 96
+PLANE_GAME_H = 192
 CEILING_FLAT_BASE = DOOR_ATLAS_BASE + WALL_ATLAS_TILES
 FLOOR_FLAT_BASE = CEILING_FLAT_BASE + FLAT_TILES
 HUD_BASE = FLOOR_FLAT_BASE + FLAT_TILES
@@ -129,7 +131,8 @@ WEAPON_CENTERED_FRAMES = {"SHTGB0", "SHTGC0", "SHTGD0"}
 
 def recompute_layout() -> None:
     global WALL_ATLAS_TILES, WALL_ALT_ATLAS_BASE, DOOR_ATLAS_BASE
-    global PLANE_PERSPECTIVE_TILES, CEILING_FLAT_BASE, FLOOR_FLAT_BASE
+    global BG_HALF_TILES, PLANE_PERSPECTIVE_ROWS, PLANE_PERSPECTIVE_TILES
+    global CEILING_FLAT_BASE, FLOOR_FLAT_BASE
     global HUD_BASE, HUD_FACE_BASE, WEAPON_BASE, HUD_KEYCARD_BASE
     global HUD_DIGIT_BASE, HUD_SMALL_DIGIT_BASE, CEILING_PERSPECTIVE_BASE
     global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, SPRITE_CACHE_BASE
@@ -137,6 +140,8 @@ def recompute_layout() -> None:
     WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
     WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
     DOOR_ATLAS_BASE = WALL_ALT_ATLAS_BASE + len(WALL_ALT_TEXTURES) * WALL_ATLAS_TILES
+    BG_HALF_TILES = BG_COLS * BG_HALF_ROWS
+    PLANE_PERSPECTIVE_ROWS = BG_HALF_ROWS
     PLANE_PERSPECTIVE_TILES = (
         PLANE_PERSPECTIVE_DIRS
         * PLANE_PERSPECTIVE_PHASES
@@ -169,6 +174,20 @@ def apply_detail_layout(detail: str) -> None:
         PLANE_PERSPECTIVE_DIRS = 4
     else:
         PLANE_PERSPECTIVE_DIRS = 16
+    recompute_layout()
+
+
+def apply_simple_map_layout(simple_map: bool) -> None:
+    global BG_HALF_ROWS, PLANE_HORIZON, PLANE_GAME_H
+
+    if simple_map:
+        BG_HALF_ROWS = 7
+        PLANE_HORIZON = 112
+        PLANE_GAME_H = 224
+    else:
+        BG_HALF_ROWS = 6
+        PLANE_HORIZON = 96
+        PLANE_GAME_H = 192
     recompute_layout()
 
 
@@ -636,8 +655,8 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
     playpal = playpal_rgb(wad)
     tiles = []
     fov_plane = 0.66
-    horizon = 96
-    game_h = 192
+    horizon = PLANE_HORIZON
+    game_h = PLANE_GAME_H
     base_rgb = tuple(sum(rgb[i] for rgb in palette) // len(palette) for i in range(3))
     floor_blend = (42, 39, 34)
     ceiling_blend = (32, 35, 58)
@@ -1308,6 +1327,7 @@ def main():
     ap.add_argument("--wall-alt-textures", default=",".join(WALL_ALT_TEXTURES), help="Comma-separated extra Doom wall atlases for per-cell map texture classes")
     ap.add_argument("--door-texture", default=DOOR_TEXTURE, help="Doom door texture to precompose into the second wall atlas")
     ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="quality", help="Tile layout tier; quality/clarity double wall atlas sampling, clarity also trims the plane direction cache")
+    ap.add_argument("--simple-map", action="store_true", help="Bake full-screen NGRayEx-style floor/ceiling plane tiles")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
@@ -1361,6 +1381,7 @@ def main():
     ap.add_argument("--sprite-scales", default="1.00,0.75,0.50,0.33,0.25", help="Comma-separated sprite scale levels")
     args = ap.parse_args()
     apply_detail_layout(args.detail)
+    apply_simple_map_layout(args.simple_map)
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")

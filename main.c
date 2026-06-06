@@ -7,8 +7,8 @@
 #include "raycast.h"
 #include "map.h"
 
-#if MAP_W > 255 || MAP_H > 255
-#error "monster path queue packs x/y into one word; MAP_W and MAP_H must stay <= 255"
+#if ACTIVE_MAP_W > 255 || ACTIVE_MAP_H > 255
+#error "monster path queue packs x/y into one word; ACTIVE_MAP_W and ACTIVE_MAP_H must stay <= 255"
 #endif
 
 #if defined(DOOM_COMBAT_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) \
@@ -897,6 +897,8 @@ static u8  level_next_episode = DOOM_NEXT_MAP_EPISODE;
 static u8  level_next_mission = DOOM_NEXT_MAP_MISSION;
 static u32 bg_scroll_key = 0xFFFFFFFFUL;
 static u32 bg_pending_key = 0xFFFFFFFFUL;
+static u32 bg_col_key[BG_COUNT];
+static u8  bg_col_hidden[BG_COUNT];
 static u8  bg_update_col = 0;
 static int bg_direction_dir_x = 0x7FFFFFFF;
 static int bg_direction_dir_y = 0x7FFFFFFF;
@@ -973,8 +975,8 @@ static u16 dynamic_drop_type[8];
 static short dynamic_drop_x_q8[8];
 static short dynamic_drop_y_q8[8];
 static u8 secret_found_bits[MAP_SECRET_BYTES ? MAP_SECRET_BYTES : 1];
-static u8 monster_path_dist[MAP_H][MAP_W];
-static u16 monster_path_queue[MAP_W * MAP_H];
+static u8 monster_path_dist[ACTIVE_MAP_H][ACTIVE_MAP_W];
+static u16 monster_path_queue[ACTIVE_MAP_W * ACTIVE_MAP_H];
 static u8 monster_path_valid = 0;
 static u8 monster_path_timer = 0;
 static short monster_path_player_cell_x = -1;
@@ -1086,6 +1088,7 @@ static void update_weapon_flash(void) {
 }
 
 static EnemyDraw enemies[ENEMY_VISIBLE_COUNT];
+static u8 player_line_of_sight_to(short x_q8, short y_q8);
 
 static int enemy_visible_width_for_geometry(int screen_x, int screen_w) {
     int left, right;
@@ -1110,7 +1113,9 @@ static void update_enemy_slot_flags(u16 slot) {
         if (visible_w >= 12 && enemies[slot].screen_x + enemies[slot].screen_w >= 16
             && enemies[slot].screen_x <= SCRW - 16 && center_x >= 24 && center_x <= SCRW - 24) {
             readable = 1;
-            if (!enemies[slot].fallback_projection) {
+            if (!enemies[slot].fallback_projection
+                || (enemies[slot].thing_index >= 0
+                    && player_line_of_sight_to(thing_x_q8[enemies[slot].thing_index], thing_y_q8[enemies[slot].thing_index]))) {
                 attackable = 1;
                 if (visible_w >= 24 && enemies[slot].screen_h >= 48 && center_x >= 48 && center_x <= SCRW - 48) {
                     ranged_attackable = 1;
@@ -1483,8 +1488,8 @@ static void compute_level_totals(void) {
             if (level_total_items < 999) level_total_items++;
         }
     }
-    for (u16 y = 0; y < MAP_H; y++) {
-        for (u16 x = 0; x < MAP_W; x++) {
+    for (u16 y = 0; y < ACTIVE_MAP_H; y++) {
+        for (u16 x = 0; x < ACTIVE_MAP_W; x++) {
             if (map_cell_secret(x, y) && level_total_secrets < 999) level_total_secrets++;
         }
     }
@@ -1811,6 +1816,10 @@ static void invalidate_background_cache(void) {
     bg_direction_dir_x = 0x7FFFFFFF;
     bg_direction_dir_y = 0x7FFFFFFF;
     bg_direction_bucket = 0;
+    for (u16 i = 0; i < BG_COUNT; i++) {
+        bg_col_key[i] = 0xFFFFFFFFUL;
+        bg_col_hidden[i] = 0xFF;
+    }
 }
 
 static void spawn_dynamic_drop(u16 thing_type, short x_q8, short y_q8) {
@@ -2103,6 +2112,25 @@ static int best_visible_enemy(void) {
         }
     }
     if (best_thing >= 0) return best_thing;
+    for (u16 si = 0; si < thing_shootable_count; si++) {
+        int thing = thing_shootable_indices[si];
+        int sx;
+        int h;
+        int dist_q8;
+        int lateral;
+        int score;
+        if (enemy_dead[thing]) continue;
+        if (!runtime_thing_is_shootable(thing)) continue;
+        if (!project_point_q8(thing_x_q8[thing], thing_y_q8[thing], &sx, &h, &dist_q8)) continue;
+        lateral = iabs16(sx - SCRW / 2);
+        if (lateral > 52 && h < 112) continue;
+        if (!player_line_of_sight_to(thing_x_q8[thing], thing_y_q8[thing])) continue;
+        score = lateral + (dist_q8 >> 7) - (h >> 2);
+        if (score < best_score) {
+            best_score = score;
+            best_thing = thing;
+        }
+    }
     return best_thing;
 }
 
@@ -2312,7 +2340,7 @@ static void alert_monsters_by_sound(void) {
         } else if (monster_path_valid) {
             int cx = thing_x_q8[i] >> 8;
             int cy = thing_y_q8[i] >> 8;
-            if (cx >= 0 && cy >= 0 && cx < MAP_W && cy < MAP_H) {
+            if (cx >= 0 && cy >= 0 && cx < ACTIVE_MAP_W && cy < ACTIVE_MAP_H) {
                 u8 path_dist = monster_path_dist[cy][cx];
                 if (path_dist != 0xFF && path_dist <= 32 && range <= WORLD_Q8(8192)) audible = 1;
             }
@@ -2764,8 +2792,8 @@ static void rebuild_monster_path(void) {
     rc_player_cell(&px, &py);
     monster_path_player_cell_x = (short)px;
     monster_path_player_cell_y = (short)py;
-    for (u16 y = 0; y < MAP_H; y++) {
-        for (u16 x = 0; x < MAP_W; x++) monster_path_dist[y][x] = 0xFF;
+    for (u16 y = 0; y < ACTIVE_MAP_H; y++) {
+        for (u16 x = 0; x < ACTIVE_MAP_W; x++) monster_path_dist[y][x] = 0xFF;
     }
     if (map_at(px, py)) {
         monster_path_valid = 0;
@@ -2786,7 +2814,7 @@ static void rebuild_monster_path(void) {
         for (u8 i = 0; i < 4; i++) {
             int nx = x + dirs[i][0];
             int ny = y + dirs[i][1];
-            if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+            if (nx < 0 || ny < 0 || nx >= ACTIVE_MAP_W || ny >= ACTIVE_MAP_H) continue;
             if (map_at(nx, ny)) continue;
             if (monster_path_dist[ny][nx] != 0xFF) continue;
             monster_path_dist[ny][nx] = (u8)(d + 1);
@@ -2825,7 +2853,7 @@ static u8 move_monster_along_path(int i) {
         { 1,  0}, {-1,  0}, { 0,  1}, { 0, -1}
     };
     if (!monster_path_valid) return 0;
-    if (cx < 0 || cy < 0 || cx >= MAP_W || cy >= MAP_H) return 0;
+    if (cx < 0 || cy < 0 || cx >= ACTIVE_MAP_W || cy >= ACTIVE_MAP_H) return 0;
     best_dist = monster_path_dist[cy][cx];
     if (best_dist == 0xFF || best_dist == 0) return 0;
     best_x = cx;
@@ -2834,7 +2862,7 @@ static u8 move_monster_along_path(int i) {
         int nx = cx + dirs[dir][0];
         int ny = cy + dirs[dir][1];
         u8 d;
-        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+        if (nx < 0 || ny < 0 || nx >= ACTIVE_MAP_W || ny >= ACTIVE_MAP_H) continue;
         d = monster_path_dist[ny][nx];
         if (d < best_dist) {
             best_dist = d;
@@ -3896,7 +3924,7 @@ static void check_secret_reached(void) {
     px >>= 8;
     py >>= 8;
     if (!map_cell_secret(px, py)) return;
-    cell = (u16)(py * MAP_W + px);
+    cell = (u16)(py * ACTIVE_MAP_W + px);
     if (map_bit_get(secret_found_bits, cell)) return;
     map_bit_set(secret_found_bits, cell);
     if (player_secrets < 999) player_secrets++;
@@ -3962,8 +3990,8 @@ static void check_exit_reached(void) {
 }
 
 static int closed_door_at_cell(int cell_x, int cell_y) {
-    if (cell_x < 0 || cell_y < 0 || cell_x >= MAP_W || cell_y >= MAP_H) return -1;
-    u8 cell = g_map[cell_y][cell_x];
+    if (cell_x < 0 || cell_y < 0 || cell_x >= ACTIVE_MAP_W || cell_y >= ACTIVE_MAP_H) return -1;
+    u8 cell = map_cell_value(cell_x, cell_y);
     if (cell < 2) return -1;
     int door_index = cell - 2;
     if (door_index < 0 || door_index >= NG_RUNTIME_DOOR_COUNT) return -1;
@@ -4047,14 +4075,14 @@ static int touching_closed_door(int px, int py) {
 }
 
 static void mark_runtime_cell_open(int x, int y) {
-    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return;
-    map_bit_set(g_runtime_cell_open, (u16)(y * MAP_W + x));
+    if (x < 0 || y < 0 || x >= ACTIVE_MAP_W || y >= ACTIVE_MAP_H) return;
+    map_bit_set(g_runtime_cell_open, (u16)(y * ACTIVE_MAP_W + x));
     if (map_on) draw_minimap_source_cell(x, y);
 }
 
 static u8 map_cell_runtime_open(int x, int y) {
-    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;
-    return map_bit_get(g_runtime_cell_open, (u16)(y * MAP_W + x));
+    if (x < 0 || y < 0 || x >= ACTIVE_MAP_W || y >= ACTIVE_MAP_H) return 0;
+    return map_bit_get(g_runtime_cell_open, (u16)(y * ACTIVE_MAP_W + x));
 }
 
 static void carve_door_bridge_from_cell(int x, int y) {
@@ -4066,8 +4094,8 @@ static void carve_door_bridge_from_cell(int x, int y) {
         for (u8 step = 1; step <= 4; step++) {
             int nx = x + dirs[d][0] * step;
             int ny = y + dirs[d][1] * step;
-            if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) break;
-            if (g_map[ny][nx] == 0 || map_cell_runtime_open(nx, ny)) {
+            if (nx < 0 || ny < 0 || nx >= ACTIVE_MAP_W || ny >= ACTIVE_MAP_H) break;
+            if (map_cell_value(nx, ny) == 0 || map_cell_runtime_open(nx, ny)) {
                 for (u8 carve = 1; carve < step; carve++) {
                     mark_runtime_cell_open(x + dirs[d][0] * carve, y + dirs[d][1] * carve);
                 }
@@ -4086,8 +4114,8 @@ static void open_lift_index(u8 lift_index) {
     lift = &g_runtime_lifts[lift_index];
     for (u16 i = 0; i < lift->cell_count; i++) {
         u16 cell = g_runtime_lift_cells[lift->first_cell + i];
-        int x = cell % MAP_W;
-        int y = cell / MAP_W;
+        int x = cell % ACTIVE_MAP_W;
+        int y = cell / ACTIVE_MAP_W;
         mark_runtime_cell_open(x, y);
         opened = 1;
     }
@@ -4496,30 +4524,30 @@ enum {
 
 static int minimap_view_x(int map_x) {
     if (map_x < 0) return 0;
-    if (map_x >= MAP_W) return MINIMAP_W - 1;
-    return (map_x * MINIMAP_W) / MAP_W;
+    if (map_x >= ACTIVE_MAP_W) return MINIMAP_W - 1;
+    return (map_x * MINIMAP_W) / ACTIVE_MAP_W;
 }
 
 static int minimap_view_y(int map_y) {
     if (map_y < 0) return 0;
-    if (map_y >= MAP_H) return MINIMAP_H - 1;
-    return (map_y * MINIMAP_H) / MAP_H;
+    if (map_y >= ACTIVE_MAP_H) return MINIMAP_H - 1;
+    return (map_y * MINIMAP_H) / ACTIVE_MAP_H;
 }
 
 static int minimap_src_x0(int view_x) {
-    return (view_x * MAP_W) / MINIMAP_W;
+    return (view_x * ACTIVE_MAP_W) / MINIMAP_W;
 }
 
 static int minimap_src_x1(int view_x) {
-    return (((view_x + 1) * MAP_W) + MINIMAP_W - 1) / MINIMAP_W;
+    return (((view_x + 1) * ACTIVE_MAP_W) + MINIMAP_W - 1) / MINIMAP_W;
 }
 
 static int minimap_src_y0(int view_y) {
-    return (view_y * MAP_H) / MINIMAP_H;
+    return (view_y * ACTIVE_MAP_H) / MINIMAP_H;
 }
 
 static int minimap_src_y1(int view_y) {
-    return (((view_y + 1) * MAP_H) + MINIMAP_H - 1) / MINIMAP_H;
+    return (((view_y + 1) * ACTIVE_MAP_H) + MINIMAP_H - 1) / MINIMAP_H;
 }
 
 static void draw_minimap_source_cell(int map_x, int map_y);
@@ -4786,6 +4814,47 @@ static void init_background(void) {
     invalidate_background_cache();
 }
 
+static void set_background_column_visible(u16 col, u8 visible) {
+    u16 spr = BG_BASE + col;
+    if (visible) {
+        scb2(spr, 0x0F, 0xFF);
+        scb3(spr, 0, 0, BG_WIN);
+    } else {
+        scb2(spr, 0x0F, 0x00);
+        scb3(spr, SCRH + 32, 0, 1);
+    }
+}
+
+static void write_background_column_tiles(u16 col, u8 scroll_col, u16 ceiling_direction_base, u16 floor_direction_base) {
+    u16 spr = BG_BASE + col;
+    u16 plane_col = (u16)(col + scroll_col);
+    u16 ceiling_tile;
+    u16 floor_tile;
+
+    if (plane_col >= BG_COUNT) plane_col = (u16)(plane_col - BG_COUNT);
+    ceiling_tile = (u16)(ceiling_direction_base + plane_col);
+    floor_tile = (u16)(floor_direction_base + plane_col);
+
+    vram_addr(VRAM_SCB1 + spr * 64);
+    vram_mod(1);
+    for (u16 row = 0; row < BG_WIN; row++) {
+        u16 pal;
+        u16 tile;
+        if (row < BG_SPLIT) {
+            pal = (u16)(PAL_CEILING_GRAD_BASE + row);
+            tile = ceiling_tile;
+            ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
+        } else {
+            u16 floor_row = (u16)(row - BG_SPLIT);
+            pal = (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
+            tile = floor_tile;
+            floor_tile = (u16)(floor_tile + TILE_PLANE_PERSPECTIVE_COLS);
+        }
+        vram_w(tile);
+        vram_w((u16)(pal << 8));
+    }
+}
+
 static void update_background_scroll(u8 frame_overrun) {
 #if DOOM_FLAT_PLANES
     (void)frame_overrun;
@@ -4798,9 +4867,9 @@ static void update_background_scroll(u8 frame_overrun) {
     u16 direction_tile_offset;
     u16 ceiling_direction_base;
     u16 floor_direction_base;
-    u32 floor_pose_key;
     u32 key;
     u8 columns_this_frame = frame_overrun ? BG_SCROLL_COLUMNS_OVERRUN : BG_SCROLL_COLUMNS_PER_FRAME;
+    u8 all_current;
 
     rc_player_q8(&px, &py);
     rc_view_q8(&dir_x, &dir_y, &plane_x, &plane_y);
@@ -4813,47 +4882,50 @@ static void update_background_scroll(u8 frame_overrun) {
     /* Horizontal column wrapping is driven by camera-lateral motion so walking
      * forward does not force unrelated floor/ceiling column shifts. */
     scroll_col = wrap_background_scroll((int)(((long)px * plane_x + (long)py * plane_y) >> 14));
-    floor_pose_key = ((u32)((px >> 9) & 0x3F) << 13) | ((u32)((py >> 9) & 0x3F) << 19);
-    key = (u32)direction | ((u32)scroll_col << 8) | floor_pose_key;
+    key = (u32)direction | ((u32)scroll_col << 8);
     if (key != bg_pending_key) {
         bg_pending_key = key;
         bg_update_col = 0;
     }
-    if (bg_scroll_key == bg_pending_key) return;
     direction_tile_offset = (u16)(direction * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES
         * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
     ceiling_direction_base = (u16)(TILE_CEILING_PERSPECTIVE_BASE + direction_tile_offset);
     floor_direction_base = (u16)(TILE_FLOOR_PERSPECTIVE_BASE + direction_tile_offset);
 
-    while (columns_this_frame-- && bg_update_col < BG_COUNT) {
-        u16 col = bg_update_col++;
-        u16 spr = BG_BASE + col;
-        u16 plane_col = (u16)(col + scroll_col);
-        u16 ceiling_tile;
-        u16 floor_tile;
-        if (plane_col >= BG_COUNT) plane_col = (u16)(plane_col - BG_COUNT);
-        ceiling_tile = (u16)(ceiling_direction_base + plane_col);
-        floor_tile = (u16)(floor_direction_base + plane_col);
-        vram_addr(VRAM_SCB1 + spr * 64);
-        vram_mod(1);
-        for (u16 row = 0; row < BG_WIN; row++) {
-            u16 pal;
-            u16 tile;
-            if (row < BG_SPLIT) {
-                pal = (u16)(PAL_CEILING_GRAD_BASE + row);
-                tile = ceiling_tile;
-                ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
-            } else {
-                u16 floor_row = (u16)(row - BG_SPLIT);
-                pal = (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
-                tile = floor_tile;
-                floor_tile = (u16)(floor_tile + TILE_PLANE_PERSPECTIVE_COLS);
+    for (u16 col = 0; col < BG_COUNT; col++) {
+        u8 hidden = rc_background_column_hidden((u8)col);
+        if (hidden != bg_col_hidden[col]) {
+            set_background_column_visible(col, (u8)!hidden);
+            bg_col_hidden[col] = hidden;
+            if (!hidden) bg_col_key[col] = 0xFFFFFFFFUL;
+        }
+        if (!hidden && bg_col_key[col] != key) bg_scroll_key = 0xFFFFFFFFUL;
+    }
+
+    if (bg_scroll_key != bg_pending_key) {
+        u8 scanned = 0;
+        u8 col = bg_update_col;
+        while (scanned < BG_COUNT && columns_this_frame) {
+            if (!bg_col_hidden[col] && bg_col_key[col] != key) {
+                write_background_column_tiles(col, scroll_col, ceiling_direction_base, floor_direction_base);
+                bg_col_key[col] = key;
+                columns_this_frame--;
             }
-            vram_w(tile);
-            vram_w((u16)(pal << 8));
+            col++;
+            if (col >= BG_COUNT) col = 0;
+            scanned++;
+        }
+        bg_update_col = col;
+    }
+
+    all_current = 1;
+    for (u16 col = 0; col < BG_COUNT; col++) {
+        if (!bg_col_hidden[col] && bg_col_key[col] != key) {
+            all_current = 0;
+            break;
         }
     }
-    if (bg_update_col >= BG_COUNT) bg_scroll_key = bg_pending_key;
+    bg_scroll_key = all_current ? key : 0xFFFFFFFFUL;
 #endif
 }
 
@@ -5372,12 +5444,14 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
             enemy_tile_key[slot] = tile_key;
         }
     }
-    enemies[slot].screen_x = sx - meta->origin_x;
-    enemies[slot].screen_w = meta->width;
-    update_enemy_slot_flags(slot);
     {
         u8 rendered = 0;
+        int sprite_x = sx - meta->origin_x;
+        int visible_left = SCRW;
+        int visible_right = 0;
         int top;
+        enemies[slot].screen_x = sprite_x;
+        enemies[slot].screen_w = meta->width;
         if ((is_explosion && thing_index < 0) || is_projectile) {
             top = (GAME_H - meta->height) / 2;
         } else {
@@ -5388,11 +5462,17 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
             u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
-            int strip_x = enemies[slot].screen_x + j * 16;
-            if (j < meta->strips && strip_x > -16 && strip_x < SCRW) {
+            int strip_x = sprite_x + j * 16;
+            if (j < meta->strips && strip_x > -16 && strip_x < SCRW
+                && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + 15, dist_q8))) {
+                int strip_left = strip_x < 0 ? 0 : strip_x;
+                int strip_right = strip_x + 16;
+                if (strip_right > SCRW) strip_right = SCRW;
                 scb2(spr, 0x0F, 0xFF);
                 scb3(spr, top, 0, meta->rows);
                 scb4(spr, (u16)strip_x);
+                if (strip_left < visible_left) visible_left = strip_left;
+                if (strip_right > visible_right) visible_right = strip_right;
                 rendered = 1;
             } else {
                 scb2(spr, 0x0F, 0x00);
@@ -5404,6 +5484,11 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
             hide_enemy_slot(slot);
             return 0;
         }
+        if (visible_right > visible_left) {
+            enemies[slot].screen_x = visible_left;
+            enemies[slot].screen_w = visible_right - visible_left;
+        }
+        update_enemy_slot_flags(slot);
         enemy_slot_hidden[slot] = 0;
     }
     return 1;
@@ -5629,7 +5714,10 @@ static int select_visible_things(int found) {
         insert_thing_candidate(candidates, &count, &candidate);
     }
 
-    for (int i = 0; i < count && found < ENEMY_VISIBLE_COUNT; i++) {
+    {
+        int selected = count;
+        if (selected > ENEMY_VISIBLE_COUNT - found) selected = ENEMY_VISIBLE_COUNT - found;
+        for (int i = selected - 1; i >= 0 && found < ENEMY_VISIBLE_COUNT; i--) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
             rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].x_q8, candidates[i].y_q8,
@@ -5643,6 +5731,7 @@ static int select_visible_things(int found) {
                                         candidates[i].fallback_projection, px, py);
         }
         if (rendered) found++;
+        }
     }
     return found;
 }

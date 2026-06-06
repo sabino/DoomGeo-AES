@@ -29,6 +29,12 @@ readable.
   defaults were chosen from strict Episode 1 route checks and E1M1 converter
   metrics; higher-resolution builds can still override the map size for
   comparison work.
+- `DOOM_SIMPLE_MAP=1` switches to the simplified NGRayEx-style runtime shape:
+  an authored active `16x16` map, 80 wall columns, full-height grid DDA walls,
+  no generated WAD render-line refinement, and full-screen baked floor/ceiling
+  plane tiles. The converter still runs at build time for assets and support
+  metadata, but its default support grid is also `16x16` in this mode. This is
+  the current stepping stone toward WAD-to-`16x16` chunk generation.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.
@@ -673,8 +679,8 @@ readable.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
-  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`; custom
-  ROM directories receive the local `neogeo.zip` BIOS package automatically.
+  ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`;
+  GnGeo still receives BIOS data through its configured `--datafile` path.
 - Balanced rendering keeps the cheaper coarse wall path for distant solid walls
   but refines nearby solid hits against the converted WAD line metadata. The
   quality default goes further and enables solid-line refinement across the wall

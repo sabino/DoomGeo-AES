@@ -352,6 +352,11 @@ configure_waypoint() {
 
 configure_waypoint
 
+if [ "$neo_make_target" = "episode-map-gngeo" ]; then
+    neo_make_args+=("DOOM_SKIP_INTRO=1")
+    neo_press_start="0"
+fi
+
 episode="${MAP:1:1}"
 level="${MAP:3:1}"
 if [[ ! "$MAP" =~ ^E[0-9]M[0-9]$ ]]; then
