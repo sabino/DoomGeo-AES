@@ -33,6 +33,7 @@ unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTE
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 unsigned short g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
 unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
+unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];
 static u16 chunk_thing_state_type[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static short chunk_thing_state_x_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static short chunk_thing_state_y_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
@@ -4456,6 +4457,33 @@ static void carve_door_bridge_from_cell(int x, int y) {
 }
 
 static void open_lift_index(u8 lift_index) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    const NgChunkLift *lift;
+    u8 opened = 0;
+    if (lift_index >= DOOM_CHUNK_LIFT_COUNT) return;
+    if (g_chunk_lift_open[lift_index]) return;
+    g_chunk_lift_open[lift_index] = 1;
+    lift = &g_chunk_lifts[lift_index];
+    for (u16 i = 0; i < lift->cell_count; i++) {
+        u16 cell = g_chunk_lift_cells[lift->first_cell + i];
+        int global_x = cell % DOOM_CHUNK_GRID_W;
+        int global_y = cell / DOOM_CHUNK_GRID_W;
+        int local_x = global_x - (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W;
+        int local_y = global_y - (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H;
+        if (local_x >= 0 && local_y >= 0 && local_x < ACTIVE_MAP_W && local_y < ACTIVE_MAP_H) {
+            mark_runtime_cell_open(local_x, local_y);
+            opened = 1;
+        }
+    }
+    if (opened) {
+        door_message_timer = 35;
+        monster_path_valid = 0;
+        monster_path_player_cell_x = -1;
+        monster_path_player_cell_y = -1;
+        invalidate_background_cache();
+        rc_invalidate_view();
+    }
+#else
     const NgRuntimeLift *lift;
     u8 opened = 0;
     if (lift_index >= NG_RUNTIME_LIFT_COUNT) return;
@@ -4477,9 +4505,23 @@ static void open_lift_index(u8 lift_index) {
         invalidate_background_cache();
         rc_invalidate_view();
     }
+#endif
 }
 
 static u8 try_lift_trigger_cell(int cell_x, int cell_y, u8 require_walk) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    int global_x = (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W + cell_x;
+    int global_y = (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H + cell_y;
+    for (u16 i = 0; i < DOOM_CHUNK_LIFT_TRIGGER_COUNT; i++) {
+        const NgChunkLiftTrigger *trigger = &g_chunk_lift_triggers[i];
+        if (require_walk && !trigger->walk) continue;
+        if (iabs16((int)trigger->x - global_x) > 1 || iabs16((int)trigger->y - global_y) > 1) continue;
+        if (trigger->lift >= DOOM_CHUNK_LIFT_COUNT) continue;
+        if (g_chunk_lift_open[trigger->lift]) continue;
+        open_lift_index(trigger->lift);
+        return 1;
+    }
+#else
     for (u16 i = 0; i < NG_RUNTIME_LIFT_TRIGGER_COUNT; i++) {
         const NgRuntimeLiftTrigger *trigger = &g_runtime_lift_triggers[i];
         if (require_walk && !trigger->walk) continue;
@@ -4489,6 +4531,7 @@ static u8 try_lift_trigger_cell(int cell_x, int cell_y, u8 require_walk) {
         open_lift_index(trigger->lift);
         return 1;
     }
+#endif
     return 0;
 }
 
@@ -4507,6 +4550,39 @@ static u8 open_nearby_lift(void) {
     (void)plane_x;
     (void)plane_y;
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    for (u16 i = 0; i < DOOM_CHUNK_LIFT_TRIGGER_COUNT; i++) {
+        const NgChunkLiftTrigger *trigger = &g_chunk_lift_triggers[i];
+        int local_x;
+        int local_y;
+        int to_x;
+        int to_y;
+        int adx;
+        int ady;
+        int dist;
+        int dot;
+        int lateral;
+        if (trigger->lift >= DOOM_CHUNK_LIFT_COUNT) continue;
+        if (g_chunk_lift_open[trigger->lift]) continue;
+        local_x = (int)trigger->x - (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W;
+        local_y = (int)trigger->y - (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H;
+        to_x = local_x * 256 + 128 - px;
+        to_y = local_y * 256 + 128 - py;
+        adx = iabs16(to_x);
+        ady = iabs16(to_y);
+        dist = adx + ady;
+        dot = to_x * dir_x + to_y * dir_y;
+        lateral = iabs16(to_x * dir_y - to_y * dir_x);
+        if (adx > WORLD_Q8(640) || ady > WORLD_Q8(640) || dist > WORLD_Q8(960)) continue;
+        if (dot <= -WORLD_Q8(128) || lateral > (dot > 0 ? dot * 3 : WORLD_Q8(384))) continue;
+        if (dist < best_score) {
+            best = i;
+            best_score = dist;
+        }
+    }
+    if (best < 0) return 0;
+    open_lift_index(g_chunk_lift_triggers[best].lift);
+#else
     for (u16 i = 0; i < NG_RUNTIME_LIFT_TRIGGER_COUNT; i++) {
         const NgRuntimeLiftTrigger *trigger = &g_runtime_lift_triggers[i];
         int to_x;
@@ -4534,6 +4610,7 @@ static u8 open_nearby_lift(void) {
     }
     if (best < 0) return 0;
     open_lift_index(g_runtime_lift_triggers[best].lift);
+#endif
     return 1;
 }
 
@@ -6475,6 +6552,7 @@ static void restart_level(void) {
     for (u16 i = 0; i < NG_RUNTIME_LIFT_COUNT; i++) g_runtime_lift_open[i] = 0;
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
     for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) g_chunk_door_open[i] = 0;
+    for (u16 i = 0; i < DOOM_CHUNK_LIFT_COUNT; i++) g_chunk_lift_open[i] = 0;
 #endif
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;

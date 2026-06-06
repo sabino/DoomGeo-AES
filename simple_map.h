@@ -83,6 +83,7 @@
 
 extern unsigned short g_simple_active_chunk;
 extern unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
+extern unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];
 #define SIMPLE_ACTIVE_CHUNK g_simple_active_chunk
 
 static inline unsigned short simple_chunk_cell_index(int x, int y) {
@@ -126,6 +127,10 @@ static inline int map_at(int x, int y) {
     {
         unsigned char door_id = g_chunk_door_cell[chunk][cell];
         if (door_id >= 2) return g_chunk_door_open[door_id - 2] ? 0 : 1;
+    }
+    {
+        unsigned char lift_id = g_chunk_lift_cell[chunk][cell];
+        if (lift_id && !g_chunk_lift_open[lift_id - 1]) return 1;
     }
     return g_chunk_solid[chunk][cell] ? 1 : 0;
 }

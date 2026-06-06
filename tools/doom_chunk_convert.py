@@ -353,9 +353,12 @@ def write_outputs(
     light_grid: list[list[int]],
     floor_height_grid: list[list[int]],
     ceiling_height_grid: list[list[int]],
+    lift_grid: list[list[int]],
     things: list[ChunkThing],
     exits: list[ChunkExit],
     doors: list[ChunkDoor],
+    lifts: list[tuple[int, list[tuple[int, int]]]],
+    lift_triggers: list[tuple[int, int, int, int, int]],
 ) -> None:
     chunk_count = chunk_cols * chunk_rows
     chunk_first: list[int] = []
@@ -395,6 +398,10 @@ def write_outputs(
         f.write(f"#define DOOM_CHUNK_THING_COUNT {len(things)}\n\n")
         f.write(f"#define DOOM_CHUNK_EXIT_COUNT {len(exits)}\n")
         f.write(f"#define DOOM_CHUNK_DOOR_COUNT {len(doors)}\n\n")
+        f.write(f"#define DOOM_CHUNK_LIFT_COUNT {len(lifts)}\n")
+        f.write(f"#define DOOM_CHUNK_LIFT_TRIGGER_COUNT {len(lift_triggers)}\n")
+        lift_cell_refs = [y * len(grid[0]) + x for _tag, cells in lifts for x, y in cells]
+        f.write(f"#define DOOM_CHUNK_LIFT_CELL_REF_COUNT {len(lift_cell_refs)}\n\n")
         f.write(f"#define DOOM_CHUNK_START_CHUNK {start_chunk}\n")
         f.write(f"#define DOOM_CHUNK_START_X {start_x:.3f}\n")
         f.write(f"#define DOOM_CHUNK_START_Y {start_y:.3f}\n")
@@ -428,8 +435,21 @@ def write_outputs(
         f.write("    unsigned short special;\n")
         f.write("    unsigned short chunk;\n")
         f.write("} NgChunkDoor;\n\n")
+        f.write("typedef struct NgChunkLift {\n")
+        f.write("    unsigned short first_cell;\n")
+        f.write("    unsigned short cell_count;\n")
+        f.write("    unsigned short tag;\n")
+        f.write("} NgChunkLift;\n\n")
+        f.write("typedef struct NgChunkLiftTrigger {\n")
+        f.write("    unsigned short x;\n")
+        f.write("    unsigned short y;\n")
+        f.write("    unsigned char lift;\n")
+        f.write("    unsigned short special;\n")
+        f.write("    unsigned char walk;\n")
+        f.write("} NgChunkLiftTrigger;\n\n")
         f.write("extern const unsigned char g_chunk_solid[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_door_cell[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
+        f.write("extern const unsigned char g_chunk_lift_cell[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_tex[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_floor_visual[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_damage[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
@@ -441,6 +461,9 @@ def write_outputs(
         f.write("extern const NgChunkThing g_chunk_things[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];\n\n")
         f.write("extern const NgChunkExit g_chunk_exits[DOOM_CHUNK_EXIT_COUNT ? DOOM_CHUNK_EXIT_COUNT : 1];\n")
         f.write("extern const NgChunkDoor g_chunk_doors[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];\n\n")
+        f.write("extern const NgChunkLift g_chunk_lifts[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];\n")
+        f.write("extern const NgChunkLiftTrigger g_chunk_lift_triggers[DOOM_CHUNK_LIFT_TRIGGER_COUNT ? DOOM_CHUNK_LIFT_TRIGGER_COUNT : 1];\n")
+        f.write("extern const unsigned short g_chunk_lift_cells[DOOM_CHUNK_LIFT_CELL_REF_COUNT ? DOOM_CHUNK_LIFT_CELL_REF_COUNT : 1];\n\n")
         f.write("#endif /* DOOM_CHUNKS_GENERATED_H */\n")
 
     with open(source_path, "w", encoding="ascii") as f:
@@ -448,6 +471,7 @@ def write_outputs(
         f.write('#include "doom_chunks_generated.h"\n\n')
         write_u8_chunks(f, "g_chunk_solid", grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_door_cell", door_grid, chunk_count, chunk_size, chunk_cols)
+        write_u8_chunks(f, "g_chunk_lift_cell", lift_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_tex", tex_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_floor_visual", floor_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_damage", damage_grid, chunk_count, chunk_size, chunk_cols)
@@ -486,6 +510,31 @@ def write_outputs(
                 f.write(f"    {{{row.x},{row.y},{row.special},{row.chunk}}},\n")
         else:
             f.write("    {0,0,0,0},\n")
+        f.write("};\n")
+        f.write("\nconst NgChunkLift g_chunk_lifts[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1] = {\n")
+        first_cell = 0
+        if lifts:
+            for tag, cells in lifts:
+                f.write(f"    {{{first_cell},{len(cells)},{tag}}},\n")
+                first_cell += len(cells)
+        else:
+            f.write("    {0,0,0},\n")
+        f.write("};\n")
+        f.write("\nconst NgChunkLiftTrigger g_chunk_lift_triggers[DOOM_CHUNK_LIFT_TRIGGER_COUNT ? DOOM_CHUNK_LIFT_TRIGGER_COUNT : 1] = {\n")
+        if lift_triggers:
+            for x, y, lift_index, special, walk in lift_triggers:
+                f.write(f"    {{{x},{y},{lift_index},{special},{walk}}},\n")
+        else:
+            f.write("    {0,0,0,0,0},\n")
+        f.write("};\n")
+        f.write("\nconst unsigned short g_chunk_lift_cells[DOOM_CHUNK_LIFT_CELL_REF_COUNT ? DOOM_CHUNK_LIFT_CELL_REF_COUNT : 1] = {\n")
+        if lift_cell_refs:
+            for i in range(0, len(lift_cell_refs), 24):
+                f.write("    ")
+                f.write(",".join(str(cell) for cell in lift_cell_refs[i : i + 24]))
+                f.write(",\n")
+        else:
+            f.write("    0,\n")
         f.write("};\n")
 
 
@@ -538,6 +587,9 @@ def convert(args: argparse.Namespace) -> None:
     floor_grid, damage_grid, light_grid, floor_height_grid, ceiling_height_grid = build_sector_grids(
         grid, linedefs, sidedefs, sectors, vertices, origin_x, origin_y, args.cell_units
     )
+    converted_lifts, converted_lift_triggers, lift_grid = dc.runtime_lifts(
+        linedefs, sidedefs, sectors, vertices, grid, origin_x, origin_y, args.cell_units, 0
+    )
     converted_things = build_things(
         things, origin_x, origin_y, width, height, args.cell_units,
         args.chunk_size, chunk_cols, args.skill_mask
@@ -578,9 +630,12 @@ def convert(args: argparse.Namespace) -> None:
         light_grid,
         floor_height_grid,
         ceiling_height_grid,
+        lift_grid,
         converted_things,
         converted_exits,
         converted_doors,
+        converted_lifts,
+        converted_lift_triggers,
     )
     if args.preview:
         write_preview(args.preview, grid, converted_things, args.chunk_size)
@@ -589,7 +644,8 @@ def convert(args: argparse.Namespace) -> None:
         f"{args.map.upper()}: {width}x{height} fixed cells, "
         f"{chunk_cols}x{chunk_rows} chunks of {args.chunk_size}x{args.chunk_size}, "
         f"{solid_cells} solid cells, {len(converted_things)} things, "
-        f"{len(converted_exits)} exits, {len(converted_doors)} doors -> {args.out}"
+        f"{len(converted_exits)} exits, {len(converted_doors)} doors, "
+        f"{len(converted_lifts)} lifts/{len(converted_lift_triggers)} triggers -> {args.out}"
     )
 
 
