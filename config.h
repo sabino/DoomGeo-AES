@@ -53,7 +53,17 @@
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #if DOOM_SIMPLE_MAP
-#define WALLH    SCRH               /* original NGRayEx projection scale */
+#ifndef DOOM_SIMPLE_WALLH
+#if DOOM_CHUNKED_SIMPLE_MAP
+#ifndef DOOM_CHUNK_CELL_UNITS
+#define DOOM_CHUNK_CELL_UNITS 64
+#endif
+#define DOOM_SIMPLE_WALLH ((SCRH * DOOM_CHUNK_CELL_UNITS) / 128)
+#else
+#define DOOM_SIMPLE_WALLH SCRH
+#endif
+#endif
+#define WALLH    DOOM_SIMPLE_WALLH  /* original NGRayEx scale, adjusted for chunk cell size */
 #define MAX_H    SCRH               /* original NGRayEx full-height clamp */
 #else
 #ifndef DOOM_WALL_PROJECTION_NUM
@@ -273,7 +283,11 @@
 #define BG_SCROLL_COLUMNS_OVERRUN 4
 #endif
 #ifndef DOOM_FLAT_PLANES
+#if DOOM_SIMPLE_MAP
+#define DOOM_FLAT_PLANES 1          /* simple/chunked maps favor stable, readable planes */
+#else
 #define DOOM_FLAT_PLANES 0          /* pre-baked moving floor/ceiling cache */
+#endif
 #endif
 #define TILE_CEILING_FLAT_BASE (TILE_DOOR_ATLAS_BASE + TILE_WALL_ATLAS_TILES)
 #define TILE_FLOOR_FLAT_BASE (TILE_CEILING_FLAT_BASE + TILE_FLAT_TILES)

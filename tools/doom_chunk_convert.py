@@ -132,14 +132,25 @@ def parse_map(iwad: str, zip_member: str | None, map_name: str):
     )
 
 
-def build_bounds(vertices: list[dc.Vertex], chunk_size: int, cell_units: int) -> tuple[int, int, int, int, int, int]:
+def build_bounds(
+    vertices: list[dc.Vertex],
+    chunk_size: int,
+    cell_units: int,
+    player: dc.Thing,
+    start_local_x: float,
+    start_local_y: float,
+) -> tuple[int, int, int, int, int, int]:
     min_x = min(v.x for v in vertices)
     max_x = max(v.x for v in vertices)
     min_y = min(v.y for v in vertices)
     max_y = max(v.y for v in vertices)
     page_units = chunk_size * cell_units
-    origin_x = snap_floor(min_x, page_units)
-    origin_y = snap_ceil(max_y, page_units)
+    start_offset_x = int(round(start_local_x * cell_units))
+    start_offset_y = int(round(start_local_y * cell_units))
+    start_page_x = max(0, math.ceil((player.x - start_offset_x - min_x) / page_units))
+    start_page_y = max(0, math.ceil((max_y - player.y - start_offset_y) / page_units))
+    origin_x = player.x - start_page_x * page_units - start_offset_x
+    origin_y = player.y + start_page_y * page_units + start_offset_y
     end_x = snap_ceil(max_x, page_units)
     end_y = snap_floor(min_y, page_units)
     width = max(chunk_size, ceil_div(end_x - origin_x, cell_units))
@@ -158,9 +169,32 @@ def build_base_grids(
     height: int,
     cell_units: int,
 ) -> tuple[list[list[int]], list[list[int]], list[list[int]]]:
-    grid = [[0 for _ in range(width)] for _ in range(height)]
+    grid = [[1 for _ in range(width)] for _ in range(height)]
     tex_grid = [[0 for _ in range(width)] for _ in range(height)]
     priority_grid = [[0 for _ in range(width)] for _ in range(height)]
+    sector_edges = [dc.sector_segments(i, linedefs, sidedefs, vertices) for i in range(len(sectors))]
+    sector_bounds: list[tuple[int, int, int, int]] = []
+
+    for edges in sector_edges:
+        if not edges:
+            sector_bounds.append((0, 0, -1, -1))
+            continue
+        xs = [point.x for segment in edges for point in segment]
+        ys = [point.y for segment in edges for point in segment]
+        sector_bounds.append((min(xs), min(ys), max(xs), max(ys)))
+
+    for gy in range(height):
+        for gx in range(width):
+            doom_x, doom_y = doom_coord_from_cell(gx, gy, origin_x, origin_y, cell_units)
+            for sector_index, edges in enumerate(sector_edges):
+                if not edges:
+                    continue
+                min_x, min_y, max_x, max_y = sector_bounds[sector_index]
+                if doom_x < min_x or doom_x > max_x or doom_y < min_y or doom_y > max_y:
+                    continue
+                if dc.point_in_sector(doom_x, doom_y, edges):
+                    grid[gy][gx] = 0
+                    break
 
     for line in linedefs:
         if not dc.is_solid_linedef(line, sidedefs, sectors):
@@ -707,7 +741,14 @@ def convert(args: argparse.Namespace) -> None:
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
         raise ValueError("map has no player 1 start thing")
-    origin_x, origin_y, width, height, _min_x, _max_y = build_bounds(vertices, args.chunk_size, args.cell_units)
+    origin_x, origin_y, width, height, _min_x, _max_y = build_bounds(
+        vertices,
+        args.chunk_size,
+        args.cell_units,
+        player,
+        args.start_local_x,
+        args.start_local_y,
+    )
     chunk_cols = ceil_div(width, args.chunk_size)
     chunk_rows = ceil_div(height, args.chunk_size)
     width = chunk_cols * args.chunk_size
@@ -810,6 +851,18 @@ def main() -> int:
     parser.add_argument("--out", default="build/doom_chunks_generated.h")
     parser.add_argument("--chunk-source", default="build/doom_chunks_generated.c")
     parser.add_argument("--preview", help="Optional ASCII chunk map preview")
+    parser.add_argument(
+        "--start-local-x",
+        type=float,
+        default=8.5,
+        help="Preferred player start X inside the active 16x16 runtime chunk",
+    )
+    parser.add_argument(
+        "--start-local-y",
+        type=float,
+        default=8.5,
+        help="Preferred player start Y inside the active 16x16 runtime chunk",
+    )
     args = parser.parse_args()
     if args.chunk_size <= 0:
         parser.error("--chunk-size must be positive")
