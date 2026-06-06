@@ -143,7 +143,7 @@ make cart DOOM_DETAIL=quality     # 40 wall columns, seven world things
 make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
 make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things
 make route-check
-make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map chunk-route-check chunk-visibility-check
+make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map chunk-route-check chunk-visibility-check chunk-stream-check
 make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-map ripdoom-check
 make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-runtime-check
 make DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_RIPDOOM_RENDER=1 BUILDDIR=build/ripdoom-render-e1m1 ROM=build/ripdoom-render-e1m1-cart GFX_ROM_DIR=build/ripdoom-render-e1m1-assets cart

@@ -6,6 +6,9 @@
 #include "doom_gfx_generated.h"
 #include "raycast.h"
 #include "map.h"
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#include "chunk_stream.h"
+#endif
 
 #if ACTIVE_MAP_W > 255 || ACTIVE_MAP_H > 255
 #error "monster path queue packs x/y into one word; ACTIVE_MAP_W and ACTIVE_MAP_H must stay <= 255"
@@ -1451,15 +1454,12 @@ static void index_pickup_candidate(u16 thing_index) {
 }
 
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-#define SIMPLE_CHUNK_PAGE_W_Q8 (SIMPLE_MAP_W * 256)
-#define SIMPLE_CHUNK_PAGE_H_Q8 (SIMPLE_MAP_H * 256)
-
 static int active_chunk_origin_x_q8(void) {
-    return (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_CHUNK_PAGE_W_Q8;
+    return (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * NG_CHUNK_STREAM_PAGE_W_Q8;
 }
 
 static int active_chunk_origin_y_q8(void) {
-    return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_CHUNK_PAGE_H_Q8;
+    return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * NG_CHUNK_STREAM_PAGE_H_Q8;
 }
 
 static void persist_runtime_slot_to_chunk_state(u16 slot) {
@@ -1581,7 +1581,7 @@ static void load_active_chunk_dynamic_drops(void) {
         if (!chunk_drop_active[chunk][slot]) continue;
         local_x = chunk_drop_x_q8[chunk][slot];
         local_y = chunk_drop_y_q8[chunk][slot];
-        if (local_x < 0 || local_y < 0 || local_x >= SIMPLE_CHUNK_PAGE_W_Q8 || local_y >= SIMPLE_CHUNK_PAGE_H_Q8) continue;
+        if (local_x < 0 || local_y < 0 || local_x >= NG_CHUNK_STREAM_PAGE_W_Q8 || local_y >= NG_CHUNK_STREAM_PAGE_H_Q8) continue;
         dynamic_drop_active[slot] = 1;
         dynamic_drop_type[slot] = chunk_drop_type[chunk][slot];
         dynamic_drop_x_q8[slot] = local_x;
@@ -1688,8 +1688,8 @@ static void init_runtime_things(void) {
                         u8 thing_class;
                         u8 thing_info;
                         unsigned short chunk_index = (unsigned short)(chunk_first + n);
-                        short offset_x_q8 = (short)(dx * SIMPLE_CHUNK_PAGE_W_Q8);
-                        short offset_y_q8 = (short)(dy * SIMPLE_CHUNK_PAGE_H_Q8);
+                        short offset_x_q8 = (short)(dx * NG_CHUNK_STREAM_PAGE_W_Q8);
+                        short offset_y_q8 = (short)(dy * NG_CHUNK_STREAM_PAGE_H_Q8);
                         if (!load_chunk_runtime_slot(slot, chunk_index, offset_x_q8, offset_y_q8, &thing_class, &thing_info)) continue;
                         thing_static_class[slot] = thing_class;
                         if (thing_info & NG_THING_INFO_RENDER) index_render_candidate(slot);
@@ -6656,43 +6656,18 @@ static void update_enemy(void) {
 static void update_chunk_streaming(void) {
     int px;
     int py;
-    int chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
-    int chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
-    int new_chunk_x = chunk_x;
-    int new_chunk_y = chunk_y;
-    short shift_x = 0;
-    short shift_y = 0;
+    NgChunkStreamState stream;
 
 #if defined(DOOM_FOCUSED_TEST) && !defined(DOOM_CHUNK_MOVEMENT_TEST)
     return;
 #endif
     rc_player_q8(&px, &py);
-    while (px < 0 && new_chunk_x > 0) {
-        new_chunk_x--;
-        px += SIMPLE_CHUNK_PAGE_W_Q8;
-        shift_x = (short)(shift_x + SIMPLE_CHUNK_PAGE_W_Q8);
-    }
-    while (px >= SIMPLE_CHUNK_PAGE_W_Q8 && new_chunk_x + 1 < DOOM_CHUNK_COLS) {
-        new_chunk_x++;
-        px -= SIMPLE_CHUNK_PAGE_W_Q8;
-        shift_x = (short)(shift_x - SIMPLE_CHUNK_PAGE_W_Q8);
-    }
-    while (py < 0 && new_chunk_y > 0) {
-        new_chunk_y--;
-        py += SIMPLE_CHUNK_PAGE_H_Q8;
-        shift_y = (short)(shift_y + SIMPLE_CHUNK_PAGE_H_Q8);
-    }
-    while (py >= SIMPLE_CHUNK_PAGE_H_Q8 && new_chunk_y + 1 < DOOM_CHUNK_ROWS) {
-        new_chunk_y++;
-        py -= SIMPLE_CHUNK_PAGE_H_Q8;
-        shift_y = (short)(shift_y - SIMPLE_CHUNK_PAGE_H_Q8);
-    }
-
-    if (new_chunk_x == chunk_x && new_chunk_y == chunk_y) return;
+    stream = ng_chunk_stream_update(px, py, SIMPLE_ACTIVE_CHUNK);
+    if (!stream.changed) return;
 
     save_active_chunk_runtime_things();
-    g_simple_active_chunk = (unsigned short)(new_chunk_y * DOOM_CHUNK_COLS + new_chunk_x);
-    rc_shift_player_q8(shift_x, shift_y);
+    g_simple_active_chunk = stream.chunk;
+    rc_shift_player_q8(stream.shift_x_q8, stream.shift_y_q8);
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     load_active_chunk_dynamic_drops();
     init_runtime_things();

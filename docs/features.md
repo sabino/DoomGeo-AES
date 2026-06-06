@@ -418,6 +418,10 @@ readable.
   coarse-grid wall, chunk conversion moves it to the nearest open cell and
   opens the minimum number of coarse wall cells needed to preserve a playable
   start-to-exit route.
+- `make chunk-stream-check` compiles a host probe against the generated chunk
+  header and the same inline streaming helper used by the 68000 runtime. It
+  verifies that local player coordinates wrap by full `16x16` q8 pages when the
+  active chunk changes, guarding against tiny-shift chunk drift.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. `make episode-route-check` runs the same pass in strict
