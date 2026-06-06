@@ -79,6 +79,21 @@ and emits generated C headers/sources under `build/`:
   chunk-local thing metadata, and writes an ASCII preview for inspection. The
   runtime streams one generated page at a time into the existing simple-map
   renderer.
+- RIPDOOM-lite geometry path. `tools/doom_ripdoom_convert.py` is the next
+  converter track inspired by the SNES Doom tooling model: keep the authored
+  simple map as the playable baseline, but separately emit compact WAD-native
+  geometry tables for `VERTEXES`, `LINEDEFS`, `SIDEDEFS`, `SECTORS`, `SEGS`,
+  `SSECTORS`, `NODES`, `REJECT`, `BLOCKMAP`, and `THINGS`. Generated segs carry
+  preclassified flags for one-sided/two-sided walls, solid/passable spans,
+  doors, lower/upper wall deltas, and mid textures. The converter also emits a
+  linedef-to-seg index so runtime code can turn nearby blockmap lines into a
+  small seg candidate list without scanning the whole map. This data is
+  validated by `make ripdoom-check`. `ripdoom_runtime.c` adds the first
+  runtime-facing query helpers for BSP point-to-subsector/sector lookup,
+  blockmap cell line counts, local line/seg collection, and nearest local ray
+  hits; `make ripdoom-runtime-check` compiles those helpers as a host probe,
+  and `DOOM_RIPDOOM_RUNTIME=1` includes them in a Neo Geo ROM. The wall
+  renderer still ignores these tables until the table contract is stable.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

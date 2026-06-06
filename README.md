@@ -19,6 +19,7 @@ drawing pixels.
 | Rendering | Default 40-column wall raycaster tuned for readable navigation, with WAD-derived portal/span hits, denser Doom wall/door atlases, lower/upper sector-height span cues, throttled wall strip uploads, brighter depth palettes, and pre-baked moving floor/ceiling planes. `DOOM_SIMPLE_MAP=1` keeps the original NGRayEx-style 80-column, full-height grid DDA proportions and disables WAD render-line refinement while retaining Doom HUD/weapons/things. Failed/missing or wall-hidden sprite strips no longer consume visible thing slots. |
 | HUD | Doom `STBAR`, face frames, key/weapon indicators, large red status digits, and compact ammo counters. |
 | Weapons | Fist, pistol, shotgun, chaingun, rocket launcher, plasma rifle, BFG, and chainsaw have playable runtime paths when the selected IWAD supplies the matching psprite art. The default shareware build masks unavailable plasma/BFG psprites instead of drawing fake placeholders; explicit Freedoom builds exercise the full redistributable weapon-art path. |
+| RIPDOOM-lite geometry | `make ripdoom-map ripdoom-check ripdoom-runtime-check` emits and validates a compact, SNES-inspired geometry package from real Doom `VERTEXES`, `LINEDEFS`, `SIDEDEFS`, `SECTORS`, `SEGS`, `SSECTORS`, `NODES`, `REJECT`, `BLOCKMAP`, and `THINGS`, plus a linedef-to-seg index for cheap local renderer candidates. `DOOM_RIPDOOM_RUNTIME=1` also compiles the C BSP/blockmap query layer and local ray-hit helper into a ROM. This is the next converter contract for BSP/seg-driven rendering; it does not drive wall rendering yet. |
 | Gameplay | Pickups, keys, timed powerups, doors, exits, secrets, hurt/bonus/muzzle feedback, monsters with baked Doom rotation frames, barrels, corpses, drops, projectiles, and compact AI are present. Two-sided lines use Doom-like player-height and step-height checks, so small stairs stay passable while high ledges remain blocking. `make combat-test-rom`, `make encounter-test-rom`, `make monster-gallery-rom`, and `make arsenal-test-rom` boot isolated verification ROMs. |
 | Map | Low-complexity internal grid with a downsampled fix-layer minimap for player, walls, pickups, threats, doors, and exits. Opening and normal closing spread fix-layer work across frames instead of blocking on full one-frame redraws. |
 | Flow | Normal ROMs boot to a fix-layer block-letter intro/menu and start E1M1 with B or D. Focused verification ROMs skip the intro so smoke captures still launch directly into their scenario. |
@@ -143,6 +144,8 @@ make cart DOOM_DETAIL=balanced    # 32 wall columns, nine world things
 make cart DOOM_DETAIL=speed       # 20 wall columns, eleven world things
 make route-check
 make DOOM_MAP=E1M1 BUILDDIR=build/chunk-e1m1 chunk-map chunk-route-check chunk-visibility-check
+make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-map ripdoom-check
+make DOOM_MAP=E1M1 BUILDDIR=build/ripdoom-e1m1 ripdoom-runtime-check
 make bsp-asset-check
 tools/smoke_gameplay.sh
 make key-test-rom
