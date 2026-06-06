@@ -100,6 +100,14 @@ and emits generated C headers/sources under `build/`:
   RIPDOOM ray candidate path, so a door that becomes passable no longer remains
   a static visual blocker in the sprite-strip renderer. This render mode is not
   the default gameplay path yet.
+- Chunk movement validation mirrors the runtime stream contract. The
+  `chunk-movement-check` host probe still verifies that the real start pose can
+  move forward for the first scripted ticks, and now also follows a generated
+  start-to-exit route across 16x16 pages while opening generated door/lift
+  state and checking player-radius occupancy at each route cell and edge
+  midpoint. This catches cases where the static route checker says a path
+  exists but the runtime chunk window, door/lift state, or player body cannot
+  actually traverse it.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.
