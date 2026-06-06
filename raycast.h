@@ -6,6 +6,7 @@
 
 void rc_init(void);          /* set player start, init shadow buffers       */
 u8 rc_input(u8 pressed);     /* pressed = active-HIGH P1 bits; returns camera changed */
+u8 rc_moved_last_input(void);
 void rc_invalidate_view(void);
 void rc_render(void);        /* run DDA for every column -> shadow buffers   */
 void rc_set_frame_overrun(u8 overrun);

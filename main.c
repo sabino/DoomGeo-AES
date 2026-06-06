@@ -6909,6 +6909,7 @@ int main(void) {
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
         u8 camera_changed = 0;
+        u8 player_moved = 0;
 #if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
         pressed = chunk_movement_test_pressed(pressed);
 #endif
@@ -6923,8 +6924,10 @@ int main(void) {
                 move_pressed = (u8)(move_pressed & ~dpad);
             }
             camera_changed |= rc_input(move_pressed);
+            player_moved |= rc_moved_last_input();
             if (catchup_input && (move_pressed & dpad)) {
                 camera_changed |= rc_input(move_pressed);
+                player_moved |= rc_moved_last_input();
             }
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
             update_chunk_streaming();
@@ -6986,7 +6989,7 @@ int main(void) {
          * advancing from stale visibility after the source leaves view. */
         update_projectile();
         update_monster_damage();
-        update_weapon(pressed, camera_changed);
+        update_weapon(pressed, player_moved);
         update_enemy_hit_flash();
         update_power_timers();
         update_status_numbers(pressed);

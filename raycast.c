@@ -98,6 +98,7 @@ static u8  wall_upload_scan = 0;
 static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
 static u8  render_motion_active = 0;
+static u8  moved_last_input = 0;
 #if DOOM_RIPDOOM_RENDER
 static long ripdoom_start_global_x_q8 = 0;
 static long ripdoom_start_global_y_q8 = 0;
@@ -388,6 +389,7 @@ u8 rc_input(u8 pressed) {
     signed char side = 0;
     signed char turn = 0;
     u8 camera_changed = 0;
+    moved_last_input = 0;
     if (pressed & A) {                              /* strafe with A held    */
         side = input_axis(pressed, LEFT, RIGHT);
     } else {
@@ -409,7 +411,8 @@ u8 rc_input(u8 pressed) {
             if (side > 0) { dx += step_x; dy += step_y; }
             else          { dx -= step_x; dy -= step_y; }
         }
-        camera_changed |= try_move(dx, dy);
+        moved_last_input = try_move(dx, dy);
+        camera_changed |= moved_last_input;
     }
     if (turn) {
         rotate(turn);
@@ -417,6 +420,10 @@ u8 rc_input(u8 pressed) {
     }
     render_motion_active = camera_changed;
     return camera_changed;
+}
+
+u8 rc_moved_last_input(void) {
+    return moved_last_input;
 }
 
 void rc_player_cell(int *cx, int *cy) {

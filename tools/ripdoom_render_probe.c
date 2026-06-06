@@ -16,13 +16,18 @@
 #define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 8
 #endif
 
+static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first);
+
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 enum {
     PLAYER_RADIUS_Q8 = 51,
     DYNAMIC_BLOCK_RANGE_Q8 = 104,
     MOVE_SPEED_Q8 = 31,
     MOVEMENT_RENDER_TICKS = 70,
-    MIN_RENDER_MOVE_PROGRESS_Q8 = 256
+    MIN_RENDER_MOVE_PROGRESS_Q8 = 256,
+    ROUTE_WAYPOINTS = 8,
+    ROUTE_MIN_HITS = 40,
+    MAX_ROUTE_CELLS = DOOM_CHUNK_COUNT * DOOM_CHUNK_CELLS
 };
 
 typedef struct DynamicBlocker {
@@ -32,6 +37,21 @@ typedef struct DynamicBlocker {
 
 static DynamicBlocker dynamic_blockers[DOOM_CHUNK_MAX_ACTIVE_THINGS ? DOOM_CHUNK_MAX_ACTIVE_THINGS : 1];
 static int dynamic_blocker_count = 0;
+static int route_prev[MAX_ROUTE_CELLS ? MAX_ROUTE_CELLS : 1];
+static int route_queue[MAX_ROUTE_CELLS ? MAX_ROUTE_CELLS : 1];
+static int route_path[MAX_ROUTE_CELLS ? MAX_ROUTE_CELLS : 1];
+
+static void ripdoom_pose_from_chunk_q8(
+    unsigned short active_chunk,
+    int local_x_q8,
+    int local_y_q8,
+    long start_global_x_q8,
+    long start_global_y_q8,
+    int start_rip_x,
+    int start_rip_y,
+    int *rip_x,
+    int *rip_y
+);
 
 static int floor_div16(int value) {
     return value >= 0 ? value / SIMPLE_MAP_W : -((SIMPLE_MAP_W - 1 - value) / SIMPLE_MAP_W);
@@ -127,6 +147,14 @@ static int mul_q8(int a, int b) {
     return (a * b) / 256;
 }
 
+static int global_grid_w(void) {
+    return DOOM_CHUNK_COLS * SIMPLE_MAP_W;
+}
+
+static int global_grid_h(void) {
+    return DOOM_CHUNK_ROWS * SIMPLE_MAP_H;
+}
+
 static int chunk_global_x_q8(unsigned short active_chunk, int x_q8) {
     int chunk_x = active_chunk % DOOM_CHUNK_COLS;
     return chunk_x * SIMPLE_MAP_W * 256 + x_q8;
@@ -135,6 +163,159 @@ static int chunk_global_x_q8(unsigned short active_chunk, int x_q8) {
 static int chunk_global_y_q8(unsigned short active_chunk, int y_q8) {
     int chunk_y = active_chunk / DOOM_CHUNK_COLS;
     return chunk_y * SIMPLE_MAP_H * 256 + y_q8;
+}
+
+static int global_cell_blocked(int x, int y) {
+    unsigned short chunk;
+    unsigned short cell;
+    int width = global_grid_w();
+    int height = global_grid_h();
+    if (x < 0 || y < 0 || x >= width || y >= height) return 1;
+    chunk = (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
+    cell = (unsigned short)((y % SIMPLE_MAP_H) * SIMPLE_MAP_W + (x % SIMPLE_MAP_W));
+    if (g_chunk_door_cell[chunk][cell] >= 2) return 0;
+    if (g_chunk_lift_cell[chunk][cell]) return 0;
+    return g_chunk_solid[chunk][cell] ? 1 : 0;
+}
+
+static int build_route_to_exit(int *out_path, int max_path) {
+    static const signed char dirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+    int width = global_grid_w();
+    int height = global_grid_h();
+    int cell_count = width * height;
+    int start_cell;
+    int target_cell = -1;
+    int head = 0;
+    int tail = 0;
+    int path_len = 0;
+
+    if (cell_count > MAX_ROUTE_CELLS || max_path <= 0 || DOOM_CHUNK_EXIT_COUNT <= 0) {
+        fprintf(stderr, "RIPDOOM route probe failed: invalid route bounds cells=%d max=%d exits=%d\n", cell_count, MAX_ROUTE_CELLS, DOOM_CHUNK_EXIT_COUNT);
+        return 0;
+    }
+    for (int i = 0; i < cell_count; i++) route_prev[i] = -2;
+
+    start_cell = (DOOM_CHUNK_START_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * width
+        + (DOOM_CHUNK_START_Y_Q8 >> 8) * width
+        + (DOOM_CHUNK_START_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W
+        + (DOOM_CHUNK_START_X_Q8 >> 8);
+    if (start_cell < 0 || start_cell >= cell_count || global_cell_blocked(start_cell % width, start_cell / width)) {
+        fprintf(stderr, "RIPDOOM route probe failed: start blocked/out of bounds cell=%d pos=(%d,%d)\n", start_cell, start_cell % width, start_cell / width);
+        return 0;
+    }
+
+    for (unsigned short i = 0; i < DOOM_CHUNK_EXIT_COUNT; i++) {
+        int x = g_chunk_exits[i].x_q8 >> 8;
+        int y = g_chunk_exits[i].y_q8 >> 8;
+        if (x >= 0 && y >= 0 && x < width && y < height) {
+            target_cell = y * width + x;
+            break;
+        }
+    }
+    if (target_cell < 0) {
+        fprintf(stderr, "RIPDOOM route probe failed: no valid exit target\n");
+        return 0;
+    }
+
+    route_prev[start_cell] = -1;
+    route_queue[tail++] = start_cell;
+    while (head < tail) {
+        int cell = route_queue[head++];
+        int x = cell % width;
+        int y = cell / width;
+        if (cell == target_cell) break;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + dirs[d][0];
+            int ny = y + dirs[d][1];
+            int next;
+            if (global_cell_blocked(nx, ny)) continue;
+            next = ny * width + nx;
+            if (route_prev[next] != -2) continue;
+            route_prev[next] = cell;
+            route_queue[tail++] = next;
+        }
+    }
+    if (route_prev[target_cell] == -2) {
+        fprintf(stderr, "RIPDOOM route probe failed: no route start=(%d,%d) exit=(%d,%d) visited=%d\n", start_cell % width, start_cell / width, target_cell % width, target_cell / width, tail);
+        return 0;
+    }
+
+    for (int cell = target_cell; cell >= 0 && path_len < max_path; cell = route_prev[cell]) {
+        route_path[path_len++] = cell;
+        if (route_prev[cell] == -1) break;
+    }
+    for (int i = 0; i < path_len; i++) out_path[i] = route_path[path_len - 1 - i];
+    return path_len;
+}
+
+static void route_view_for_index(const int *path, int path_len, int index, short *view_x, short *view_y) {
+    int width = global_grid_w();
+    int prev = index > 3 ? index - 3 : 0;
+    int next = index + 3 < path_len ? index + 3 : path_len - 1;
+    int dx = (path[next] % width) - (path[prev] % width);
+    int dy = (path[next] / width) - (path[prev] / width);
+    if (abs(dx) >= abs(dy) && dx) {
+        *view_x = dx < 0 ? -256 : 256;
+        *view_y = 0;
+    } else if (dy) {
+        *view_x = 0;
+        *view_y = dy < 0 ? 256 : -256;
+    } else {
+        *view_x = (short)FIX(DOOM_CHUNK_START_DIR_X);
+        *view_y = (short)FIX(-DOOM_CHUNK_START_DIR_Y);
+    }
+}
+
+static int validate_route_waypoints(int start_rip_x, int start_rip_y, long start_global_x_q8, long start_global_y_q8, int *out_waypoints, int *out_steps) {
+    int route[MAX_ROUTE_CELLS ? MAX_ROUTE_CELLS : 1];
+    int path_len = build_route_to_exit(route, MAX_ROUTE_CELLS);
+    int sampled = 0;
+    if (path_len <= 1) return 0;
+    *out_steps = path_len - 1;
+
+    for (int sample = 1; sample <= ROUTE_WAYPOINTS; sample++) {
+        int index = (sample * (path_len - 1)) / (ROUTE_WAYPOINTS + 1);
+        int width = global_grid_w();
+        int cell = route[index];
+        int global_x_q8 = (cell % width) * 256 + 128;
+        int global_y_q8 = (cell / width) * 256 + 128;
+        unsigned short chunk = (unsigned short)((cell / width / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (cell % width / SIMPLE_MAP_W));
+        int local_x_q8 = global_x_q8 - (chunk % DOOM_CHUNK_COLS) * SIMPLE_MAP_W * 256;
+        int local_y_q8 = global_y_q8 - (chunk / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * 256;
+        int rip_x;
+        int rip_y;
+        short waypoint_view_x;
+        short waypoint_view_y;
+        unsigned int waypoint_min = 0xffff;
+        unsigned int waypoint_max = 0;
+        int waypoint_first = -1;
+        int waypoint_hits;
+        ripdoom_pose_from_chunk_q8(chunk, local_x_q8, local_y_q8, start_global_x_q8, start_global_y_q8, start_rip_x, start_rip_y, &rip_x, &rip_y);
+        route_view_for_index(route, path_len, index, &waypoint_view_x, &waypoint_view_y);
+        waypoint_hits = sample_view(rip_x, rip_y, waypoint_view_x, waypoint_view_y, &waypoint_min, &waypoint_max, &waypoint_first);
+        if (waypoint_hits < ROUTE_MIN_HITS) {
+            fprintf(
+                stderr,
+                "RIPDOOM render probe failed: route waypoint %d/%d cell=(%d,%d) hits=%d/80 first=%d dist=%u..%u rip=(%d,%d) view=(%d,%d)\n",
+                sample,
+                ROUTE_WAYPOINTS,
+                cell % width,
+                cell / width,
+                waypoint_hits,
+                waypoint_first,
+                waypoint_min,
+                waypoint_max,
+                rip_x,
+                rip_y,
+                waypoint_view_x,
+                waypoint_view_y
+            );
+            return 0;
+        }
+        sampled++;
+    }
+    *out_waypoints = sampled;
+    return sampled == ROUTE_WAYPOINTS;
 }
 
 static void ripdoom_pose_from_chunk_q8(
@@ -354,6 +535,8 @@ int main(void) {
             unsigned int moved_max = 0;
             int moved_first = -1;
             int moved_hits;
+            int route_waypoints = 0;
+            int route_steps = 0;
             long start_global_x_q8 = chunk_global_x_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_X_Q8);
             long start_global_y_q8 = chunk_global_y_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_Y_Q8);
 
@@ -407,8 +590,17 @@ int main(void) {
                 );
                 return 1;
             }
+            if (!validate_route_waypoints(start_x, start_y, start_global_x_q8, start_global_y_q8, &route_waypoints, &route_steps)) {
+                fprintf(
+                    stderr,
+                    "RIPDOOM render probe failed: route waypoint validation failed route_steps=%d sampled=%d\n",
+                    route_steps,
+                    route_waypoints
+                );
+                return 1;
+            }
             printf(
-                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_progress_q8=%d moved_ticks=%d\n",
+                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d\n",
                 start_angle,
                 mode,
                 hits,
@@ -425,7 +617,9 @@ int main(void) {
                 moved_min,
                 moved_max,
                 progress_q8,
-                moved_ticks
+                moved_ticks,
+                route_waypoints,
+                route_steps
             );
             return 0;
         }
