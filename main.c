@@ -14,7 +14,8 @@
 #if defined(DOOM_COMBAT_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) \
     || defined(DOOM_E1M1_EXIT_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_MELEE_TEST) \
     || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) \
-    || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_E1M8_BOSS_TEST)
+    || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_E1M8_BOSS_TEST) \
+    || defined(DOOM_CHUNK_MOVEMENT_TEST)
 #define DOOM_FOCUSED_TEST 1
 #define DOOM_SKIP_INTRO 1
 #endif
@@ -3933,6 +3934,36 @@ static void configure_powerup_test(void) {
 }
 #endif
 
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+static u16 chunk_movement_test_tick = 0;
+
+static void configure_chunk_movement_test(void) {
+    g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
+    init_runtime_things();
+    rc_set_pose_q8(
+        (short)DOOM_CHUNK_START_X_Q8,
+        (short)DOOM_CHUNK_START_Y_Q8,
+        (short)(DOOM_CHUNK_START_DIR_X * 256.0),
+        (short)(DOOM_CHUNK_START_DIR_Y * 256.0)
+    );
+    chunk_movement_test_tick = 0;
+}
+
+static u8 chunk_movement_test_pressed(u8 pressed) {
+    enum { UP = 0x01, START_DELAY = 60, WALK_TICKS = 180 };
+    (void)pressed;
+    if (chunk_movement_test_tick < START_DELAY) {
+        chunk_movement_test_tick++;
+        return 0;
+    }
+    if (chunk_movement_test_tick < START_DELAY + WALK_TICKS) {
+        chunk_movement_test_tick++;
+        return UP;
+    }
+    return 0;
+}
+#endif
+
 static u8 add_capped_u16(volatile u16 *value, u16 amount, u16 cap) {
     if (*value >= cap) return 0;
     *value = (u16)(*value + amount > cap ? cap : *value + amount);
@@ -4339,6 +4370,10 @@ static void update_input_debug_overlay(u8 pressed) {
     int py;
     rc_player_q8(&px, &py);
     draw_stat3(0, 0, FIX_SOLID, pressed);
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    draw_stat3(0, 1, FIX_SOLID, SIMPLE_ACTIVE_CHUNK);
+    return;
+#endif
     draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
     draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
@@ -6623,7 +6658,7 @@ static void update_chunk_streaming(void) {
     short shift_x = 0;
     short shift_y = 0;
 
-#ifdef DOOM_FOCUSED_TEST
+#if defined(DOOM_FOCUSED_TEST) && !defined(DOOM_CHUNK_MOVEMENT_TEST)
     return;
 #endif
     rc_player_q8(&px, &py);
@@ -6865,6 +6900,9 @@ static void restart_level(void) {
 #ifdef DOOM_E1M8_BOSS_TEST
     configure_e1m8_boss_test();
 #endif
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    configure_chunk_movement_test();
+#endif
     update_sector_flat_palette();
     init_background();
     init_walls();
@@ -6886,6 +6924,9 @@ int main(void) {
 
     for (;;) {
         u8 pressed = (u8)~REG_P1CNT;
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+        pressed = chunk_movement_test_pressed(pressed);
+#endif
         u8 catchup_input = input_catchup_pending;
         input_catchup_pending = 0;
         if (game_active()) {
@@ -6902,6 +6943,10 @@ int main(void) {
             }
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
             update_chunk_streaming();
+#if defined(DOOM_CHUNK_MOVEMENT_TEST)
+            player_kills = SIMPLE_ACTIVE_CHUNK;
+            shown_frags = 0xFFFF;
+#endif
 #endif
             update_floor_damage();
             check_secret_reached();
@@ -6935,8 +6980,8 @@ int main(void) {
             watchdog_kick();
             update_sector_flat_palette();
             update_hurt_flash();
-            update_weapon_flash();
-            update_background_scroll(frame_overrun);
+        update_weapon_flash();
+        update_background_scroll(frame_overrun);
         }
         rc_blit();                      /* push to VRAM during vblank         */
         update_impact_effect();

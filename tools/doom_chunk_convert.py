@@ -167,6 +167,9 @@ def start_room_center_cell(
     if not candidates:
         return fallback_x, fallback_y
 
+    if (fallback_x, fallback_y) in candidates and wall_clearance(grid, fallback_x, fallback_y) > 0:
+        return fallback_x, fallback_y
+
     min_x = min(x for x, _y in candidates)
     max_x = max(x for x, _y in candidates)
     min_y = min(y for _x, y in candidates)

@@ -56,6 +56,7 @@ DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=quality
 DOOM_FRAME_STATS?=0
 DOOM_INPUT_DEBUG?=0
+DOOM_CHUNK_MOVEMENT_TEST?=0
 DOOM_SKIP_INTRO?=0
 DOOM_WALL_UPLOAD_COLUMNS?=
 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
@@ -107,6 +108,9 @@ override CFLAGS += -DDOOM_FRAME_STATS=1
 endif
 ifeq ($(DOOM_INPUT_DEBUG),1)
 override CFLAGS += -DDOOM_INPUT_DEBUG=1
+endif
+ifeq ($(DOOM_CHUNK_MOVEMENT_TEST),1)
+override CFLAGS += -DDOOM_CHUNK_MOVEMENT_TEST=1
 endif
 ifeq ($(DOOM_SKIP_INTRO),1)
 override CFLAGS += -DDOOM_SKIP_INTRO=1
@@ -305,6 +309,13 @@ chunk-key-door-test-gngeo:
 	$(MAKE) chunk-key-door-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
 
+chunk-movement-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=32 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_CHUNK_MOVEMENT_TEST=1 BUILDDIR=build/chunk-movement-test ROM=build/chunk-movement-test-rom GFX_ROM_DIR=build/chunk-movement-test-assets
+
+chunk-movement-test-gngeo:
+	$(MAKE) chunk-movement-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-movement-test-rom $(GAMEROM)
+
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
 
@@ -492,7 +503,7 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
