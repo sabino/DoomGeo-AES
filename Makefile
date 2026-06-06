@@ -69,6 +69,7 @@ DOOM_CHUNK_HEADER=$(BUILDDIR)/doom_chunks_generated.h
 DOOM_CHUNK_SOURCE=$(BUILDDIR)/doom_chunks_generated.c
 DOOM_CHUNK_OBJECT=
 DOOM_CHUNK_DEP=
+DOOM_CHUNK_RENDER_SOURCE=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
 DOOM_CHUNK_CELL_UNITS?=64
@@ -126,6 +127,7 @@ override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=1
 override CFLAGS += -DDOOM_CHUNK_CELL_UNITS=$(DOOM_CHUNK_CELL_UNITS)
 DOOM_CHUNK_OBJECT=$(BUILDDIR)/doom_chunks_generated.o
 DOOM_CHUNK_DEP=$(DOOM_CHUNK_HEADER)
+DOOM_CHUNK_RENDER_SOURCE=$(DOOM_CHUNK_SOURCE)
 else
 override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=0
 endif
@@ -519,7 +521,7 @@ ripdoom-runtime-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(BUILDDIR)/ripdoom_runtime_probe
 
 ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_DEP)
-	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
 .PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
