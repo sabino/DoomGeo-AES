@@ -1,6 +1,9 @@
 #include <stdio.h>
 
 #include "ripdoom_runtime.h"
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#include "doom_chunks_generated.h"
+#endif
 
 static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first) {
     enum { COLUMNS = 80, PLANE_Q8 = 169 };
@@ -41,6 +44,19 @@ int main(void) {
     unsigned int max_dist = 0;
     const char *mode = "player";
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    {
+        long chunk_x = DOOM_CHUNK_START_CHUNK % DOOM_CHUNK_COLS;
+        long chunk_y = DOOM_CHUNK_START_CHUNK / DOOM_CHUNK_COLS;
+        long global_x_q8 = chunk_x * DOOM_CHUNK_SIZE * 256L + DOOM_CHUNK_START_X_Q8;
+        long global_y_q8 = chunk_y * DOOM_CHUNK_SIZE * 256L + DOOM_CHUNK_START_Y_Q8;
+        start_x = (int)(DOOM_CHUNK_ORIGIN_X + ((global_x_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+        start_y = (int)(DOOM_CHUNK_ORIGIN_Y - ((global_y_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+        start_angle = DOOM_CHUNK_START_ANGLE;
+        player_seen = 1;
+        mode = "chunk";
+    }
+#else
     for (int i = 0; i < NG_RIP_THING_COUNT; i++) {
         if (g_rip_things[i].type == 1) {
             start_x = g_rip_things[i].x;
@@ -50,6 +66,7 @@ int main(void) {
             break;
         }
     }
+#endif
     if (!player_seen) {
         fprintf(stderr, "RIPDOOM render probe failed: no player start thing\n");
         return 1;

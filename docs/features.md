@@ -51,6 +51,11 @@ readable.
   actor arrays use that active-window cap instead of the full converted map's
   thing count, so E1M1 keeps persistent state for all things but scans only the
   currently streamable actor set.
+- Chunk start placement still prefers an open centered cell in the player's
+  source sector, but now also scores exact forward visual clearance against WAD
+  linedefs. This keeps the E1M1 playable start from being pushed into a coarse
+  cell that looks open in the `16x16` grid while the RIPDOOM wall renderer is
+  actually too close to the front wall.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
   player input. `make chunk-movement-test-rom` uses the same scale but replaces

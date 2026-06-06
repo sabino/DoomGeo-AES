@@ -116,6 +116,76 @@ def wall_clearance(grid: list[list[int]], x: int, y: int, limit: int = 5) -> int
     return limit
 
 
+def visual_linedef_for_start(
+    line: dc.LineDef,
+    sidedefs: list[dc.SideDef],
+    sectors: list[dc.Sector],
+) -> bool:
+    if line.side_back == 0xFFFF:
+        return True
+    if line.side_front >= len(sidedefs) or line.side_back >= len(sidedefs):
+        return True
+    front_side = sidedefs[line.side_front]
+    back_side = sidedefs[line.side_back]
+    if front_side.mid_texture != "-" or back_side.mid_texture != "-":
+        return True
+    if front_side.sector >= len(sectors) or back_side.sector >= len(sectors):
+        return True
+    front = sectors[front_side.sector]
+    back = sectors[back_side.sector]
+    return front.floor_height != back.floor_height or front.ceiling_height != back.ceiling_height
+
+
+def ray_segment_distance(
+    px: float,
+    py: float,
+    dx: float,
+    dy: float,
+    ax: float,
+    ay: float,
+    bx: float,
+    by: float,
+) -> float | None:
+    sx = bx - ax
+    sy = by - ay
+    den = dx * sy - dy * sx
+    if abs(den) < 0.000001:
+        return None
+    qx = ax - px
+    qy = ay - py
+    t = (qx * sy - qy * sx) / den
+    u = (qx * dy - qy * dx) / den
+    if t <= 0.0 or u < 0.0 or u > 1.0:
+        return None
+    return t
+
+
+def forward_visual_clearance(
+    x: float,
+    y: float,
+    angle: int,
+    linedefs: list[dc.LineDef],
+    sidedefs: list[dc.SideDef],
+    sectors: list[dc.Sector],
+    vertices: list[dc.Vertex],
+) -> float:
+    angle_rad = math.radians(angle)
+    dir_x = math.cos(angle_rad)
+    dir_y = math.sin(angle_rad)
+    best = 4096.0
+    for line in linedefs:
+        if line.v1 >= len(vertices) or line.v2 >= len(vertices):
+            continue
+        if not visual_linedef_for_start(line, sidedefs, sectors):
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        dist = ray_segment_distance(x, y, dir_x, dir_y, a.x, a.y, b.x, b.y)
+        if dist is not None and dist < best:
+            best = dist
+    return best
+
+
 def sector_index_for_point(
     x: float,
     y: float,
@@ -143,6 +213,7 @@ def start_room_center_cell(
     fallback_x: int,
     fallback_y: int,
     chunk_size: int,
+    start_angle: int,
 ) -> tuple[int, int]:
     sector_index = sector_index_for_point(player.x, player.y, linedefs, sidedefs, vertices, sectors)
     if sector_index is None:
@@ -180,7 +251,20 @@ def start_room_center_cell(
         dy = y - target_y
         horizontal, vertical = open_span_lengths(grid, x, y)
         clearance = wall_clearance(grid, x, y)
-        score = int(-(dx * dx + dy * dy) * 64 + clearance * 16 + horizontal + vertical)
+        doom_x, doom_y = doom_coord_from_cell(x, y, origin_x, origin_y, cell_units)
+        forward_clearance = min(
+            forward_visual_clearance(doom_x, doom_y, start_angle, linedefs, sidedefs, sectors, vertices),
+            384.0,
+        )
+        score = int(
+            -(dx * dx + dy * dy) * 64
+            + clearance * 16
+            + horizontal
+            + vertical
+            + forward_clearance * 6
+        )
+        if forward_clearance < 160.0:
+            score -= int((160.0 - forward_clearance) * 16)
         if score > best_score:
             best_score = score
             best_cell = (x, y)
@@ -933,6 +1017,7 @@ def convert(args: argparse.Namespace) -> None:
             start_cell_x,
             start_cell_y,
             args.chunk_size,
+            player.angle,
         )
         start_x = start_cell_x + 0.5
         start_y = start_cell_y + 0.5
