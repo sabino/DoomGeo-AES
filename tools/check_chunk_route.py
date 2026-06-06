@@ -29,6 +29,7 @@ KEY_THING_MASKS = {
     6: KEY_YELLOW,
     39: KEY_YELLOW,
 }
+PLAYER_RADIUS_Q8 = 51
 
 
 def parse_define_int(text: str, name: str) -> int:
@@ -121,6 +122,63 @@ def neighbors(x: int, y: int) -> tuple[tuple[int, int], ...]:
     return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
 
 
+def floor_q8_cell(value_q8: int) -> int:
+    return value_q8 // 256
+
+
+def cell_blocked(
+    grid: list[list[int]],
+    x: int,
+    y: int,
+    passable_overrides: set[tuple[int, int]],
+) -> bool:
+    width = len(grid[0])
+    height = len(grid)
+    if x < 0 or y < 0 or x >= width or y >= height:
+        return True
+    return bool(grid[y][x] and (x, y) not in passable_overrides)
+
+
+def can_player_occupy_q8(
+    grid: list[list[int]],
+    x_q8: int,
+    y_q8: int,
+    passable_overrides: set[tuple[int, int]],
+) -> bool:
+    cx = floor_q8_cell(x_q8)
+    cy = floor_q8_cell(y_q8)
+    return not (
+        cell_blocked(grid, cx, cy, passable_overrides)
+        or cell_blocked(grid, floor_q8_cell(x_q8 - PLAYER_RADIUS_Q8), cy, passable_overrides)
+        or cell_blocked(grid, floor_q8_cell(x_q8 + PLAYER_RADIUS_Q8), cy, passable_overrides)
+        or cell_blocked(grid, cx, floor_q8_cell(y_q8 - PLAYER_RADIUS_Q8), passable_overrides)
+        or cell_blocked(grid, cx, floor_q8_cell(y_q8 + PLAYER_RADIUS_Q8), passable_overrides)
+    )
+
+
+def cell_center_q8(cell: tuple[int, int]) -> tuple[int, int]:
+    return cell[0] * 256 + 128, cell[1] * 256 + 128
+
+
+def validate_player_path(
+    grid: list[list[int]],
+    path: list[tuple[int, int]],
+    passable_overrides: set[tuple[int, int]],
+) -> str | None:
+    for index, cell in enumerate(path):
+        x_q8, y_q8 = cell_center_q8(cell)
+        if not can_player_occupy_q8(grid, x_q8, y_q8, passable_overrides):
+            return f"path cell {index} {cell} cannot fit player radius"
+        if index == 0:
+            continue
+        prev_x_q8, prev_y_q8 = cell_center_q8(path[index - 1])
+        mid_x_q8 = (prev_x_q8 + x_q8) // 2
+        mid_y_q8 = (prev_y_q8 + y_q8) // 2
+        if not can_player_occupy_q8(grid, mid_x_q8, mid_y_q8, passable_overrides):
+            return f"path edge {index - 1}->{index} {path[index - 1]}->{cell} cannot fit player radius"
+    return None
+
+
 def build_global_grid(chunks: list[list[int]], chunk_cols: int, chunk_size: int) -> list[list[int]]:
     chunk_rows = (len(chunks) + chunk_cols - 1) // chunk_cols
     width = chunk_cols * chunk_size
@@ -208,6 +266,38 @@ def key_aware_bfs(
     return None
 
 
+def validate_key_player_path(
+    grid: list[list[int]],
+    path: list[tuple[int, int]],
+    normal_interactive: set[tuple[int, int]],
+    locked_doors: dict[tuple[int, int], int],
+    keys: dict[tuple[int, int], int],
+) -> str | None:
+    owned_keys = 0
+    for index, cell in enumerate(path):
+        required_key = locked_doors.get(cell, 0)
+        if required_key and (owned_keys & required_key) == 0:
+            return f"key route cell {index} {cell} crosses locked door without key mask 0x{required_key:x}"
+        passable = set(normal_interactive)
+        for door_cell, key_mask in locked_doors.items():
+            if owned_keys & key_mask:
+                passable.add(door_cell)
+        if not can_player_occupy_q8(grid, *cell_center_q8(cell), passable):
+            return f"key route cell {index} {cell} cannot fit player radius with keys 0x{owned_keys:x}"
+        if index:
+            prev_x_q8, prev_y_q8 = cell_center_q8(path[index - 1])
+            cell_x_q8, cell_y_q8 = cell_center_q8(cell)
+            mid_x_q8 = (prev_x_q8 + cell_x_q8) // 2
+            mid_y_q8 = (prev_y_q8 + cell_y_q8) // 2
+            if not can_player_occupy_q8(grid, mid_x_q8, mid_y_q8, passable):
+                return (
+                    f"key route edge {index - 1}->{index} {path[index - 1]}->{cell} "
+                    f"cannot fit player radius with keys 0x{owned_keys:x}"
+                )
+        owned_keys |= keys.get(cell, 0)
+    return None
+
+
 def forward_open_cells(
     grid: list[list[int]],
     start_x: float,
@@ -243,6 +333,12 @@ def main() -> int:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Require a start-to-exit route that collects matching keys before locked doors",
+    )
+    parser.add_argument(
+        "--check-player-radius-route",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require accepted chunk routes to fit the runtime player collision radius",
     )
     args = parser.parse_args()
 
@@ -351,6 +447,11 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    if args.check_player_radius_route:
+        error = validate_player_path(grid, interactive_path, interactive)
+        if error:
+            print(f"{label}: player-radius route failed: {error}", file=sys.stderr)
+            return 1
     key_route = None
     key_route_keys = 0
     if args.check_locked_key_route:
@@ -367,6 +468,11 @@ def main() -> int:
             )
             return 1
         key_route, key_route_keys = result
+        if args.check_player_radius_route:
+            error = validate_key_player_path(grid, key_route, normal_interactive, locked_doors, keys)
+            if error:
+                print(f"{label}: player-radius key route failed: {error}", file=sys.stderr)
+                return 1
     path_doors = [cell for cell in interactive_path if cell in {(x, y) for x, y, _special in doors}]
     path_lifts = [cell for cell in interactive_path if cell in set(lift_cells)]
     if key_route is None:
@@ -379,7 +485,7 @@ def main() -> int:
         f"doors={len(path_doors)} lifts={len(path_lifts)} chunks={chunk_count} "
         f"open_forward={open_forward} key_route_steps={len(key_route) - 1} "
         f"key_route_doors={len(key_path_doors)} locked_doors={len(locked_path_doors)} "
-        f"keys=0x{key_route_keys:x}"
+        f"keys=0x{key_route_keys:x} player_radius={'yes' if args.check_player_radius_route else 'no'}"
     )
     return 0
 
