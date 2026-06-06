@@ -41,8 +41,10 @@ readable.
   E1M1 becomes a 5x3 set of pages, but the Neo Geo runtime still loads only one
   `16x16` page into the original NGRayEx-style 80-column renderer. `make
   chunk-route-check` verifies the generated chunk start-to-exit route, treating
-  generated doors and lift cells as interactive pass-through cells, and `make
-  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
+  generated doors and lift cells as interactive pass-through cells, and also
+  runs a key-aware route pass so locked door cells require a reachable matching
+  key first. `make chunk-visibility-check` verifies generated
+  monster/pickup/weapon coverage.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated
@@ -414,7 +416,9 @@ readable.
   depends on generated door cells.
 - `make chunk-route-check` statically verifies the generated `16x16` chunk map
   route against `build/doom_chunks_generated.h` and
-  `build/doom_chunks_generated.c`. If the exact WAD player start falls on a
+  `build/doom_chunks_generated.c`. It now checks both the all-interactive route
+  and a key-aware route where keycard/skull things must be reachable before
+  matching locked door specials. If the exact WAD player start falls on a
   coarse-grid wall, chunk conversion moves it to the nearest open cell and
   opens the minimum number of coarse wall cells needed to preserve a playable
   start-to-exit route.

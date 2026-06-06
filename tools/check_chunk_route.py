@@ -10,6 +10,26 @@ import sys
 from collections import deque
 from pathlib import Path
 
+KEY_BLUE = 0x01
+KEY_RED = 0x02
+KEY_YELLOW = 0x04
+KEY_DOOR_MASKS = {
+    26: KEY_BLUE,
+    32: KEY_BLUE,
+    28: KEY_RED,
+    33: KEY_RED,
+    27: KEY_YELLOW,
+    34: KEY_YELLOW,
+}
+KEY_THING_MASKS = {
+    5: KEY_BLUE,
+    40: KEY_BLUE,
+    13: KEY_RED,
+    38: KEY_RED,
+    6: KEY_YELLOW,
+    39: KEY_YELLOW,
+}
+
 
 def parse_define_int(text: str, name: str) -> int:
     match = re.search(rf"^#define\s+{re.escape(name)}\s+(-?\d+)\b", text, re.MULTILINE)
@@ -54,6 +74,10 @@ def parse_u8_chunks(text: str, symbol: str) -> list[list[int]]:
     return ast.literal_eval(body.replace("{", "[").replace("}", "]"))
 
 
+def parse_int_array(text: str, symbol: str) -> list[int]:
+    return [int(item) for item in re.findall(r"-?\d+", array_initializer(text, symbol))]
+
+
 def parse_exits(text: str) -> list[tuple[int, int, int]]:
     body = array_initializer(text, "g_chunk_exits")
     return [
@@ -67,6 +91,19 @@ def parse_doors(text: str) -> list[tuple[int, int, int]]:
     return [
         (int(match.group(1)), int(match.group(2)), int(match.group(3)))
         for match in re.finditer(r"\{(\d+),(\d+),(\d+),\d+\}", body)
+    ]
+
+
+def parse_things(text: str) -> list[tuple[int, int, int, int]]:
+    body = array_initializer(text, "g_chunk_things")
+    return [
+        (
+            int(match.group(1)),
+            int(match.group(2)),
+            int(match.group(3)),
+            int(match.group(7)),
+        )
+        for match in re.finditer(r"\{(-?\d+),(-?\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\}", body)
     ]
 
 
@@ -131,6 +168,46 @@ def bfs(
     return None
 
 
+def key_aware_bfs(
+    grid: list[list[int]],
+    start: tuple[int, int],
+    targets: set[tuple[int, int]],
+    normal_interactive: set[tuple[int, int]],
+    locked_doors: dict[tuple[int, int], int],
+    keys: dict[tuple[int, int], int],
+) -> tuple[list[tuple[int, int]], int] | None:
+    width = len(grid[0])
+    height = len(grid)
+    start_state = (start[0], start[1], keys.get(start, 0))
+    queue: deque[tuple[int, int, int]] = deque([start_state])
+    prev: dict[tuple[int, int, int], tuple[int, int, int] | None] = {start_state: None}
+    while queue:
+        x, y, owned_keys = queue.popleft()
+        if (x, y) in targets:
+            path: list[tuple[int, int]] = []
+            cur: tuple[int, int, int] | None = (x, y, owned_keys)
+            while cur is not None:
+                path.append((cur[0], cur[1]))
+                cur = prev[cur]
+            return list(reversed(path)), owned_keys
+        for nx, ny in neighbors(x, y):
+            if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                continue
+            cell = (nx, ny)
+            required_key = locked_doors.get(cell, 0)
+            if required_key and (owned_keys & required_key) == 0:
+                continue
+            if grid[ny][nx] and cell not in normal_interactive and not required_key:
+                continue
+            next_keys = owned_keys | keys.get(cell, 0)
+            next_state = (nx, ny, next_keys)
+            if next_state in prev:
+                continue
+            prev[next_state] = (x, y, owned_keys)
+            queue.append(next_state)
+    return None
+
+
 def forward_open_cells(
     grid: list[list[int]],
     start_x: float,
@@ -161,6 +238,12 @@ def main() -> int:
     parser.add_argument("--header", default="build/doom_chunks_generated.h")
     parser.add_argument("--source", default="build/doom_chunks_generated.c")
     parser.add_argument("--label")
+    parser.add_argument(
+        "--check-locked-key-route",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require a start-to-exit route that collects matching keys before locked doors",
+    )
     args = parser.parse_args()
 
     text = Path(args.header).read_text(encoding="ascii")
@@ -195,6 +278,39 @@ def main() -> int:
     lift_cells = parse_lift_cells(text)
     interactive = {(x, y) for x, y, _special in doors}
     interactive.update(lift_cells)
+    normal_interactive = set(lift_cells)
+    locked_doors: dict[tuple[int, int], int] = {}
+    for x, y, special in doors:
+        key_mask = KEY_DOOR_MASKS.get(special, 0)
+        if key_mask:
+            locked_doors[(x, y)] = key_mask
+        else:
+            normal_interactive.add((x, y))
+    thing_count = parse_define_int(text, "DOOM_CHUNK_THING_COUNT")
+    thing_first = parse_int_array(text, "g_chunk_thing_first")
+    thing_counts = parse_int_array(text, "g_chunk_thing_count")
+    things = parse_things(text)
+    if len(things) != thing_count:
+        raise ValueError(f"g_chunk_things has {len(things)} things, expected {thing_count}")
+    if len(thing_first) != chunk_count or len(thing_counts) != chunk_count:
+        raise ValueError("chunk thing first/count arrays do not match DOOM_CHUNK_COUNT")
+    keys: dict[tuple[int, int], int] = {}
+    for chunk in range(chunk_count):
+        first = thing_first[chunk]
+        count = thing_counts[chunk]
+        if first + count > len(things):
+            raise ValueError(f"chunk {chunk}: thing range {first}+{count} exceeds {len(things)}")
+        for x_q8, y_q8, thing_type, embedded_chunk in things[first : first + count]:
+            if embedded_chunk != chunk:
+                raise ValueError(f"chunk {chunk}: thing type {thing_type} has embedded chunk {embedded_chunk}")
+            key_mask = KEY_THING_MASKS.get(thing_type, 0)
+            if not key_mask:
+                continue
+            cell = (
+                (chunk % chunk_cols) * chunk_size + (x_q8 >> 8),
+                (chunk // chunk_cols) * chunk_size + (y_q8 >> 8),
+            )
+            keys[cell] = keys.get(cell, 0) | key_mask
 
     errors: list[str] = []
     width = len(grid[0])
@@ -235,13 +351,35 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    key_route = None
+    key_route_keys = 0
+    if args.check_locked_key_route:
+        result = key_aware_bfs(grid, start, targets, normal_interactive, locked_doors, keys)
+        if result is None:
+            locked_summary = ", ".join(
+                f"{cell}:0x{mask:x}" for cell, mask in sorted(locked_doors.items())
+            ) or "none"
+            key_summary = ", ".join(f"{cell}:0x{mask:x}" for cell, mask in sorted(keys.items())) or "none"
+            print(
+                f"{label}: no key-valid chunk route from start {start} to exits {sorted(targets)} "
+                f"locked_doors=[{locked_summary}] keys=[{key_summary}]",
+                file=sys.stderr,
+            )
+            return 1
+        key_route, key_route_keys = result
     path_doors = [cell for cell in interactive_path if cell in {(x, y) for x, y, _special in doors}]
     path_lifts = [cell for cell in interactive_path if cell in set(lift_cells)]
+    if key_route is None:
+        key_route = interactive_path
+    key_path_doors = [cell for cell in key_route if cell in {(x, y) for x, y, _special in doors}]
+    locked_path_doors = [cell for cell in key_route if cell in locked_doors]
     print(
         f"{label} chunk route OK: start={start} exit={interactive_path[-1]} "
         f"steps={len(interactive_path) - 1} open_route={'yes' if open_path else 'no'} "
         f"doors={len(path_doors)} lifts={len(path_lifts)} chunks={chunk_count} "
-        f"open_forward={open_forward}"
+        f"open_forward={open_forward} key_route_steps={len(key_route) - 1} "
+        f"key_route_doors={len(key_path_doors)} locked_doors={len(locked_path_doors)} "
+        f"keys=0x{key_route_keys:x}"
     )
     return 0
 
