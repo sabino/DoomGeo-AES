@@ -63,8 +63,13 @@ readable.
   rotate the real-Doom geometry out from under the simple grid collision.
   In chunked builds it also simulates accepted forward movement through the
   `16x16` collision/streaming rules and verifies the moved RIPDOOM pose still
-  renders, covering regressions where the weapon bobs but the world appears
-  fixed in place.
+  renders after the same 70-tick movement span used by `chunk-movement-check`,
+  covering regressions where the weapon bobs but the world appears fixed in
+  place.
+- RIPDOOM ray casting keeps the fast local blockmap search first, then falls
+  back to sampling blockmap cells along a missed ray. This fills long corridor
+  or chunk-edge columns without raising the local line/seg caps for every
+  column.
 - Chunk conversion exposes `DOOM_CHUNK_START_LOCAL_X`,
   `DOOM_CHUNK_START_LOCAL_Y`, and `DOOM_CHUNK_KEEP_WAD_START_OFFSET` through
   the Makefile. The playable E1M1 chunk ROM keeps the WAD start aligned to the

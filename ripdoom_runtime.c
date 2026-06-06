@@ -94,6 +94,112 @@ static int ripdoom_div_q8(long numerator, long denominator) {
     return (int)((numerator << 8) / denominator);
 }
 
+static void ripdoom_consider_seg_ray(
+    unsigned short seg_index,
+    short x,
+    short y,
+    short dir_x_q8,
+    short dir_y_q8,
+    int *best_seg,
+    int *best_t_q8,
+    int *best_u_q8,
+    int *best_side
+) {
+    const NgRipSeg *seg;
+    const NgRipVertex *v1;
+    const NgRipVertex *v2;
+    long seg_x;
+    long seg_y;
+    long rel_x;
+    long rel_y;
+    long denom;
+    long num_t;
+    long num_u;
+    int t_q8;
+    int u_q8;
+    enum { MIN_RAY_DIST_Q8 = 24 };
+
+    if (seg_index >= NG_RIP_SEG_COUNT) return;
+    seg = &g_rip_segs[seg_index];
+    if (!(seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID))) return;
+    if (seg->v1 >= NG_RIP_VERTEX_COUNT || seg->v2 >= NG_RIP_VERTEX_COUNT) return;
+    v1 = &g_rip_vertices[seg->v1];
+    v2 = &g_rip_vertices[seg->v2];
+    seg_x = (long)v2->x - v1->x;
+    seg_y = (long)v2->y - v1->y;
+    denom = (long)dir_x_q8 * seg_y - (long)dir_y_q8 * seg_x;
+    if (denom == 0) return;
+    rel_x = (long)v1->x - x;
+    rel_y = (long)v1->y - y;
+    num_t = rel_x * seg_y - rel_y * seg_x;
+    num_u = rel_x * (long)dir_y_q8 - rel_y * (long)dir_x_q8;
+    if (denom < 0) {
+        denom = -denom;
+        num_t = -num_t;
+        num_u = -num_u;
+    }
+    if (num_t <= 0 || num_u < 0 || num_u > denom) return;
+    t_q8 = ripdoom_div_q8(num_t, denom);
+    if (t_q8 < MIN_RAY_DIST_Q8 || t_q8 >= *best_t_q8) return;
+    u_q8 = ripdoom_div_q8(num_u, denom);
+    *best_seg = seg_index;
+    *best_t_q8 = t_q8;
+    *best_u_q8 = u_q8;
+    *best_side = ((seg_x < 0 ? -seg_x : seg_x) > (seg_y < 0 ? -seg_y : seg_y)) ? 1 : 0;
+}
+
+static void ripdoom_cast_sampled_blocks(
+    short x,
+    short y,
+    short dir_x_q8,
+    short dir_y_q8,
+    int block_radius,
+    int *best_seg,
+    int *best_t_q8,
+    int *best_u_q8,
+    int *best_side
+) {
+    /* Fallback for long/open rays that leave the small local block square. */
+    enum { SAMPLE_STEP = 64, MAX_SAMPLE_STEPS = 96 };
+    int max_steps = block_radius * 4;
+    int last_bx = -1;
+    int last_by = -1;
+    int step;
+    if (max_steps < 8) max_steps = 8;
+    if (max_steps > MAX_SAMPLE_STEPS) max_steps = MAX_SAMPLE_STEPS;
+
+    for (step = 0; step <= max_steps; step++) {
+        int dist = step * SAMPLE_STEP;
+        short sx = (short)(x + (((long)dir_x_q8 * dist) >> 8));
+        short sy = (short)(y + (((long)dir_y_q8 * dist) >> 8));
+        int bx;
+        int by;
+        int cell;
+        int offset;
+        if (*best_seg >= 0 && dist > ((*best_t_q8 >> 8) + (1 << RIPDOOM_BLOCKMAP_SHIFT))) break;
+        if (!ripdoom_blockmap_cell(sx, sy, &bx, &by)) continue;
+        if (bx == last_bx && by == last_by) continue;
+        last_bx = bx;
+        last_by = by;
+        cell = by * NG_RIP_BLOCKMAP_W + bx;
+        offset = g_rip_blockmap_words[4 + cell];
+        if (offset < 0 || offset >= NG_RIP_BLOCKMAP_WORD_COUNT) continue;
+        if (g_rip_blockmap_words[offset] == 0) offset++;
+        while (offset < NG_RIP_BLOCKMAP_WORD_COUNT && g_rip_blockmap_words[offset] != -1) {
+            int line = g_rip_blockmap_words[offset++];
+            if (line >= 0 && line < NG_RIP_LINE_COUNT) {
+                const NgRipLineSegSpan *span = &g_rip_line_seg_spans[line];
+                int span_index;
+                if ((int)span->firstseg + (int)span->numsegs > NG_RIP_LINE_SEG_INDEX_COUNT) continue;
+                for (span_index = 0; span_index < span->numsegs; span_index++) {
+                    unsigned short seg = g_rip_line_seg_indices[span->firstseg + span_index];
+                    ripdoom_consider_seg_ray(seg, x, y, dir_x_q8, dir_y_q8, best_seg, best_t_q8, best_u_q8, best_side);
+                }
+            }
+        }
+    }
+}
+
 int ripdoom_blockmap_lines(int block_x, int block_y, unsigned short *out_lines, int max_lines) {
     int cell;
     int offset;
@@ -169,7 +275,7 @@ int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned shor
 }
 
 int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRayHit *out_hit) {
-    enum { LOCAL_SEG_LIMIT = 128, MIN_RAY_DIST_Q8 = 24 };
+    enum { LOCAL_SEG_LIMIT = 128 };
     unsigned short local_segs[LOCAL_SEG_LIMIT];
     int local_count;
     int best_seg = -1;
@@ -181,48 +287,13 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
     local_count = ripdoom_collect_local_segs(x, y, block_radius, local_segs, LOCAL_SEG_LIMIT);
 
     for (i = 0; i < local_count; i++) {
-        const NgRipSeg *seg;
-        const NgRipVertex *v1;
-        const NgRipVertex *v2;
-        long seg_x;
-        long seg_y;
-        long rel_x;
-        long rel_y;
-        long denom;
-        long num_t;
-        long num_u;
-        int t_q8;
-        int u_q8;
         unsigned short seg_index = local_segs[i];
-        if (seg_index >= NG_RIP_SEG_COUNT) continue;
-        seg = &g_rip_segs[seg_index];
-        if (!(seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID))) continue;
-        if (seg->v1 >= NG_RIP_VERTEX_COUNT || seg->v2 >= NG_RIP_VERTEX_COUNT) continue;
-        v1 = &g_rip_vertices[seg->v1];
-        v2 = &g_rip_vertices[seg->v2];
-        seg_x = (long)v2->x - v1->x;
-        seg_y = (long)v2->y - v1->y;
-        denom = (long)dir_x_q8 * seg_y - (long)dir_y_q8 * seg_x;
-        if (denom == 0) continue;
-        rel_x = (long)v1->x - x;
-        rel_y = (long)v1->y - y;
-        num_t = rel_x * seg_y - rel_y * seg_x;
-        num_u = rel_x * (long)dir_y_q8 - rel_y * (long)dir_x_q8;
-        if (denom < 0) {
-            denom = -denom;
-            num_t = -num_t;
-            num_u = -num_u;
-        }
-        if (num_t <= 0 || num_u < 0 || num_u > denom) continue;
-        t_q8 = ripdoom_div_q8(num_t, denom);
-        if (t_q8 < MIN_RAY_DIST_Q8 || t_q8 >= best_t_q8) continue;
-        u_q8 = ripdoom_div_q8(num_u, denom);
-        best_seg = seg_index;
-        best_t_q8 = t_q8;
-        best_u_q8 = u_q8;
-        best_side = ((seg_x < 0 ? -seg_x : seg_x) > (seg_y < 0 ? -seg_y : seg_y)) ? 1 : 0;
+        ripdoom_consider_seg_ray(seg_index, x, y, dir_x_q8, dir_y_q8, &best_seg, &best_t_q8, &best_u_q8, &best_side);
     }
 
+    if (best_seg < 0) {
+        ripdoom_cast_sampled_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, &best_seg, &best_t_q8, &best_u_q8, &best_side);
+    }
     if (best_seg < 0) return 0;
     {
         const NgRipSeg *seg = &g_rip_segs[best_seg];

@@ -12,13 +12,16 @@
 #define FBITS 8
 #define FONE 256
 #define FIX(v) ((int)((v) * FONE))
+#ifndef DOOM_RIPDOOM_RENDER_BLOCK_RADIUS
+#define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 8
+#endif
 
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 enum {
     PLAYER_RADIUS_Q8 = 51,
     DYNAMIC_BLOCK_RANGE_Q8 = 104,
     MOVE_SPEED_Q8 = 31,
-    MOVEMENT_RENDER_TICKS = 24,
+    MOVEMENT_RENDER_TICKS = 70,
     MIN_RENDER_MOVE_PROGRESS_Q8 = 256
 };
 
@@ -216,7 +219,7 @@ static int sample_view(int start_x, int start_y, short view_x, short view_y, uns
         short ray_x = (short)(view_x + (((int)plane_x * camera_q8) >> 8));
         short ray_y = (short)(view_y + (((int)plane_y * camera_q8) >> 8));
         NgRipRayHit hit;
-        if (!ripdoom_cast_local_ray((short)start_x, (short)start_y, ray_x, ray_y, 8, &hit)) {
+        if (!ripdoom_cast_local_ray((short)start_x, (short)start_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) {
             continue;
         }
         if (*out_first < 0) *out_first = column;
