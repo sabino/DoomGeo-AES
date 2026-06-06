@@ -80,6 +80,11 @@ readable.
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
   player input. `make chunk-movement-test-rom` uses the same scale but replaces
   input with a scripted forward walk, so it is only for regression testing.
+- `make chunk-playable-debug-rom` uses the same playable build but enables
+  frame and input debug overlays. The top-left rows show raw input, local
+  chunk X/Y, active chunk, global chunk-grid X/Y, and the last actual movement
+  flag, which distinguishes stale ROMs or blocked movement from valid chunk
+  streaming where local coordinates recenter.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated

@@ -4379,16 +4379,13 @@ static void update_input_debug_overlay(u8 pressed) {
     int py;
     rc_player_q8(&px, &py);
     draw_stat3(0, 0, FIX_SOLID, pressed);
-#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-    draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
-    draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
-    draw_stat3(0, 3, FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
-    return;
-#endif
     draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
     draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
     draw_stat3(0, 3, FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
+    draw_stat3(0, 4, FIX_EXIT_BASE, (u16)((active_chunk_origin_x_q8() + px) >> 8));
+    draw_stat3(0, 5, FIX_KEY_MSG_K, (u16)((active_chunk_origin_y_q8() + py) >> 8));
+    draw_stat3(0, 6, FIX_SECRET_S, rc_moved_last_input());
 #endif
 }
 #endif
