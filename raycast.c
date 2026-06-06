@@ -193,6 +193,12 @@ void rc_set_pose_q8(short x_q8, short y_q8, short dir_x_q8, short dir_y_q8) {
     rc_invalidate_view();
 }
 
+void rc_shift_player_q8(short dx_q8, short dy_q8) {
+    posX += ((fix)dx_q8) << (FBITS - 8);
+    posY += ((fix)dy_q8) << (FBITS - 8);
+    rc_invalidate_view();
+}
+
 static void rotate(int sign) {
     fix cs = FIX(ROT_COS);
     fix sn = sign < 0 ? -FIX(ROT_SIN) : FIX(ROT_SIN);

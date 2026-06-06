@@ -29,6 +29,10 @@
 #undef map_cell_ceiling_height
 #undef map_cell_secret
 
+#if DOOM_CHUNKED_SIMPLE_MAP
+#include "doom_chunks_generated.h"
+#endif
+
 #undef DOOM_MAP_SOURCE
 #undef DOOM_MAP_NAME
 #undef DOOM_NEXT_MAP_EPISODE
@@ -42,24 +46,154 @@
 #undef DOOM_PLANE_X
 #undef DOOM_PLANE_Y
 
+#if DOOM_CHUNKED_SIMPLE_MAP
+#define DOOM_MAP_SOURCE "chunk-map"
+#define DOOM_MAP_NAME DOOM_CHUNK_MAP_NAME
+#else
 #define DOOM_MAP_SOURCE "simple-map"
 #define DOOM_MAP_NAME "SIMPLE"
+#endif
 #define DOOM_NEXT_MAP_EPISODE 1
 #define DOOM_NEXT_MAP_MISSION 1
 #define DOOM_SECRET_NEXT_MAP_EPISODE 0
 #define DOOM_SECRET_NEXT_MAP_MISSION 0
+#if DOOM_CHUNKED_SIMPLE_MAP
+#define DOOM_START_X DOOM_CHUNK_START_X
+#define DOOM_START_Y DOOM_CHUNK_START_Y
+#define DOOM_DIR_X DOOM_CHUNK_START_DIR_X
+#define DOOM_DIR_Y DOOM_CHUNK_START_DIR_Y
+#define DOOM_PLANE_X DOOM_CHUNK_START_PLANE_X
+#define DOOM_PLANE_Y DOOM_CHUNK_START_PLANE_Y
+#else
 #define DOOM_START_X 8.5
 #define DOOM_START_Y 12.5
 #define DOOM_DIR_X 0.0
 #define DOOM_DIR_Y -1.0
 #define DOOM_PLANE_X 0.66
 #define DOOM_PLANE_Y 0.0
+#endif
 
 #define SIMPLE_MAP_W 16
 #define SIMPLE_MAP_H 16
 #define ACTIVE_MAP_W SIMPLE_MAP_W
 #define ACTIVE_MAP_H SIMPLE_MAP_H
 #define ACTIVE_MAP_CELL_BYTES (((ACTIVE_MAP_W * ACTIVE_MAP_H) + 7) / 8)
+
+#if DOOM_CHUNKED_SIMPLE_MAP
+
+extern unsigned short g_simple_active_chunk;
+#define SIMPLE_ACTIVE_CHUNK g_simple_active_chunk
+
+static inline unsigned short simple_chunk_cell_index(int x, int y) {
+    return (unsigned short)(y * SIMPLE_MAP_W + x);
+}
+
+static inline int simple_floor_div16(int value) {
+    return value >= 0 ? value / SIMPLE_MAP_W : -((SIMPLE_MAP_W - 1 - value) / SIMPLE_MAP_W);
+}
+
+static inline unsigned short simple_chunk_for_cell(int x, int y, int *local_x, int *local_y) {
+    int active_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+    int active_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+    int offset_x = simple_floor_div16(x);
+    int offset_y = simple_floor_div16(y);
+    int chunk_x = active_x + offset_x;
+    int chunk_y = active_y + offset_y;
+    if (chunk_x < 0 || chunk_y < 0 || chunk_x >= DOOM_CHUNK_COLS || chunk_y >= DOOM_CHUNK_ROWS) return 0xFFFF;
+    *local_x = x - offset_x * SIMPLE_MAP_W;
+    *local_y = y - offset_y * SIMPLE_MAP_H;
+    return (unsigned short)(chunk_y * DOOM_CHUNK_COLS + chunk_x);
+}
+
+static inline int simple_map_in_bounds(int x, int y) {
+    int local_x;
+    int local_y;
+    return simple_chunk_for_cell(x, y, &local_x, &local_y) != 0xFFFF;
+}
+
+static inline int map_at(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk;
+    unsigned short cell;
+    chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 1;
+    if (chunk == SIMPLE_ACTIVE_CHUNK
+        && (g_runtime_cell_open[((local_y * ACTIVE_MAP_W) + local_x) >> 3]
+            & (1 << (((local_y * ACTIVE_MAP_W) + local_x) & 7)))) return 0;
+    cell = simple_chunk_cell_index(local_x, local_y);
+    return g_chunk_solid[chunk][cell] ? 1 : 0;
+}
+
+static inline unsigned char map_cell_value(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 1;
+    return g_chunk_solid[chunk][simple_chunk_cell_index(local_x, local_y)] ? 1 : 0;
+}
+
+static inline unsigned char map_cell_texture(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 0;
+    return g_chunk_tex[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline unsigned char map_cell_texture_phase(int x, int y) {
+    (void)x;
+    (void)y;
+    return 0;
+}
+
+static inline unsigned char map_cell_damage(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 0;
+    return g_chunk_damage[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline unsigned char map_cell_floor_visual(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 0;
+    return g_chunk_floor_visual[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline unsigned char map_cell_light(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 3;
+    return g_chunk_light[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline short map_cell_floor_height(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 0;
+    return g_chunk_floor_height[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline short map_cell_ceiling_height(int x, int y) {
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 128;
+    return g_chunk_ceiling_height[chunk][simple_chunk_cell_index(local_x, local_y)];
+}
+
+static inline unsigned char map_cell_secret(int x, int y) {
+    (void)x;
+    (void)y;
+    return 0;
+}
+
+#else
 
 static const unsigned char g_simple_map[SIMPLE_MAP_H][SIMPLE_MAP_W] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -174,5 +308,7 @@ static inline unsigned char map_cell_secret(int x, int y) {
     (void)y;
     return 0;
 }
+
+#endif
 
 #endif /* SIMPLE_MAP_H_INCLUDED */

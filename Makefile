@@ -64,6 +64,8 @@ DOOM_MAP_SOURCE=$(BUILDDIR)/doom_map_generated.c
 DOOM_MAP_OBJECT=$(BUILDDIR)/doom_map_generated.o
 DOOM_CHUNK_HEADER=$(BUILDDIR)/doom_chunks_generated.h
 DOOM_CHUNK_SOURCE=$(BUILDDIR)/doom_chunks_generated.c
+DOOM_CHUNK_OBJECT=
+DOOM_CHUNK_DEP=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
 DOOM_CHUNK_CELL_UNITS?=128
@@ -96,7 +98,9 @@ ifeq ($(DOOM_SKIP_INTRO),1)
 override CFLAGS += -DDOOM_SKIP_INTRO=1
 endif
 ifeq ($(DOOM_SIMPLE_MAP),1)
-override CFLAGS += -DDOOM_SIMPLE_MAP=1
+override CFLAGS += -DDOOM_SIMPLE_MAP=1 -DDOOM_CHUNKED_SIMPLE_MAP=1
+DOOM_CHUNK_OBJECT=$(BUILDDIR)/doom_chunks_generated.o
+DOOM_CHUNK_DEP=$(DOOM_CHUNK_HEADER)
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
@@ -142,13 +146,15 @@ include emu.mk
 # 
 # Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 ELF=$(BUILDDIR)/rom.elf
-$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_ASSETS_OBJECT)
+$(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_CHUNK_OBJECT) $(DOOM_ASSETS_OBJECT)
 $(PROM1): $(ELF)
 
-$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
+$(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
 $(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
 $(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
+$(BUILDDIR)/doom_chunks_generated.o: $(DOOM_CHUNK_SOURCE) $(DOOM_CHUNK_HEADER)
+	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_CHUNK_SOURCE) -o $@
 $(DOOM_ASSETS_OBJECT): $(DOOM_ASSETS_SOURCE) $(DOOM_ASSETS_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_ASSETS_SOURCE) -o $@
 

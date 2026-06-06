@@ -30,6 +30,15 @@ enum {
 unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
 unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT ? NG_RUNTIME_LIFT_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+unsigned short g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
+static u16 chunk_thing_state_type[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static short chunk_thing_state_x_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static short chunk_thing_state_y_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static u8 chunk_thing_state_dead[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static u8 chunk_thing_state_hp[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static unsigned short thing_chunk_index[NG_RUNTIME_THING_COUNT];
+#endif
 static u8 hurt_flash = 0;
 static u8 muzzle_flash = 0;
 static u8 bonus_flash = 0;
@@ -1304,6 +1313,7 @@ static void player_take_damage(u16 amount);
 static void spawn_impact_effect(short x_q8, short y_q8, u8 timer);
 static u8 key_bit_for_thing(u16 thing_type);
 static u8 thing_render_class(u16 thing_type);
+static u16 runtime_thing_type(int thing_index);
 static u8 runtime_thing_is_monster(int thing_index);
 static u8 runtime_thing_is_pickup(int thing_index);
 static u8 runtime_thing_is_threat(int thing_index);
@@ -1430,6 +1440,56 @@ static void index_pickup_candidate(u16 thing_index) {
     }
 }
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+static int active_chunk_origin_x_q8(void) {
+    return (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W * 256;
+}
+
+static int active_chunk_origin_y_q8(void) {
+    return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * 256;
+}
+
+static void init_chunk_thing_state(void) {
+    for (u16 i = 0; i < DOOM_CHUNK_THING_COUNT; i++) {
+        chunk_thing_state_type[i] = g_chunk_things[i].type;
+        chunk_thing_state_x_q8[i] = g_chunk_things[i].x_q8;
+        chunk_thing_state_y_q8[i] = g_chunk_things[i].y_q8;
+        chunk_thing_state_dead[i] = 0;
+        chunk_thing_state_hp[i] = 0;
+    }
+    g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
+}
+
+static void save_active_chunk_runtime_things(void) {
+    int origin_x = active_chunk_origin_x_q8();
+    int origin_y = active_chunk_origin_y_q8();
+    for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
+        unsigned short chunk_index = thing_chunk_index[i];
+        if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) continue;
+        if (enemy_dead[i] || thing_type_override[i] == 0) {
+            chunk_thing_state_type[chunk_index] = 0;
+            chunk_thing_state_dead[chunk_index] = 1;
+            chunk_thing_state_hp[chunk_index] = 0;
+            continue;
+        }
+        chunk_thing_state_type[chunk_index] = runtime_thing_type(i);
+        chunk_thing_state_x_q8[chunk_index] = (short)(origin_x + thing_x_q8[i]);
+        chunk_thing_state_y_q8[chunk_index] = (short)(origin_y + thing_y_q8[i]);
+        chunk_thing_state_dead[chunk_index] = 0;
+        chunk_thing_state_hp[chunk_index] = enemy_hp[i];
+    }
+}
+
+static void clear_dynamic_drops(void) {
+    for (u8 i = 0; i < 8; i++) {
+        dynamic_drop_active[i] = 0;
+        dynamic_drop_type[i] = 0;
+        dynamic_drop_x_q8[i] = 0;
+        dynamic_drop_y_q8[i] = 0;
+    }
+}
+#endif
+
 static void init_runtime_things(void) {
     thing_monster_count = 0;
     thing_shootable_count = 0;
@@ -1438,6 +1498,56 @@ static void init_runtime_things(void) {
     for (int i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         u8 thing_class;
         u8 thing_info;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+        unsigned short chunk_first = g_chunk_thing_first[SIMPLE_ACTIVE_CHUNK];
+        unsigned char chunk_count = g_chunk_thing_count[SIMPLE_ACTIVE_CHUNK];
+        thing_chunk_index[i] = 0xFFFF;
+        if (i >= chunk_count) {
+            thing_x_q8[i] = 0;
+            thing_y_q8[i] = 0;
+            thing_type_override[i] = 0;
+            thing_static_class[i] = THING_CLASS_NONE;
+            enemy_dead[i] = 1;
+            enemy_hp[i] = 0;
+            continue;
+        }
+        {
+            unsigned short chunk_index = (unsigned short)(chunk_first + i);
+            u16 type = chunk_thing_state_type[chunk_index];
+            short x_q8 = (short)(chunk_thing_state_x_q8[chunk_index] - active_chunk_origin_x_q8());
+            short y_q8 = (short)(chunk_thing_state_y_q8[chunk_index] - active_chunk_origin_y_q8());
+            if (chunk_thing_state_dead[chunk_index] || type == 0) {
+                thing_x_q8[i] = 0;
+                thing_y_q8[i] = 0;
+                thing_type_override[i] = 0;
+                thing_static_class[i] = THING_CLASS_NONE;
+                enemy_dead[i] = 1;
+                enemy_hp[i] = 0;
+                continue;
+            }
+            if (x_q8 < 0 || y_q8 < 0 || x_q8 >= WORLD_Q8(SIMPLE_MAP_W) || y_q8 >= WORLD_Q8(SIMPLE_MAP_H)) {
+                thing_x_q8[i] = 0;
+                thing_y_q8[i] = 0;
+                thing_type_override[i] = 0;
+                thing_static_class[i] = THING_CLASS_NONE;
+                enemy_dead[i] = 1;
+                enemy_hp[i] = 0;
+                continue;
+            }
+            thing_chunk_index[i] = chunk_index;
+            thing_x_q8[i] = x_q8;
+            thing_y_q8[i] = y_q8;
+            thing_type_override[i] = type;
+            thing_class = thing_render_class(type);
+            thing_info = 0;
+            if (thing_class != THING_CLASS_NONE) thing_info |= NG_THING_INFO_RENDER;
+            if (thing_class == THING_CLASS_MONSTER) thing_info |= NG_THING_INFO_MONSTER | NG_THING_INFO_SHOOTABLE;
+            if (thing_class == THING_CLASS_THREAT) thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
+            if (thing_class == THING_CLASS_PICKUP) thing_info |= NG_THING_INFO_PICKUP;
+            enemy_dead[i] = 0;
+            enemy_hp[i] = chunk_thing_state_hp[chunk_index];
+        }
+#else
         thing_x_q8[i] = g_runtime_things[i].x_q8;
         thing_y_q8[i] = g_runtime_things[i].y_q8;
 #if DOOM_SIMPLE_MAP
@@ -1457,6 +1567,7 @@ static void init_runtime_things(void) {
         if (thing_class == THING_CLASS_MONSTER) thing_info |= NG_THING_INFO_MONSTER | NG_THING_INFO_SHOOTABLE;
         if (thing_class == THING_CLASS_THREAT) thing_info |= NG_THING_INFO_THREAT | NG_THING_INFO_SHOOTABLE;
         if (thing_class == THING_CLASS_PICKUP) thing_info |= NG_THING_INFO_PICKUP;
+#endif
 #endif
         thing_static_class[i] = thing_class;
         if (thing_info & NG_THING_INFO_RENDER) index_render_candidate((u16)i);
@@ -5739,6 +5850,57 @@ static void insert_thing_candidate(ThingCandidate *candidates, int *count, const
     if (*count < THING_CANDIDATE_COUNT) (*count)++;
 }
 
+#if DOOM_SIMPLE_MAP
+static u8 candidate_is_collectible_pickup(const ThingCandidate *candidate) {
+    return thing_is_pickup(candidate->thing_type) && pickup_is_collectible(candidate->thing_type);
+}
+
+static u8 candidate_is_threat(const ThingCandidate *candidate) {
+    return thing_is_monster(candidate->thing_type) || thing_is_runtime_threat(candidate->thing_type);
+}
+
+static void reserve_visible_pickups(ThingCandidate *candidates, int count, int selected) {
+    enum { PICKUP_RESERVE_MAX = 3, PICKUP_RESERVE_DIST_Q8 = WORLD_Q8(4096) };
+    u8 selected_pickups = 0;
+
+    if (selected <= 0) return;
+    for (int i = 0; i < selected; i++) {
+        if (candidate_is_collectible_pickup(&candidates[i])) selected_pickups++;
+    }
+    if (selected_pickups >= PICKUP_RESERVE_MAX) return;
+
+    for (int outside = selected; outside < count && selected_pickups < PICKUP_RESERVE_MAX; outside++) {
+        int replace = -1;
+        ThingCandidate pickup;
+        if (!candidate_is_collectible_pickup(&candidates[outside])) continue;
+        if (candidates[outside].dist_q8 > PICKUP_RESERVE_DIST_Q8) continue;
+
+        for (int inside = selected - 1; inside >= 0; inside--) {
+            if (candidate_is_collectible_pickup(&candidates[inside])) continue;
+            if (!candidate_is_threat(&candidates[inside])) {
+                replace = inside;
+                break;
+            }
+        }
+        if (replace < 0 && selected > 4) {
+            for (int inside = selected - 1; inside >= 0; inside--) {
+                if (candidate_is_collectible_pickup(&candidates[inside])) continue;
+                if (candidates[outside].dist_q8 <= candidates[inside].dist_q8 || selected_pickups == 0) {
+                    replace = inside;
+                    break;
+                }
+            }
+        }
+        if (replace < 0) continue;
+
+        pickup = candidates[outside];
+        candidates[outside] = candidates[replace];
+        candidates[replace] = pickup;
+        selected_pickups++;
+    }
+}
+#endif
+
 static u8 thing_render_class(u16 thing_type) {
     if (thing_is_monster(thing_type)) return 1;
     if (thing_is_runtime_threat(thing_type)) return 2;
@@ -5944,6 +6106,9 @@ static int select_visible_things(int found) {
     {
         int selected = count;
         if (selected > ENEMY_VISIBLE_COUNT - found) selected = ENEMY_VISIBLE_COUNT - found;
+#if DOOM_SIMPLE_MAP
+        reserve_visible_pickups(candidates, count, selected);
+#endif
         for (int i = selected - 1; i >= 0 && found < ENEMY_VISIBLE_COUNT; i--) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
@@ -6026,6 +6191,57 @@ static void update_enemy(void) {
     for (u16 slot = (u16)found; slot < ENEMY_VISIBLE_COUNT; slot++) hide_enemy_slot(slot);
     update_enemy_ranged_readiness();
 }
+
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+static void update_chunk_streaming(void) {
+    int px;
+    int py;
+    int chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+    int chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+    int new_chunk_x = chunk_x;
+    int new_chunk_y = chunk_y;
+    short shift_x = 0;
+    short shift_y = 0;
+
+    rc_player_q8(&px, &py);
+    while (px < 0 && new_chunk_x > 0) {
+        new_chunk_x--;
+        px += WORLD_Q8(SIMPLE_MAP_W);
+        shift_x = (short)(shift_x + WORLD_Q8(SIMPLE_MAP_W));
+    }
+    while (px >= WORLD_Q8(SIMPLE_MAP_W) && new_chunk_x + 1 < DOOM_CHUNK_COLS) {
+        new_chunk_x++;
+        px -= WORLD_Q8(SIMPLE_MAP_W);
+        shift_x = (short)(shift_x - WORLD_Q8(SIMPLE_MAP_W));
+    }
+    while (py < 0 && new_chunk_y > 0) {
+        new_chunk_y--;
+        py += WORLD_Q8(SIMPLE_MAP_H);
+        shift_y = (short)(shift_y + WORLD_Q8(SIMPLE_MAP_H));
+    }
+    while (py >= WORLD_Q8(SIMPLE_MAP_H) && new_chunk_y + 1 < DOOM_CHUNK_ROWS) {
+        new_chunk_y++;
+        py -= WORLD_Q8(SIMPLE_MAP_H);
+        shift_y = (short)(shift_y - WORLD_Q8(SIMPLE_MAP_H));
+    }
+
+    if (new_chunk_x == chunk_x && new_chunk_y == chunk_y) return;
+
+    save_active_chunk_runtime_things();
+    g_simple_active_chunk = (unsigned short)(new_chunk_y * DOOM_CHUNK_COLS + new_chunk_x);
+    rc_shift_player_q8(shift_x, shift_y);
+    clear_dynamic_drops();
+    init_runtime_things();
+    reset_enemy_slot_cache();
+    hide_enemies();
+    invalidate_background_cache();
+    rc_invalidate_view();
+    monster_path_valid = 0;
+    monster_path_timer = 0;
+    prev_px = -1;
+    prev_py = -1;
+}
+#endif
 
 static void restart_level(void) {
     prev_px = -1;
@@ -6174,12 +6390,15 @@ static void restart_level(void) {
     }
     reset_enemy_slot_cache();
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    init_chunk_thing_state();
+#endif
     init_palettes();
     clear_fix();
     disable_sprites();
     init_runtime_things();
     rc_init();
-#if DOOM_SIMPLE_MAP && !defined(DOOM_FOCUSED_TEST)
+#if DOOM_SIMPLE_MAP && !DOOM_CHUNKED_SIMPLE_MAP && !defined(DOOM_FOCUSED_TEST)
     seed_simple_map_things();
 #endif
 #ifdef DOOM_COMBAT_TEST
@@ -6253,6 +6472,9 @@ int main(void) {
             if (catchup_input && (move_pressed & dpad)) {
                 rc_input(move_pressed);
             }
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+            update_chunk_streaming();
+#endif
             update_floor_damage();
             check_secret_reached();
             check_lift_walk_triggers();
