@@ -1451,12 +1451,15 @@ static void index_pickup_candidate(u16 thing_index) {
 }
 
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#define SIMPLE_CHUNK_PAGE_W_Q8 (SIMPLE_MAP_W * 256)
+#define SIMPLE_CHUNK_PAGE_H_Q8 (SIMPLE_MAP_H * 256)
+
 static int active_chunk_origin_x_q8(void) {
-    return (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W * 256;
+    return (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_CHUNK_PAGE_W_Q8;
 }
 
 static int active_chunk_origin_y_q8(void) {
-    return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * 256;
+    return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_CHUNK_PAGE_H_Q8;
 }
 
 static void persist_runtime_slot_to_chunk_state(u16 slot) {
@@ -1578,7 +1581,7 @@ static void load_active_chunk_dynamic_drops(void) {
         if (!chunk_drop_active[chunk][slot]) continue;
         local_x = chunk_drop_x_q8[chunk][slot];
         local_y = chunk_drop_y_q8[chunk][slot];
-        if (local_x < 0 || local_y < 0 || local_x >= WORLD_Q8(SIMPLE_MAP_W) || local_y >= WORLD_Q8(SIMPLE_MAP_H)) continue;
+        if (local_x < 0 || local_y < 0 || local_x >= SIMPLE_CHUNK_PAGE_W_Q8 || local_y >= SIMPLE_CHUNK_PAGE_H_Q8) continue;
         dynamic_drop_active[slot] = 1;
         dynamic_drop_type[slot] = chunk_drop_type[chunk][slot];
         dynamic_drop_x_q8[slot] = local_x;
@@ -1685,8 +1688,8 @@ static void init_runtime_things(void) {
                         u8 thing_class;
                         u8 thing_info;
                         unsigned short chunk_index = (unsigned short)(chunk_first + n);
-                        short offset_x_q8 = (short)(dx * WORLD_Q8(SIMPLE_MAP_W));
-                        short offset_y_q8 = (short)(dy * WORLD_Q8(SIMPLE_MAP_H));
+                        short offset_x_q8 = (short)(dx * SIMPLE_CHUNK_PAGE_W_Q8);
+                        short offset_y_q8 = (short)(dy * SIMPLE_CHUNK_PAGE_H_Q8);
                         if (!load_chunk_runtime_slot(slot, chunk_index, offset_x_q8, offset_y_q8, &thing_class, &thing_info)) continue;
                         thing_static_class[slot] = thing_class;
                         if (thing_info & NG_THING_INFO_RENDER) index_render_candidate(slot);
@@ -3950,7 +3953,7 @@ static void configure_chunk_movement_test(void) {
 }
 
 static u8 chunk_movement_test_pressed(u8 pressed) {
-    enum { UP = 0x01, START_DELAY = 60, WALK_TICKS = 180 };
+    enum { UP = 0x01, START_DELAY = 60, WALK_TICKS = 70 };
     (void)pressed;
     if (chunk_movement_test_tick < START_DELAY) {
         chunk_movement_test_tick++;
@@ -4371,7 +4374,9 @@ static void update_input_debug_overlay(u8 pressed) {
     rc_player_q8(&px, &py);
     draw_stat3(0, 0, FIX_SOLID, pressed);
 #if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-    draw_stat3(0, 1, FIX_SOLID, SIMPLE_ACTIVE_CHUNK);
+    draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
+    draw_stat3(0, 2, FIX_KEY_MSG_Y, (u16)(py >> 8));
+    draw_stat3(0, 3, FIX_DEAD_D, SIMPLE_ACTIVE_CHUNK);
     return;
 #endif
     draw_stat3(0, 1, FIX_AMMO_M, (u16)(px >> 8));
@@ -6664,23 +6669,23 @@ static void update_chunk_streaming(void) {
     rc_player_q8(&px, &py);
     while (px < 0 && new_chunk_x > 0) {
         new_chunk_x--;
-        px += WORLD_Q8(SIMPLE_MAP_W);
-        shift_x = (short)(shift_x + WORLD_Q8(SIMPLE_MAP_W));
+        px += SIMPLE_CHUNK_PAGE_W_Q8;
+        shift_x = (short)(shift_x + SIMPLE_CHUNK_PAGE_W_Q8);
     }
-    while (px >= WORLD_Q8(SIMPLE_MAP_W) && new_chunk_x + 1 < DOOM_CHUNK_COLS) {
+    while (px >= SIMPLE_CHUNK_PAGE_W_Q8 && new_chunk_x + 1 < DOOM_CHUNK_COLS) {
         new_chunk_x++;
-        px -= WORLD_Q8(SIMPLE_MAP_W);
-        shift_x = (short)(shift_x - WORLD_Q8(SIMPLE_MAP_W));
+        px -= SIMPLE_CHUNK_PAGE_W_Q8;
+        shift_x = (short)(shift_x - SIMPLE_CHUNK_PAGE_W_Q8);
     }
     while (py < 0 && new_chunk_y > 0) {
         new_chunk_y--;
-        py += WORLD_Q8(SIMPLE_MAP_H);
-        shift_y = (short)(shift_y + WORLD_Q8(SIMPLE_MAP_H));
+        py += SIMPLE_CHUNK_PAGE_H_Q8;
+        shift_y = (short)(shift_y + SIMPLE_CHUNK_PAGE_H_Q8);
     }
-    while (py >= WORLD_Q8(SIMPLE_MAP_H) && new_chunk_y + 1 < DOOM_CHUNK_ROWS) {
+    while (py >= SIMPLE_CHUNK_PAGE_H_Q8 && new_chunk_y + 1 < DOOM_CHUNK_ROWS) {
         new_chunk_y++;
-        py -= WORLD_Q8(SIMPLE_MAP_H);
-        shift_y = (short)(shift_y - WORLD_Q8(SIMPLE_MAP_H));
+        py -= SIMPLE_CHUNK_PAGE_H_Q8;
+        shift_y = (short)(shift_y - SIMPLE_CHUNK_PAGE_H_Q8);
     }
 
     if (new_chunk_x == chunk_x && new_chunk_y == chunk_y) return;
@@ -6944,7 +6949,16 @@ int main(void) {
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
             update_chunk_streaming();
 #if defined(DOOM_CHUNK_MOVEMENT_TEST)
-            player_kills = SIMPLE_ACTIVE_CHUNK;
+            {
+                int debug_px;
+                int debug_py;
+                rc_player_q8(&debug_px, &debug_py);
+                player_ammo = (u16)(debug_px >> 8);
+                player_kills = (u16)(debug_py >> 8);
+                player_armor = SIMPLE_ACTIVE_CHUNK;
+            }
+            shown_ammo = 0xFFFF;
+            shown_armor = 0xFFFF;
             shown_frags = 0xFFFF;
 #endif
 #endif
