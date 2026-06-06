@@ -354,6 +354,34 @@ u8 rc_sprite_strip_visible(int left, int right, int dist_q8) {
     return 0;
 }
 
+void rc_reserve_sprite_budget_for_screen_range(int left, int right) {
+#if DOOM_SIMPLE_MAP
+    int first_col;
+    int last_col;
+    u16 hidden_scb3;
+    if (right < 0 || left >= SCRW) return;
+    if (left < 0) left = 0;
+    if (right >= SCRW) right = SCRW - 1;
+    if (right < left) return;
+    first_col = left / COLW;
+    last_col = right / COLW;
+    if (first_col < 0) first_col = 0;
+    if (last_col >= NUM_COLS) last_col = NUM_COLS - 1;
+    hidden_scb3 = scb3_word(SCRH + 32, 0, 1);
+    for (int c = first_col; c <= last_col; c++) {
+        u16 spr = WALL_BASE + c;
+        u16 hidden_scb2 = (u16)((HSHRINK << 8) | 0x00);
+        vram_poke((u16)(VRAM_SCB2 + spr), hidden_scb2);
+        vram_poke((u16)(VRAM_SCB3 + spr), hidden_scb3);
+        curscb2[c] = hidden_scb2;
+        curscb3[c] = hidden_scb3;
+    }
+#else
+    (void)left;
+    (void)right;
+#endif
+}
+
 u8 rc_background_column_hidden(u8 col) {
     int left;
     int right;

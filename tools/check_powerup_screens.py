@@ -21,7 +21,7 @@ def pixels(image: Image.Image, box: tuple[int, int, int, int]) -> list[tuple[int
 
 
 def score_region(image: Image.Image, box: tuple[int, int, int, int]) -> dict[str, int]:
-    score = {"red": 0, "blue": 0, "green": 0, "tan": 0, "bright": 0, "dark": 0, "colored": 0, "varied": 0}
+    score = {"red": 0, "blue": 0, "green": 0, "tan": 0, "gray": 0, "bright": 0, "dark": 0, "colored": 0, "varied": 0}
     varied: set[tuple[int, int, int]] = set()
     for r, g, b in pixels(image, box):
         if max(r, g, b) - min(r, g, b) > 18:
@@ -34,6 +34,8 @@ def score_region(image: Image.Image, box: tuple[int, int, int, int]) -> dict[str
             score["green"] += 1
         if r > 95 and g > 45 and b < 85 and r > g + 15:
             score["tan"] += 1
+        if abs(r - g) < 20 and abs(g - b) < 20 and r > 90:
+            score["gray"] += 1
         if r + g + b > 180:
             score["bright"] += 1
         if r + g + b < 80:
@@ -74,20 +76,22 @@ def main() -> int:
             print(error, file=sys.stderr)
         return 1
 
-    left_powerups = score_region(image, (180, 260, 520, 470))
-    right_powerups = score_region(image, (520, 300, 850, 460))
-    imp = score_region(image, (390, 250, 590, 430))
-    playfield = score_region(image, (100, 220, 850, 555))
+    armor = score_region(image, (300, 310, 440, 420))
+    ammo = score_region(image, (400, 315, 500, 395))
+    weapon = score_region(image, (470, 300, 620, 395))
+    shells = score_region(image, (610, 315, 700, 400))
+    playfield = score_region(image, (240, 250, 720, 460))
     hud = score_region(image, (0, 560, 960, 672))
 
-    require_min(errors, path, "left pickup cluster", left_powerups, "tan", 3000)
-    require_min(errors, path, "left pickup cluster", left_powerups, "colored", 2400)
-    require_min(errors, path, "right pickup cluster", right_powerups, "bright", 40000)
-    require_min(errors, path, "right pickup cluster", right_powerups, "tan", 3000)
-    require_min(errors, path, "right pickup cluster", right_powerups, "colored", 3000)
-    require_min(errors, path, "visible imp", imp, "tan", 1000)
-    require_min(errors, path, "visible imp", imp, "red", 500)
-    require_min(errors, path, "powerup playfield", playfield, "colored", 20000)
+    require_min(errors, path, "green armor pickup", armor, "green", 1500)
+    require_min(errors, path, "green armor pickup", armor, "colored", 3000)
+    require_min(errors, path, "ammo box pickup", ammo, "green", 400)
+    require_min(errors, path, "ammo box pickup", ammo, "gray", 500)
+    require_min(errors, path, "weapon pickup", weapon, "gray", 2000)
+    require_min(errors, path, "weapon pickup", weapon, "bright", 2500)
+    require_min(errors, path, "shell pickup", shells, "red", 250)
+    require_min(errors, path, "shell pickup", shells, "colored", 600)
+    require_min(errors, path, "powerup playfield", playfield, "colored", 12000)
     require_min(errors, path, "status bar", hud, "red", 9000)
     require_min(errors, path, "status bar", hud, "bright", 65000)
 

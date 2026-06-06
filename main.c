@@ -1456,6 +1456,24 @@ static int active_chunk_origin_y_q8(void) {
     return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * 256;
 }
 
+static void persist_runtime_slot_to_chunk_state(u16 slot) {
+    unsigned short chunk_index;
+    int origin_x;
+    int origin_y;
+    u16 type;
+    if (slot >= NG_RUNTIME_THING_COUNT) return;
+    chunk_index = thing_chunk_index[slot];
+    if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) return;
+    type = runtime_thing_type(slot);
+    origin_x = active_chunk_origin_x_q8();
+    origin_y = active_chunk_origin_y_q8();
+    chunk_thing_state_type[chunk_index] = type;
+    chunk_thing_state_x_q8[chunk_index] = (short)(origin_x + thing_x_q8[slot]);
+    chunk_thing_state_y_q8[chunk_index] = (short)(origin_y + thing_y_q8[slot]);
+    chunk_thing_state_dead[chunk_index] = (u8)(enemy_dead[slot] || type == 0);
+    chunk_thing_state_hp[chunk_index] = enemy_hp[slot];
+}
+
 static void clear_chunk_dynamic_drop_state(void) {
     for (u16 chunk = 0; chunk < DOOM_CHUNK_COUNT; chunk++) {
         for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
@@ -3432,6 +3450,9 @@ static u8 place_test_thing(u16 thing, u16 type, short forward, short lateral) {
     if (thing_is_pickup(type)) index_pickup_candidate(thing);
     if (thing_is_monster(type)) index_monster_candidate(thing);
     if (thing_is_shootable(type)) index_shootable_candidate(thing);
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    persist_runtime_slot_to_chunk_state(thing);
+#endif
     return 1;
 #else
     (void)thing;
@@ -3824,12 +3845,12 @@ static void configure_death_test(void) {
 static void configure_powerup_test(void) {
     static const u16 power_types[6] = {2013, 2018, 2048, 2012, 2001, 2008};
     static const short power_forward[6] = {
-        WORLD_Q8(176), WORLD_Q8(208), WORLD_Q8(240),
-        WORLD_Q8(272), WORLD_Q8(304), WORLD_Q8(336)
+        WORLD_Q8(512), WORLD_Q8(576), WORLD_Q8(640),
+        WORLD_Q8(704), WORLD_Q8(768), WORLD_Q8(832)
     };
     static const short power_lateral[6] = {
-        -WORLD_Q8(320), -WORLD_Q8(192), -WORLD_Q8(64),
-        WORLD_Q8(64), WORLD_Q8(192), WORLD_Q8(320)
+        -WORLD_Q8(240), -WORLD_Q8(144), -WORLD_Q8(48),
+        WORLD_Q8(48), WORLD_Q8(144), WORLD_Q8(240)
     };
 #if NG_RUNTIME_THING_COUNT > 0
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
@@ -6110,6 +6131,11 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
             int strip_x = sprite_x + j * 16;
             if (j < meta->strips && strip_x > -16 && strip_x < SCRW
                 && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + 15, dist_q8))) {
+#if DOOM_SIMPLE_MAP
+                if (!is_projectile && !is_explosion) {
+                    rc_reserve_sprite_budget_for_screen_range(strip_x - 8, strip_x + 23);
+                }
+#endif
                 int strip_left = strip_x < 0 ? 0 : strip_x;
                 int strip_right = strip_x + 16;
                 if (strip_right > SCRW) strip_right = SCRW;
@@ -6538,6 +6564,9 @@ static void update_chunk_streaming(void) {
     short shift_x = 0;
     short shift_y = 0;
 
+#ifdef DOOM_FOCUSED_TEST
+    return;
+#endif
     rc_player_q8(&px, &py);
     while (px < 0 && new_chunk_x > 0) {
         new_chunk_x--;
