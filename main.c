@@ -31,6 +31,7 @@ unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT 
 unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT ? NG_RUNTIME_LIFT_COUNT : 1];
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+enum { CHUNK_DYNAMIC_DROP_SLOTS = 8 };
 unsigned short g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
 unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
 unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 1];
@@ -39,6 +40,10 @@ static short chunk_thing_state_x_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_CO
 static short chunk_thing_state_y_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static u8 chunk_thing_state_dead[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static u8 chunk_thing_state_hp[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
+static u8 chunk_drop_active[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
+static u16 chunk_drop_type[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
+static short chunk_drop_x_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
+static short chunk_drop_y_q8[DOOM_CHUNK_COUNT][CHUNK_DYNAMIC_DROP_SLOTS];
 static unsigned short thing_chunk_index[NG_RUNTIME_THING_COUNT];
 #endif
 static u8 hurt_flash = 0;
@@ -1451,6 +1456,17 @@ static int active_chunk_origin_y_q8(void) {
     return (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H * 256;
 }
 
+static void clear_chunk_dynamic_drop_state(void) {
+    for (u16 chunk = 0; chunk < DOOM_CHUNK_COUNT; chunk++) {
+        for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
+            chunk_drop_active[chunk][slot] = 0;
+            chunk_drop_type[chunk][slot] = 0;
+            chunk_drop_x_q8[chunk][slot] = 0;
+            chunk_drop_y_q8[chunk][slot] = 0;
+        }
+    }
+}
+
 static void init_chunk_thing_state(void) {
     for (u16 i = 0; i < DOOM_CHUNK_THING_COUNT; i++) {
         chunk_thing_state_type[i] = g_chunk_things[i].type;
@@ -1459,22 +1475,64 @@ static void init_chunk_thing_state(void) {
         chunk_thing_state_dead[i] = 0;
         chunk_thing_state_hp[i] = 0;
     }
+    clear_chunk_dynamic_drop_state();
     g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
+}
+
+static void save_active_chunk_dynamic_drops(void) {
+    unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
+    int origin_x = active_chunk_origin_x_q8();
+    int origin_y = active_chunk_origin_y_q8();
+    for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
+        chunk_drop_active[chunk][slot] = dynamic_drop_active[slot];
+        chunk_drop_type[chunk][slot] = dynamic_drop_type[slot];
+        chunk_drop_x_q8[chunk][slot] = (short)(origin_x + dynamic_drop_x_q8[slot]);
+        chunk_drop_y_q8[chunk][slot] = (short)(origin_y + dynamic_drop_y_q8[slot]);
+    }
+}
+
+static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local_y_q8) {
+    unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
+    int origin_x;
+    int origin_y;
+    u8 slot = 0;
+    if (!thing_type) return;
+    for (u8 i = 0; i < CHUNK_DYNAMIC_DROP_SLOTS; i++) {
+        if (!chunk_drop_active[chunk][i]) {
+            slot = i;
+            break;
+        }
+    }
+    origin_x = active_chunk_origin_x_q8();
+    origin_y = active_chunk_origin_y_q8();
+    chunk_drop_active[chunk][slot] = 1;
+    chunk_drop_type[chunk][slot] = thing_type;
+    chunk_drop_x_q8[chunk][slot] = (short)(origin_x + local_x_q8);
+    chunk_drop_y_q8[chunk][slot] = (short)(origin_y + local_y_q8);
 }
 
 static void save_active_chunk_runtime_things(void) {
     int origin_x = active_chunk_origin_x_q8();
     int origin_y = active_chunk_origin_y_q8();
+    save_active_chunk_dynamic_drops();
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         unsigned short chunk_index = thing_chunk_index[i];
+        u16 type;
         if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) continue;
-        if (enemy_dead[i] || thing_type_override[i] == 0) {
+        type = runtime_thing_type(i);
+        if (death_anim_final_type[i]) {
+            if (death_anim_drop_type[i]) save_active_chunk_drop(death_anim_drop_type[i], thing_x_q8[i], thing_y_q8[i]);
+            type = death_anim_final_type[i];
+        } else if (death_drop_type[i]) {
+            type = death_drop_type[i];
+        }
+        if (enemy_dead[i] || type == 0) {
             chunk_thing_state_type[chunk_index] = 0;
             chunk_thing_state_dead[chunk_index] = 1;
             chunk_thing_state_hp[chunk_index] = 0;
             continue;
         }
-        chunk_thing_state_type[chunk_index] = runtime_thing_type(i);
+        chunk_thing_state_type[chunk_index] = type;
         chunk_thing_state_x_q8[chunk_index] = (short)(origin_x + thing_x_q8[i]);
         chunk_thing_state_y_q8[chunk_index] = (short)(origin_y + thing_y_q8[i]);
         chunk_thing_state_dead[chunk_index] = 0;
@@ -1490,6 +1548,45 @@ static void clear_dynamic_drops(void) {
         dynamic_drop_y_q8[i] = 0;
     }
 }
+
+static void load_active_chunk_dynamic_drops(void) {
+    unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
+    int origin_x = active_chunk_origin_x_q8();
+    int origin_y = active_chunk_origin_y_q8();
+    clear_dynamic_drops();
+    for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
+        short local_x;
+        short local_y;
+        if (!chunk_drop_active[chunk][slot]) continue;
+        local_x = (short)(chunk_drop_x_q8[chunk][slot] - origin_x);
+        local_y = (short)(chunk_drop_y_q8[chunk][slot] - origin_y);
+        if (local_x < 0 || local_y < 0 || local_x >= WORLD_Q8(SIMPLE_MAP_W) || local_y >= WORLD_Q8(SIMPLE_MAP_H)) continue;
+        dynamic_drop_active[slot] = 1;
+        dynamic_drop_type[slot] = chunk_drop_type[chunk][slot];
+        dynamic_drop_x_q8[slot] = local_x;
+        dynamic_drop_y_q8[slot] = local_y;
+    }
+}
+
+static void reset_chunk_runtime_slot(u16 i) {
+    enemy_dead[i] = 1;
+    enemy_hp[i] = 0;
+    enemy_hit_flash[i] = 0;
+    enemy_awake[i] = 0;
+    enemy_attack_cooldown[i] = 0;
+    enemy_attack_anim[i] = 0;
+    enemy_ranged_readable_ticks[i] = 0;
+    enemy_hidden_timer[i] = 0;
+    monster_face_x[i] = 0;
+    monster_face_y[i] = 1;
+    explosion_timer[i] = 0;
+    death_anim_timer[i] = 0;
+    death_drop_timer[i] = 0;
+    thing_type_override[i] = 0;
+    death_anim_final_type[i] = 0;
+    death_anim_drop_type[i] = 0;
+    death_drop_type[i] = 0;
+}
 #endif
 
 static void init_runtime_things(void) {
@@ -1503,14 +1600,13 @@ static void init_runtime_things(void) {
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
         unsigned short chunk_first = g_chunk_thing_first[SIMPLE_ACTIVE_CHUNK];
         unsigned char chunk_count = g_chunk_thing_count[SIMPLE_ACTIVE_CHUNK];
+        reset_chunk_runtime_slot((u16)i);
         thing_chunk_index[i] = 0xFFFF;
         if (i >= chunk_count) {
             thing_x_q8[i] = 0;
             thing_y_q8[i] = 0;
             thing_type_override[i] = 0;
             thing_static_class[i] = THING_CLASS_NONE;
-            enemy_dead[i] = 1;
-            enemy_hp[i] = 0;
             continue;
         }
         {
@@ -1523,8 +1619,6 @@ static void init_runtime_things(void) {
                 thing_y_q8[i] = 0;
                 thing_type_override[i] = 0;
                 thing_static_class[i] = THING_CLASS_NONE;
-                enemy_dead[i] = 1;
-                enemy_hp[i] = 0;
                 continue;
             }
             if (x_q8 < 0 || y_q8 < 0 || x_q8 >= WORLD_Q8(SIMPLE_MAP_W) || y_q8 >= WORLD_Q8(SIMPLE_MAP_H)) {
@@ -1532,8 +1626,6 @@ static void init_runtime_things(void) {
                 thing_y_q8[i] = 0;
                 thing_type_override[i] = 0;
                 thing_static_class[i] = THING_CLASS_NONE;
-                enemy_dead[i] = 1;
-                enemy_hp[i] = 0;
                 continue;
             }
             thing_chunk_index[i] = chunk_index;
@@ -6044,9 +6136,12 @@ typedef struct ThingCandidate {
 
 #define THING_CANDIDATE_COUNT (ENEMY_VISIBLE_COUNT * 3)
 
-static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, short x, short y) {
+static u8 candidate_coord_selected(const ThingCandidate *candidates, int count, short x, short y, u16 thing_type) {
+    u8 new_is_pickup = thing_is_pickup(thing_type);
     for (int slot = 0; slot < count; slot++) {
-        if (candidates[slot].x_q8 == x && candidates[slot].y_q8 == y) return 1;
+        if (candidates[slot].x_q8 != x || candidates[slot].y_q8 != y) continue;
+        if (new_is_pickup != thing_is_pickup(candidates[slot].thing_type)) continue;
+        return 1;
     }
     return 0;
 }
@@ -6261,7 +6356,7 @@ static int select_visible_things(int found) {
         if (!thing_maybe_projectable(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y)) continue;
         bucket = runtime_thing_render_bucket(i, &thing_type);
         if (!bucket) continue;
-        if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i])) continue;
+        if (candidate_coord_selected(candidates, count, thing_x_q8[i], thing_y_q8[i], thing_type)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(thing_x_q8[i], thing_y_q8[i], &sx, &h, &dist_q8)) {
             if (!project_point_from_view_q8(thing_x_q8[i], thing_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y,
@@ -6293,7 +6388,7 @@ static int select_visible_things(int found) {
         if (!dynamic_drop_active[i]) continue;
         bucket = thing_render_bucket(thing_type);
         if (bucket != 3 && bucket != 5) continue;
-        if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i])) continue;
+        if (candidate_coord_selected(candidates, count, dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], thing_type)) continue;
         if (!thing_maybe_projectable(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], px, py, dir_x, dir_y, plane_x, plane_y)) continue;
         u8 fallback_projection = 0;
         if (!rc_project_point(dynamic_drop_x_q8[i], dynamic_drop_y_q8[i], &sx, &h, &dist_q8)) {
@@ -6445,7 +6540,7 @@ static void update_chunk_streaming(void) {
     g_simple_active_chunk = (unsigned short)(new_chunk_y * DOOM_CHUNK_COLS + new_chunk_x);
     rc_shift_player_q8(shift_x, shift_y);
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
-    clear_dynamic_drops();
+    load_active_chunk_dynamic_drops();
     init_runtime_things();
     reset_enemy_slot_cache();
     hide_enemies();
