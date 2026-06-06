@@ -79,6 +79,15 @@ and emits generated C headers/sources under `build/`:
   chunk-local thing metadata, and writes an ASCII preview for inspection. The
   runtime streams one generated page at a time into the existing simple-map
   renderer.
+- RIPDOOM-lite geometry path. `tools/doom_ripdoom_convert.py` is the next
+  converter track inspired by the SNES Doom tooling model: keep the authored
+  simple map as the playable baseline, but separately emit compact WAD-native
+  geometry tables for `VERTEXES`, `LINEDEFS`, `SIDEDEFS`, `SECTORS`, `SEGS`,
+  `SSECTORS`, `NODES`, `REJECT`, `BLOCKMAP`, and `THINGS`. Generated segs carry
+  preclassified flags for one-sided/two-sided walls, solid/passable spans,
+  doors, lower/upper wall deltas, and mid textures. This data is validated by
+  `make ripdoom-check` and is intentionally not wired into the renderer until
+  the table contract is stable.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

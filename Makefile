@@ -70,6 +70,9 @@ DOOM_CHUNK_DEP=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
 DOOM_CHUNK_CELL_UNITS?=64
+DOOM_RIPDOOM_HEADER=$(BUILDDIR)/doom_ripdoom_generated.h
+DOOM_RIPDOOM_SOURCE=$(BUILDDIR)/doom_ripdoom_generated.c
+DOOM_RIPDOOM_REPORT=$(BUILDDIR)/doom_ripdoom_report.txt
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
@@ -450,7 +453,10 @@ chunk-route-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 chunk-visibility-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 	$(PYTHON) tools/check_chunk_visibility.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check
+ripdoom-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
+	$(PYTHON) tools/check_ripdoom_assets.py --header $(DOOM_RIPDOOM_HEADER) --source $(DOOM_RIPDOOM_SOURCE)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
@@ -467,6 +473,11 @@ $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE): Makefile tools/doom_chunk_convert.py 
 	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
 
 chunk-map: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+
+$(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE): Makefile tools/doom_ripdoom_convert.py tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
+	$(PYTHON) tools/doom_ripdoom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --out $(DOOM_RIPDOOM_HEADER) --source $(DOOM_RIPDOOM_SOURCE) --report $(DOOM_RIPDOOM_REPORT)
+
+ripdoom-map: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 
 $(DOOM_ASSETS_HEADER) $(DOOM_ASSETS_SOURCE): $(DOOM_MAP_HEADER)
 
