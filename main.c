@@ -1683,6 +1683,9 @@ static void init_runtime_things(void) {
 
 static u16 runtime_thing_type(int thing_index) {
     if (thing_index < 0 || thing_index >= NG_RUNTIME_THING_COUNT) return 0;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    if (thing_chunk_index[thing_index] == 0xFFFF && !thing_type_override[thing_index]) return 0;
+#endif
     return thing_type_override[thing_index] ? thing_type_override[thing_index] : g_runtime_things[thing_index].type;
 }
 
