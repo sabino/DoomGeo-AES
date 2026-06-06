@@ -86,6 +86,10 @@ hold_keys() {
     local seconds="$2"
     shift 2
     local key=""
+    if [ "$USE_XVFB" = "1" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool windowfocus "$wid" >/dev/null 2>&1 || true
+        DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    fi
     trap 'for key in "$@"; do DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key" >/dev/null 2>&1 || true; done' RETURN
     for key in "$@"; do
         DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"

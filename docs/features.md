@@ -47,6 +47,10 @@ readable.
   collision and chunk-stream update enough to prove the generated start can
   walk forward instead of spawning wedged against a wall. `make
   chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
+- `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
+  ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
+  player input. `make chunk-movement-test-rom` uses the same scale but replaces
+  input with a scripted forward walk, so it is only for regression testing.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated

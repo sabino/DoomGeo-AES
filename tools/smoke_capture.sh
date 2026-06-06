@@ -28,6 +28,7 @@ MAKE_ARGS=()
 MAKE_ROM_DIR=""
 MAKE_BUILD_DIR=""
 BIOS_SOURCE=".tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip"
+KILL_OLD_GNGEO="${SMOKE_KILL_OLD_GNGEO:-1}"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -102,6 +103,7 @@ if [ "$USE_XVFB" = "1" ]; then
     DISPLAY_VALUE="${SMOKE_XVFB_DISPLAY:-:99}"
     WORKSPACE=""
     TILE_WINDOWS=0
+    KILL_OLD_GNGEO="${SMOKE_KILL_OLD_GNGEO:-0}"
 fi
 
 cleanup() {
@@ -156,7 +158,9 @@ fi
 if [ -n "$MAKE_ROM_DIR" ] && [ ! -e "$MAKE_ROM_DIR/neogeo.zip" ] && [ -e "$BIOS_SOURCE" ]; then
     ln -nsf "$ROOT/$BIOS_SOURCE" "$MAKE_ROM_DIR/neogeo.zip"
 fi
-kill_old_gngeo
+if [ "$KILL_OLD_GNGEO" = "1" ]; then
+    kill_old_gngeo
+fi
 
 if [ "$USE_XVFB" = "1" ]; then
     Xvfb "$DISPLAY_VALUE" -screen 0 "$XVFB_SCREEN" >"${LOG%.log}-xvfb.log" 2>&1 &
@@ -185,6 +189,10 @@ wid="$(window_for_gngeo)"
 tile_window "$wid"
 if [ "$START_GAME" = "1" ]; then
     sleep 0.2
+    if [ "$USE_XVFB" = "1" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool windowfocus "$wid" >/dev/null 2>&1 || true
+        DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    fi
     DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" x
     sleep 0.25
     DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" x
