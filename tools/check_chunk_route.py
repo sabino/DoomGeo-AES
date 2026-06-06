@@ -421,6 +421,92 @@ def validate_key_lift_player_path(
     return None
 
 
+def stream_update(
+    local_x_q8: int,
+    local_y_q8: int,
+    active_chunk: int,
+    chunk_cols: int,
+    chunk_rows: int,
+    chunk_size: int,
+) -> tuple[int, int, int, int]:
+    page_q8 = chunk_size * 256
+    chunk_x = active_chunk % chunk_cols
+    chunk_y = active_chunk // chunk_cols
+    new_chunk_x = chunk_x
+    new_chunk_y = chunk_y
+    while local_x_q8 < 0 and new_chunk_x > 0:
+        new_chunk_x -= 1
+        local_x_q8 += page_q8
+    while local_x_q8 >= page_q8 and new_chunk_x + 1 < chunk_cols:
+        new_chunk_x += 1
+        local_x_q8 -= page_q8
+    while local_y_q8 < 0 and new_chunk_y > 0:
+        new_chunk_y -= 1
+        local_y_q8 += page_q8
+    while local_y_q8 >= page_q8 and new_chunk_y + 1 < chunk_rows:
+        new_chunk_y += 1
+        local_y_q8 -= page_q8
+    return new_chunk_y * chunk_cols + new_chunk_x, local_x_q8, local_y_q8, (
+        int(new_chunk_x != chunk_x) + int(new_chunk_y != chunk_y)
+    )
+
+
+def validate_stream_route(
+    path: list[tuple[int, int]],
+    start_chunk: int,
+    start_local_q8: tuple[int, int],
+    chunk_cols: int,
+    chunk_rows: int,
+    chunk_size: int,
+) -> tuple[str | None, int]:
+    active_chunk = start_chunk
+    local_x_q8, local_y_q8 = start_local_q8
+    transitions = 0
+    for index, cell in enumerate(path):
+        expected_chunk = (cell[1] // chunk_size) * chunk_cols + (cell[0] // chunk_size)
+        expected_local = ((cell[0] % chunk_size) * 256 + 128, (cell[1] % chunk_size) * 256 + 128)
+        if index == 0:
+            if active_chunk != expected_chunk:
+                return (
+                    f"stream route start chunk mismatch: active={active_chunk} expected={expected_chunk}",
+                    transitions,
+                )
+            if (local_x_q8, local_y_q8) != expected_local:
+                return (
+                    f"stream route start local mismatch: local=({local_x_q8},{local_y_q8}) "
+                    f"expected={expected_local}",
+                    transitions,
+                )
+            continue
+        prev = path[index - 1]
+        dx_q8 = (cell[0] - prev[0]) * 256
+        dy_q8 = (cell[1] - prev[1]) * 256
+        if (dx_q8 and dy_q8) or (abs(dx_q8) + abs(dy_q8) != 256):
+            return f"stream route step {index - 1}->{index} is not cardinal adjacent: {prev}->{cell}", transitions
+        active_chunk, local_x_q8, local_y_q8, changed_axes = stream_update(
+            local_x_q8 + dx_q8,
+            local_y_q8 + dy_q8,
+            active_chunk,
+            chunk_cols,
+            chunk_rows,
+            chunk_size,
+        )
+        transitions += changed_axes
+        if active_chunk != expected_chunk:
+            return (
+                f"stream route step {index} chunk mismatch at {cell}: active={active_chunk} "
+                f"expected={expected_chunk}",
+                transitions,
+            )
+        if (local_x_q8, local_y_q8) != expected_local:
+            return (
+                f"stream route step {index} local mismatch at {cell}: "
+                f"local=({local_x_q8},{local_y_q8}) expected={expected_local}",
+                transitions,
+            )
+    return None, transitions
+
+
 def forward_open_cells(
     grid: list[list[int]],
     start_x: float,
@@ -462,6 +548,12 @@ def main() -> int:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Require accepted chunk routes to fit the runtime player collision radius",
+    )
+    parser.add_argument(
+        "--check-stream-route",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require the accepted state route to follow the runtime 16x16 chunk streaming convention",
     )
     args = parser.parse_args()
 
@@ -646,6 +738,20 @@ def main() -> int:
         if error:
             print(f"{label}: player-radius key/lift route failed: {error}", file=sys.stderr)
             return 1
+    stream_transitions = 0
+    if args.check_stream_route:
+        chunk_rows = (chunk_count + chunk_cols - 1) // chunk_cols
+        error, stream_transitions = validate_stream_route(
+            state_route,
+            start_chunk,
+            start_local_q8,
+            chunk_cols,
+            chunk_rows,
+            chunk_size,
+        )
+        if error:
+            print(f"{label}: chunk stream route failed: {error}", file=sys.stderr)
+            return 1
     key_path_doors = [cell for cell in key_route if cell in {(x, y) for x, y, _special in doors}]
     locked_path_doors = [cell for cell in key_route if cell in locked_doors]
     state_path_lifts = [cell for cell in state_route if cell in lift_cell_masks]
@@ -658,6 +764,8 @@ def main() -> int:
         f"keys=0x{key_route_keys:x} state_route_steps={len(state_route) - 1} "
         f"state_lifts={len(state_path_lifts)} state_keys=0x{state_route_keys:x} "
         f"state_lift_mask=0x{state_route_lifts:x} "
+        f"stream_route={'yes' if args.check_stream_route else 'no'} "
+        f"stream_transitions={stream_transitions} "
         f"player_radius={'yes' if args.check_player_radius_route else 'no'}"
     )
     return 0

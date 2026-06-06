@@ -428,7 +428,10 @@ readable.
   cells closed until a reachable lift trigger opens them, so converted
   elevators/platforms cannot silently become always-open route shortcuts.
   Accepted routes are also sampled at cell centers and cell-boundary midpoints
-  with the same q8 player radius used by the runtime collision checks. If the
+  with the same q8 player radius used by the runtime collision checks. The
+  accepted state route is also replayed through the shared `16x16` chunk
+  streaming convention, so start-to-exit validation catches page-wrap mistakes
+  before they become runtime movement traps. If the
   exact WAD player start falls on a
   coarse-grid wall, chunk conversion moves it to the nearest open cell and
   opens the minimum number of coarse wall cells needed to preserve a playable
