@@ -82,6 +82,7 @@
 #if DOOM_CHUNKED_SIMPLE_MAP
 
 extern unsigned short g_simple_active_chunk;
+extern unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
 #define SIMPLE_ACTIVE_CHUNK g_simple_active_chunk
 
 static inline unsigned short simple_chunk_cell_index(int x, int y) {
@@ -122,6 +123,10 @@ static inline int map_at(int x, int y) {
         && (g_runtime_cell_open[((local_y * ACTIVE_MAP_W) + local_x) >> 3]
             & (1 << (((local_y * ACTIVE_MAP_W) + local_x) & 7)))) return 0;
     cell = simple_chunk_cell_index(local_x, local_y);
+    {
+        unsigned char door_id = g_chunk_door_cell[chunk][cell];
+        if (door_id >= 2) return g_chunk_door_open[door_id - 2] ? 0 : 1;
+    }
     return g_chunk_solid[chunk][cell] ? 1 : 0;
 }
 
@@ -130,7 +135,12 @@ static inline unsigned char map_cell_value(int x, int y) {
     int local_y;
     unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
     if (chunk == 0xFFFF) return 1;
-    return g_chunk_solid[chunk][simple_chunk_cell_index(local_x, local_y)] ? 1 : 0;
+    {
+        unsigned short cell = simple_chunk_cell_index(local_x, local_y);
+        unsigned char door_id = g_chunk_door_cell[chunk][cell];
+        if (door_id >= 2) return door_id;
+        return g_chunk_solid[chunk][cell] ? 1 : 0;
+    }
 }
 
 static inline unsigned char map_cell_texture(int x, int y) {

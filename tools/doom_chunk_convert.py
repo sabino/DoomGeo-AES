@@ -24,6 +24,24 @@ class ChunkThing:
     chunk: int
 
 
+@dataclass(frozen=True)
+class ChunkExit:
+    x_q8: int
+    y_q8: int
+    special: int
+    next_episode: int
+    next_mission: int
+    chunk: int
+
+
+@dataclass(frozen=True)
+class ChunkDoor:
+    x: int
+    y: int
+    special: int
+    chunk: int
+
+
 def snap_floor(value: int, unit: int) -> int:
     return math.floor(value / unit) * unit
 
@@ -198,6 +216,87 @@ def build_things(
     return rows
 
 
+def build_exits(
+    linedefs: list[dc.LineDef],
+    vertices: list[dc.Vertex],
+    grid: list[list[int]],
+    origin_x: int,
+    origin_y: int,
+    cell_units: int,
+    chunk_size: int,
+    chunk_cols: int,
+    map_name: str,
+) -> list[ChunkExit]:
+    rows: list[ChunkExit] = []
+    seen: set[tuple[int, int]] = set()
+    for line in linedefs:
+        if line.special not in dc.EXIT_SPECIALS:
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        gx, gy = grid_coord((a.x + b.x) // 2, (a.y + b.y) // 2, origin_x, origin_y, cell_units)
+        cell_x, cell_y = dc.nearest_open(grid, int(math.floor(gx)), int(math.floor(gy)))
+        key = (cell_x, cell_y)
+        if key in seen:
+            continue
+        seen.add(key)
+        chunk = (cell_y // chunk_size) * chunk_cols + (cell_x // chunk_size)
+        next_episode, next_mission = dc.exit_episode_mission(map_name, line.special)
+        rows.append(
+            ChunkExit(
+                int(round((cell_x + 0.5) * 256)),
+                int(round((cell_y + 0.5) * 256)),
+                line.special,
+                next_episode,
+                next_mission,
+                chunk,
+            )
+        )
+    rows.sort(key=lambda row: (row.chunk, row.y_q8, row.x_q8, row.special))
+    return rows
+
+
+def build_doors(
+    linedefs: list[dc.LineDef],
+    vertices: list[dc.Vertex],
+    grid: list[list[int]],
+    origin_x: int,
+    origin_y: int,
+    cell_units: int,
+    chunk_size: int,
+    chunk_cols: int,
+) -> list[ChunkDoor]:
+    rows: list[ChunkDoor] = []
+    seen: set[tuple[int, int]] = set()
+    for line in linedefs:
+        if line.special not in dc.DOOR_SPECIALS:
+            continue
+        a = vertices[line.v1]
+        b = vertices[line.v2]
+        x0, y0 = grid_point(a.x, a.y, origin_x, origin_y, cell_units)
+        x1, y1 = grid_point(b.x, b.y, origin_x, origin_y, cell_units)
+        for cell_x, cell_y in dc.line_cells(grid, x0, y0, x1, y1):
+            if not grid[cell_y][cell_x]:
+                continue
+            key = (cell_x, cell_y)
+            if key in seen:
+                continue
+            seen.add(key)
+            chunk = (cell_y // chunk_size) * chunk_cols + (cell_x // chunk_size)
+            rows.append(ChunkDoor(cell_x, cell_y, line.special, chunk))
+    rows.sort(key=lambda row: (row.chunk, row.y, row.x, row.special))
+    return rows
+
+
+def build_door_grid(width: int, height: int, doors: list[ChunkDoor]) -> list[list[int]]:
+    grid = [[0 for _ in range(width)] for _ in range(height)]
+    for index, door in enumerate(doors):
+        if index >= 254:
+            raise ValueError("chunk door id table supports at most 254 doors")
+        grid[door.y][door.x] = index + 2
+    return grid
+
+
 def chunk_cells(grid: list[list[int]], chunk: int, chunk_size: int, chunk_cols: int) -> list[int]:
     chunk_x = chunk % chunk_cols
     chunk_y = chunk // chunk_cols
@@ -255,10 +354,13 @@ def write_outputs(
     floor_height_grid: list[list[int]],
     ceiling_height_grid: list[list[int]],
     things: list[ChunkThing],
+    exits: list[ChunkExit],
+    doors: list[ChunkDoor],
 ) -> None:
     chunk_count = chunk_cols * chunk_rows
     chunk_first: list[int] = []
     chunk_count_things: list[int] = []
+    door_grid = build_door_grid(len(grid[0]), len(grid), doors)
     cursor = 0
     for chunk in range(chunk_count):
         chunk_first.append(cursor)
@@ -291,6 +393,8 @@ def write_outputs(
         f.write(f"#define DOOM_CHUNK_ROWS {chunk_rows}\n")
         f.write(f"#define DOOM_CHUNK_COUNT {chunk_count}\n")
         f.write(f"#define DOOM_CHUNK_THING_COUNT {len(things)}\n\n")
+        f.write(f"#define DOOM_CHUNK_EXIT_COUNT {len(exits)}\n")
+        f.write(f"#define DOOM_CHUNK_DOOR_COUNT {len(doors)}\n\n")
         f.write(f"#define DOOM_CHUNK_START_CHUNK {start_chunk}\n")
         f.write(f"#define DOOM_CHUNK_START_X {start_x:.3f}\n")
         f.write(f"#define DOOM_CHUNK_START_Y {start_y:.3f}\n")
@@ -310,7 +414,22 @@ def write_outputs(
         f.write("    unsigned char info;\n")
         f.write("    unsigned short chunk;\n")
         f.write("} NgChunkThing;\n\n")
+        f.write("typedef struct NgChunkExit {\n")
+        f.write("    short x_q8;\n")
+        f.write("    short y_q8;\n")
+        f.write("    unsigned short special;\n")
+        f.write("    unsigned char next_episode;\n")
+        f.write("    unsigned char next_mission;\n")
+        f.write("    unsigned short chunk;\n")
+        f.write("} NgChunkExit;\n\n")
+        f.write("typedef struct NgChunkDoor {\n")
+        f.write("    unsigned short x;\n")
+        f.write("    unsigned short y;\n")
+        f.write("    unsigned short special;\n")
+        f.write("    unsigned short chunk;\n")
+        f.write("} NgChunkDoor;\n\n")
         f.write("extern const unsigned char g_chunk_solid[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
+        f.write("extern const unsigned char g_chunk_door_cell[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_tex[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_floor_visual[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_damage[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
@@ -320,12 +439,15 @@ def write_outputs(
         f.write("extern const unsigned short g_chunk_thing_first[DOOM_CHUNK_COUNT];\n")
         f.write("extern const unsigned char g_chunk_thing_count[DOOM_CHUNK_COUNT];\n")
         f.write("extern const NgChunkThing g_chunk_things[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];\n\n")
+        f.write("extern const NgChunkExit g_chunk_exits[DOOM_CHUNK_EXIT_COUNT ? DOOM_CHUNK_EXIT_COUNT : 1];\n")
+        f.write("extern const NgChunkDoor g_chunk_doors[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];\n\n")
         f.write("#endif /* DOOM_CHUNKS_GENERATED_H */\n")
 
     with open(source_path, "w", encoding="ascii") as f:
         f.write("/* Generated by tools/doom_chunk_convert.py; do not edit by hand. */\n")
         f.write('#include "doom_chunks_generated.h"\n\n')
         write_u8_chunks(f, "g_chunk_solid", grid, chunk_count, chunk_size, chunk_cols)
+        write_u8_chunks(f, "g_chunk_door_cell", door_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_tex", tex_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_floor_visual", floor_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_damage", damage_grid, chunk_count, chunk_size, chunk_cols)
@@ -347,6 +469,23 @@ def write_outputs(
                 )
         else:
             f.write("    {0,0,0,0,0,0,0},\n")
+        f.write("};\n")
+        f.write("\nconst NgChunkExit g_chunk_exits[DOOM_CHUNK_EXIT_COUNT ? DOOM_CHUNK_EXIT_COUNT : 1] = {\n")
+        if exits:
+            for row in exits:
+                f.write(
+                    f"    {{{row.x_q8},{row.y_q8},{row.special},"
+                    f"{row.next_episode},{row.next_mission},{row.chunk}}},\n"
+                )
+        else:
+            f.write("    {0,0,0,0,0,0},\n")
+        f.write("};\n")
+        f.write("\nconst NgChunkDoor g_chunk_doors[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1] = {\n")
+        if doors:
+            for row in doors:
+                f.write(f"    {{{row.x},{row.y},{row.special},{row.chunk}}},\n")
+        else:
+            f.write("    {0,0,0,0},\n")
         f.write("};\n")
 
 
@@ -403,6 +542,14 @@ def convert(args: argparse.Namespace) -> None:
         things, origin_x, origin_y, width, height, args.cell_units,
         args.chunk_size, chunk_cols, args.skill_mask
     )
+    converted_exits = build_exits(
+        linedefs, vertices, grid, origin_x, origin_y, args.cell_units,
+        args.chunk_size, chunk_cols, args.map.upper()
+    )
+    converted_doors = build_doors(
+        linedefs, vertices, grid, origin_x, origin_y, args.cell_units,
+        args.chunk_size, chunk_cols
+    )
     start_x, start_y = grid_coord(player.x, player.y, origin_x, origin_y, args.cell_units)
     start_cell_x = int(math.floor(start_x))
     start_cell_y = int(math.floor(start_y))
@@ -432,6 +579,8 @@ def convert(args: argparse.Namespace) -> None:
         floor_height_grid,
         ceiling_height_grid,
         converted_things,
+        converted_exits,
+        converted_doors,
     )
     if args.preview:
         write_preview(args.preview, grid, converted_things, args.chunk_size)
@@ -439,7 +588,8 @@ def convert(args: argparse.Namespace) -> None:
     print(
         f"{args.map.upper()}: {width}x{height} fixed cells, "
         f"{chunk_cols}x{chunk_rows} chunks of {args.chunk_size}x{args.chunk_size}, "
-        f"{solid_cells} solid cells, {len(converted_things)} things -> {args.out}"
+        f"{solid_cells} solid cells, {len(converted_things)} things, "
+        f"{len(converted_exits)} exits, {len(converted_doors)} doors -> {args.out}"
     )
 
 

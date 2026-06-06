@@ -32,6 +32,7 @@ unsigned char g_runtime_lift_open[NG_RUNTIME_LIFT_COUNT ? NG_RUNTIME_LIFT_COUNT 
 unsigned char g_runtime_cell_open[MAP_RUNTIME_OPEN_BYTES ? MAP_RUNTIME_OPEN_BYTES : 1];
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 unsigned short g_simple_active_chunk = DOOM_CHUNK_START_CHUNK;
+unsigned char g_chunk_door_open[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
 static u16 chunk_thing_state_type[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static short chunk_thing_state_x_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
 static short chunk_thing_state_y_q8[DOOM_CHUNK_THING_COUNT ? DOOM_CHUNK_THING_COUNT : 1];
@@ -4301,6 +4302,20 @@ static void check_exit_reached(void) {
     int px, py;
     if (level_complete) return;
     rc_player_q8(&px, &py);
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    {
+        int global_px = active_chunk_origin_x_q8() + px;
+        int global_py = active_chunk_origin_y_q8() + py;
+        for (u16 i = 0; i < DOOM_CHUNK_EXIT_COUNT; i++) {
+            const NgChunkExit *exit = &g_chunk_exits[i];
+            if (iabs16(global_px - exit->x_q8) <= WORLD_Q8(128)
+                && iabs16(global_py - exit->y_q8) <= WORLD_Q8(128)) {
+                complete_level_to(exit->next_episode, exit->next_mission);
+                return;
+            }
+        }
+    }
+#else
     for (u16 i = 0; i < NG_RUNTIME_EXIT_COUNT; i++) {
         const NgRuntimeExit *exit = &g_runtime_exits[i];
         if (iabs16(px - exit->x_q8) <= WORLD_Q8(128) && iabs16(py - exit->y_q8) <= WORLD_Q8(128)) {
@@ -4308,15 +4323,21 @@ static void check_exit_reached(void) {
             return;
         }
     }
+#endif
 }
 
 static int closed_door_at_cell(int cell_x, int cell_y) {
-    if (cell_x < 0 || cell_y < 0 || cell_x >= ACTIVE_MAP_W || cell_y >= ACTIVE_MAP_H) return -1;
     u8 cell = map_cell_value(cell_x, cell_y);
     if (cell < 2) return -1;
     int door_index = cell - 2;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    if (door_index < 0 || door_index >= DOOM_CHUNK_DOOR_COUNT) return -1;
+    if (g_chunk_door_open[door_index]) return -1;
+#else
+    if (cell_x < 0 || cell_y < 0 || cell_x >= ACTIVE_MAP_W || cell_y >= ACTIVE_MAP_H) return -1;
     if (door_index < 0 || door_index >= NG_RUNTIME_DOOR_COUNT) return -1;
     if (g_runtime_door_open[door_index]) return -1;
+#endif
     return door_index;
 }
 
@@ -4382,9 +4403,17 @@ static int touching_closed_door(int px, int py) {
         int y = py + probes[i][1] * TOUCH_Q8;
         int door_index = closed_door_at_cell(x >> 8, y >> 8);
         if (door_index >= 0) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+            const NgChunkDoor *door = &g_chunk_doors[door_index];
+            int door_x = (int)door->x - (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W;
+            int door_y = (int)door->y - (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H;
+            int dx = door_x * 256 + 128 - px;
+            int dy = door_y * 256 + 128 - py;
+#else
             const NgRuntimeDoor *door = &g_runtime_doors[door_index];
             int dx = (int)door->x * 256 + 128 - px;
             int dy = (int)door->y * 256 + 128 - py;
+#endif
             int score = iabs16(dx) + iabs16(dy);
             if (score < best_score) {
                 best = door_index;
@@ -4509,6 +4538,65 @@ static u8 open_nearby_lift(void) {
 }
 
 static void open_door_index(u16 door_index) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    const NgChunkDoor *door;
+    u8 in_group[DOOM_CHUNK_DOOR_COUNT ? DOOM_CHUNK_DOOR_COUNT : 1];
+    u8 opened = 0;
+    u8 required_key;
+    if (door_index >= DOOM_CHUNK_DOOR_COUNT) return;
+    door = &g_chunk_doors[door_index];
+    required_key = key_bit_for_door(door->special);
+    if (required_key && (player_keys & required_key) == 0) {
+        missing_key_bits = required_key;
+        key_message_timer = 60;
+        return;
+    }
+
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) in_group[i] = 0;
+    in_group[door_index] = 1;
+    for (;;) {
+        u8 changed = 0;
+        for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) {
+            if (in_group[i]) continue;
+            if (g_chunk_doors[i].special != door->special) continue;
+            for (u16 j = 0; j < DOOM_CHUNK_DOOR_COUNT; j++) {
+                int dx;
+                int dy;
+                if (!in_group[j]) continue;
+                dx = (int)g_chunk_doors[i].x - (int)g_chunk_doors[j].x;
+                dy = (int)g_chunk_doors[i].y - (int)g_chunk_doors[j].y;
+                if (iabs16(dx) + iabs16(dy) == 1) {
+                    in_group[i] = 1;
+                    changed = 1;
+                    break;
+                }
+            }
+        }
+        if (!changed) break;
+    }
+
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) {
+        int local_x;
+        int local_y;
+        if (!in_group[i]) continue;
+        if (!g_chunk_door_open[i]) opened = 1;
+        g_chunk_door_open[i] = 1;
+        local_x = (int)g_chunk_doors[i].x - (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W;
+        local_y = (int)g_chunk_doors[i].y - (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H;
+        if (local_x >= 0 && local_y >= 0 && local_x < ACTIVE_MAP_W && local_y < ACTIVE_MAP_H) {
+            carve_door_bridge_from_cell(local_x, local_y);
+            if (map_on) draw_minimap_source_cell(local_x, local_y);
+        }
+    }
+    if (opened) {
+        door_message_timer = 35;
+        monster_path_valid = 0;
+        monster_path_player_cell_x = -1;
+        monster_path_player_cell_y = -1;
+        invalidate_background_cache();
+        rc_invalidate_view();
+    }
+#else
     const NgRuntimeDoor *door = &g_runtime_doors[door_index];
     u8 required_key = key_bit_for_door(door->special);
     u8 in_group[NG_RUNTIME_DOOR_COUNT];
@@ -4556,6 +4644,7 @@ static void open_door_index(u16 door_index) {
         monster_path_player_cell_y = -1;
         rc_invalidate_view();
     }
+#endif
 }
 
 static void open_nearby_door(void) {
@@ -4581,6 +4670,27 @@ static void open_nearby_door(void) {
         }
     }
 
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) {
+        const NgChunkDoor *door = &g_chunk_doors[i];
+        int local_x = (int)door->x - (int)(SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS) * SIMPLE_MAP_W;
+        int local_y = (int)door->y - (int)(SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS) * SIMPLE_MAP_H;
+        int to_x = local_x * 256 + 128 - px;
+        int to_y = local_y * 256 + 128 - py;
+        int adx = iabs16(to_x);
+        int ady = iabs16(to_y);
+        int dist = adx + ady;
+        int dot = to_x * dir_x + to_y * dir_y;
+        int lateral = iabs16(to_x * dir_y - to_y * dir_x);
+        if (g_chunk_door_open[i]) continue;
+        if (adx > WORLD_Q8(512) || ady > WORLD_Q8(512) || dist > WORLD_Q8(768)) continue;
+        if (dot <= 0 || lateral > dot * 2) continue;
+        if (dist < best_score) {
+            best = i;
+            best_score = dist;
+        }
+    }
+#else
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) {
         const NgRuntimeDoor *door = &g_runtime_doors[i];
         int to_x = (int)door->x * 256 + 128 - px;
@@ -4598,6 +4708,7 @@ static void open_nearby_door(void) {
             best_score = dist;
         }
     }
+#endif
     if (best < 0) return;
     open_door_index((u16)best);
 }
@@ -6230,6 +6341,7 @@ static void update_chunk_streaming(void) {
     save_active_chunk_runtime_things();
     g_simple_active_chunk = (unsigned short)(new_chunk_y * DOOM_CHUNK_COLS + new_chunk_x);
     rc_shift_player_q8(shift_x, shift_y);
+    for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     clear_dynamic_drops();
     init_runtime_things();
     reset_enemy_slot_cache();
@@ -6361,6 +6473,9 @@ static void restart_level(void) {
 
     for (u16 i = 0; i < NG_RUNTIME_DOOR_COUNT; i++) g_runtime_door_open[i] = 0;
     for (u16 i = 0; i < NG_RUNTIME_LIFT_COUNT; i++) g_runtime_lift_open[i] = 0;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    for (u16 i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) g_chunk_door_open[i] = 0;
+#endif
     for (u16 i = 0; i < MAP_RUNTIME_OPEN_BYTES; i++) g_runtime_cell_open[i] = 0;
     for (u16 i = 0; i < MAP_SECRET_BYTES; i++) secret_found_bits[i] = 0;
     for (u8 i = 0; i < 8; i++) {
