@@ -21,6 +21,8 @@ from zipfile import ZipFile
 DEFAULT_WAD_IN_ZIP = "freedoom-0.13.0/freedoom1.wad"
 PLAYER_HEIGHT = 56
 PLAYER_MAX_STEP_HEIGHT = 24
+NG_RENDER_SIDE_POS = 0x01
+NG_RENDER_SIDE_NEG = 0x02
 
 
 @dataclass(frozen=True)
@@ -658,31 +660,68 @@ def line_side_sectors(line: LineDef, sidedefs: list[SideDef], sectors: list[Sect
     return front_side, back_side, sectors[front_side.sector], sectors[back_side.sector]
 
 
-def visual_line_span(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> tuple[int, str, int, int] | None:
+def visual_line_spans(line: LineDef, sidedefs: list[SideDef], sectors: list[Sector]) -> list[tuple[int, str, int, int, int]]:
     if is_solid_linedef(line, sidedefs, sectors):
         texture_name = solid_line_texture(line, sidedefs)
-        return 0, texture_name, solid_line_texture_x(line, sidedefs), solid_line_height(line, sidedefs, sectors)
+        return [(0, texture_name, solid_line_texture_x(line, sidedefs), solid_line_height(line, sidedefs, sectors), 0)]
 
     sides = line_side_sectors(line, sidedefs, sectors)
     if sides is None:
-        return None
+        return []
     front_side, back_side, front, back = sides
 
+    spans: list[tuple[int, str, int, int, int]] = []
     floor_delta = abs(front.floor_height - back.floor_height)
     ceiling_delta = abs(front.ceiling_height - back.ceiling_height)
     if floor_delta:
         if front.floor_height < back.floor_height:
-            return 1, sidedef_texture_or_fallback(front_side.bottom_texture, front_side, back_side), front_side.texture_x, min(128, max(4, floor_delta))
-        return 1, sidedef_texture_or_fallback(back_side.bottom_texture, back_side, front_side), back_side.texture_x, min(128, max(4, floor_delta))
+            spans.append(
+                (
+                    1,
+                    sidedef_texture_or_fallback(front_side.bottom_texture, front_side, back_side),
+                    front_side.texture_x,
+                    min(128, max(4, floor_delta)),
+                    NG_RENDER_SIDE_POS,
+                )
+            )
+        else:
+            spans.append(
+                (
+                    1,
+                    sidedef_texture_or_fallback(back_side.bottom_texture, back_side, front_side),
+                    back_side.texture_x,
+                    min(128, max(4, floor_delta)),
+                    NG_RENDER_SIDE_NEG,
+                )
+            )
     if ceiling_delta:
         if front.ceiling_height > back.ceiling_height:
-            return 2, sidedef_texture_or_fallback(front_side.top_texture, front_side, back_side), front_side.texture_x, min(128, max(4, ceiling_delta))
-        return 2, sidedef_texture_or_fallback(back_side.top_texture, back_side, front_side), back_side.texture_x, min(128, max(4, ceiling_delta))
+            spans.append(
+                (
+                    2,
+                    sidedef_texture_or_fallback(front_side.top_texture, front_side, back_side),
+                    front_side.texture_x,
+                    min(128, max(4, ceiling_delta)),
+                    NG_RENDER_SIDE_POS,
+                )
+            )
+        else:
+            spans.append(
+                (
+                    2,
+                    sidedef_texture_or_fallback(back_side.top_texture, back_side, front_side),
+                    back_side.texture_x,
+                    min(128, max(4, ceiling_delta)),
+                    NG_RENDER_SIDE_NEG,
+                )
+            )
+    if spans:
+        return spans
     if front_side.mid_texture and front_side.mid_texture != "-":
-        return 0, front_side.mid_texture, front_side.texture_x, 0
+        return [(0, front_side.mid_texture, front_side.texture_x, 0, 0)]
     if back_side.mid_texture and back_side.mid_texture != "-":
-        return 0, back_side.mid_texture, back_side.texture_x, 0
-    return None
+        return [(0, back_side.mid_texture, back_side.texture_x, 0, 0)]
+    return []
 
 
 def parse_texture_widths(wad: Wad) -> dict[str, int]:
@@ -1442,17 +1481,14 @@ def render_lines(
     scale: float,
     margin: int,
     detail_cull: float,
-) -> tuple[list[tuple[int, int, int, int, int, int, int, int]], list[list[int]], list[list[int]], list[int]]:
-    rows: list[tuple[int, int, int, int, int, int, int, int]] = []
+) -> tuple[list[tuple[int, int, int, int, int, int, int, int, int]], list[list[int]], list[list[int]], list[int]]:
+    rows: list[tuple[int, int, int, int, int, int, int, int, int]] = []
     cell_lists: list[list[list[int]]] = [[[] for _ in row] for row in grid]
     min_solid_len = scale * detail_cull
     default_texture_width = texture_widths.get("STARTAN3", 64)
     for line in linedefs:
-        span = visual_line_span(line, sidedefs, sectors)
-        if span is None:
-            continue
-        span_kind, texture_name, texture_x, span_height = span
-        if span_kind == 0 and is_passable_flat_bridge_linedef(line, sidedefs, sectors):
+        spans = visual_line_spans(line, sidedefs, sectors)
+        if not spans:
             continue
         a = vertices[line.v1]
         b = vertices[line.v2]
@@ -1462,23 +1498,28 @@ def render_lines(
         x1, y1 = grid_coord(b.x, b.y, min_x, max_y, scale, margin)
         cell_x0, cell_y0 = grid_point(a.x, a.y, min_x, max_y, scale, margin)
         cell_x1, cell_y1 = grid_point(b.x, b.y, min_x, max_y, scale, margin)
-        texture_width = texture_widths.get(texture_name, default_texture_width)
-        texture_class = 8 if line.special in DOOR_SPECIALS else wall_texture_class(texture_name)
-        line_index = len(rows)
-        rows.append(
-            (
-                int(round(x0 * 256)),
-                int(round(y0 * 256)),
-                int(round(x1 * 256)),
-                int(round(y1 * 256)),
-                texture_class,
-                texture_phase_for_cell(texture_x, texture_width, 0, 1),
-                span_kind,
-                span_height,
+        covered_cells = line_cells(grid, cell_x0, cell_y0, cell_x1, cell_y1)
+        for span_kind, texture_name, texture_x, span_height, side_flag in spans:
+            if span_kind == 0 and is_passable_flat_bridge_linedef(line, sidedefs, sectors):
+                continue
+            texture_width = texture_widths.get(texture_name, default_texture_width)
+            texture_class = 8 if line.special in DOOR_SPECIALS else wall_texture_class(texture_name)
+            line_index = len(rows)
+            rows.append(
+                (
+                    int(round(x0 * 256)),
+                    int(round(y0 * 256)),
+                    int(round(x1 * 256)),
+                    int(round(y1 * 256)),
+                    texture_class,
+                    texture_phase_for_cell(texture_x, texture_width, 0, 1),
+                    span_kind,
+                    span_height,
+                    side_flag,
+                )
             )
-        )
-        for cell_x, cell_y in line_cells(grid, cell_x0, cell_y0, cell_x1, cell_y1):
-            cell_lists[cell_y][cell_x].append(line_index)
+            for cell_x, cell_y in covered_cells:
+                cell_lists[cell_y][cell_x].append(line_index)
 
     starts: list[list[int]] = [[0 for _ in row] for row in grid]
     counts: list[list[int]] = [[0 for _ in row] for row in grid]
@@ -1513,7 +1554,7 @@ def write_generated_map_arrays(
     doors: list[tuple[int, int, int]],
     lifts: list[tuple[int, list[tuple[int, int]]]],
     lift_triggers: list[tuple[int, int, int, int, int]],
-    render_line_rows: list[tuple[int, int, int, int, int, int, int, int]],
+    render_line_rows: list[tuple[int, int, int, int, int, int, int, int, int]],
     render_cell_starts: list[list[int]],
     render_cell_counts: list[list[int]],
     render_cell_refs: list[int],
@@ -1522,8 +1563,8 @@ def write_generated_map_arrays(
     lift_cell_refs = [y * len(grid[0]) + x for _tag, cells in lifts for x, y in cells]
 
     f.write(f"{storage} NgRenderLine g_render_lines[NG_RENDER_LINE_COUNT] = {{\n")
-    for x1, y1, x2, y2, texture, phase, span, height in render_line_rows:
-        f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase},{span},{height}}},\n")
+    for x1, y1, x2, y2, texture, phase, span, height, flags in render_line_rows:
+        f.write(f"    {{{x1},{y1},{x2},{y2},{texture},{phase},{span},{height},{flags}}},\n")
     f.write("};\n\n")
     f.write(f"{storage} unsigned short g_render_cell_start[MAP_H][MAP_W] = {{\n")
     for row in render_cell_starts:
@@ -1745,7 +1786,7 @@ def emit_header(
     lifts: list[tuple[int, list[tuple[int, int]]]],
     lift_triggers: list[tuple[int, int, int, int, int]],
     lift_grid: list[list[int]],
-    render_line_rows: list[tuple[int, int, int, int, int, int, int, int]],
+    render_line_rows: list[tuple[int, int, int, int, int, int, int, int, int]],
     render_cell_starts: list[list[int]],
     render_cell_counts: list[list[int]],
     render_cell_refs: list[int],
@@ -1821,6 +1862,8 @@ def emit_header(
         f.write(f"#define NG_THING_INFO_CORPSE 0x{THING_INFO_CORPSE:02x}\n")
         f.write(f"#define NG_THING_INFO_SHOOTABLE 0x{THING_INFO_SHOOTABLE:02x}\n")
         f.write(f"#define NG_THING_INFO_RENDER 0x{THING_INFO_RENDER:02x}\n\n")
+        f.write(f"#define NG_RENDER_SIDE_POS 0x{NG_RENDER_SIDE_POS:02x}\n")
+        f.write(f"#define NG_RENDER_SIDE_NEG 0x{NG_RENDER_SIDE_NEG:02x}\n\n")
         f.write(f"#define MAP_SECRET_BYTES {((len(grid) * len(grid[0])) + 7) // 8}\n")
         f.write("#define MAP_RUNTIME_OPEN_BYTES MAP_SECRET_BYTES\n\n")
         f.write("typedef struct NgRuntimeThing { short x_q8; short y_q8; unsigned short type; unsigned short flags; } NgRuntimeThing;\n\n")
@@ -1828,7 +1871,7 @@ def emit_header(
         f.write("typedef struct NgRuntimeDoor { unsigned char x; unsigned char y; unsigned short special; } NgRuntimeDoor;\n\n")
         f.write("typedef struct NgRuntimeLift { unsigned short first_cell; unsigned short cell_count; unsigned short tag; } NgRuntimeLift;\n\n")
         f.write("typedef struct NgRuntimeLiftTrigger { unsigned char x; unsigned char y; unsigned char lift; unsigned short special; unsigned char walk; } NgRuntimeLiftTrigger;\n\n")
-        f.write("typedef struct NgRenderLine { short x1_q8; short y1_q8; short x2_q8; short y2_q8; unsigned char texture; unsigned char phase; unsigned char span; unsigned char height; } NgRenderLine;\n\n")
+        f.write("typedef struct NgRenderLine { short x1_q8; short y1_q8; short x2_q8; short y2_q8; unsigned char texture; unsigned char phase; unsigned char span; unsigned char height; unsigned char flags; } NgRenderLine;\n\n")
         if doors:
             f.write("extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT];\n\n")
         if lifts:

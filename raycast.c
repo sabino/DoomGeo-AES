@@ -342,6 +342,7 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         int y2 = g_render_lines[i].y2_q8 >> 4;
         int seg_x = x2 - x1;
         int seg_y = y2 - y1;
+        u8 flags = g_render_lines[i].flags;
         int denom = ray_x_q4 * seg_y - ray_y_q4 * seg_x;
         int rel_x;
         int rel_y;
@@ -351,6 +352,14 @@ static u8 rc_refine_render_line_hit(fix rayX, fix rayY, int cell_x, int cell_y, 
         int u_q8;
 
         if (denom == 0) continue;
+        if (flags & (NG_RENDER_SIDE_POS | NG_RENDER_SIDE_NEG)) {
+            int side_cross = seg_x * (pos_y_q4 - y1) - seg_y * (pos_x_q4 - x1);
+            if (side_cross > 0) {
+                if (!(flags & NG_RENDER_SIDE_POS)) continue;
+            } else if (side_cross < 0) {
+                if (!(flags & NG_RENDER_SIDE_NEG)) continue;
+            }
+        }
         rel_x = x1 - pos_x_q4;
         rel_y = y1 - pos_y_q4;
         num_t = rel_x * seg_y - rel_y * seg_x;

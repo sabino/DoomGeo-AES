@@ -73,15 +73,18 @@ readable.
   without paying the full per-column line-intersection cost on every solid wall
   in the stress tiers.
 - In addition to solid linedefs, the converter now emits selected two-sided
-  lower, upper, and mid-texture visual lines. The runtime can draw one
-  top- or bottom-aligned partial wall span per column when that span projects
-  large enough to be readable. Open-cell spans are collected while the ray keeps
-  walking to the farther solid wall, then the span replaces the wall column only
-  when its projected height is large enough to carry the view. This keeps
-  window/opening views from collapsing into dark horizontal fences while still
-  showing nearby ledge/step cues. Converted lower/upper spans are capped so
-  large Doom sector-height deltas do not become fake full-height walls in the
-  one-span-per-column approximation.
+  lower, upper, and mid-texture visual lines. Lower/upper spans are side-owned
+  from the WAD sidedef that should see them, so a stair lip or upper window cap
+  is not considered from the opposite sector. A single Doom linedef can now emit
+  both lower and upper visual spans when adjacent floor and ceiling heights both
+  differ. The runtime can draw one top- or bottom-aligned partial wall span per
+  column when that span projects large enough to be readable. Open-cell spans
+  are collected while the ray keeps walking to the farther solid wall, then the
+  span replaces the wall column only when its projected height is large enough
+  to carry the view. This keeps window/opening views from collapsing into dark
+  horizontal fences while still showing nearby ledge/step cues. Converted
+  lower/upper spans are capped so large Doom sector-height deltas do not become
+  fake full-height walls in the one-span-per-column approximation.
 - Generated lower/upper span metadata uses WAD texture fallbacks when a sidedef
   omits the explicit upper/lower texture, so sector-height transitions still
   get a visible cue in the sprite-strip renderer.

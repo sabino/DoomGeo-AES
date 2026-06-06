@@ -60,8 +60,9 @@ after the current documentation pass.
   `DOOM_RENDER_DETAIL_CULL=1.5` visual-line pass deliberately reduce runtime
   map complexity while retaining larger Doom room-edge cues. Current E1M1/E1M2
   start comparisons still show large visual differences from native Doom. The
-  next major renderer gap is choosing the correct sector/span owner for visible
-  portals, windows, and height transitions.
+  converter now tags lower/upper spans with sidedef ownership, so the next major
+  renderer gap is drawing more than one visible sector/span in a column instead
+  of replacing the far wall with one selected partial span.
 - Experiment with diagonal wall or multi-span approximations within Neo Geo
   sprite limits.
 - Profile wall, plane, thing, and HUD update costs before increasing sprite or

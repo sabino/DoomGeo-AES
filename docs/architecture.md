@@ -26,7 +26,9 @@ and emits generated C headers/sources under `build/`:
 - Per-cell wall texture class and texture phase.
 - Compact visual render-line rows derived from solid Doom linedefs plus selected
   two-sided lower, upper, and mid-texture linedefs, stored in generated map
-  coordinates and one-span metadata for runtime hit refinement.
+  coordinates with span kind, height, texture, and side-ownership metadata for
+  runtime hit refinement. A single Doom linedef can emit both lower and upper
+  visual spans when both adjacent sector floors and ceilings differ.
 - Per-cell render-line index tables, generated from the same raster cells as
   the collision grid. On E1M1 this reduces wall-hit refinement from scanning
   hundreds of render lines per column to checking only local cell candidates.
