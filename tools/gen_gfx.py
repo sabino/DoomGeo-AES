@@ -118,7 +118,9 @@ TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
 TITLEPIC_COLS = 20
 TITLEPIC_ROWS = 13
 TITLEPIC_TILES = TITLEPIC_COLS * TITLEPIC_ROWS
-SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+FLASH_CHECKER_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+FLASH_CHECKER_TILES = 1
+SPRITE_CACHE_BASE = FLASH_CHECKER_BASE + FLASH_CHECKER_TILES
 # Must match main.c/config.h's weapon sprite-chain top. If this differs, the
 # correct Doom psprite is baked into the wrong part of the visible tile window.
 WEAPON_SCREEN_TOP = 192 - WEAPON_ROWS * 16
@@ -135,7 +137,7 @@ def recompute_layout() -> None:
     global CEILING_FLAT_BASE, FLOOR_FLAT_BASE
     global HUD_BASE, HUD_FACE_BASE, WEAPON_BASE, HUD_KEYCARD_BASE
     global HUD_DIGIT_BASE, HUD_SMALL_DIGIT_BASE, CEILING_PERSPECTIVE_BASE
-    global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, SPRITE_CACHE_BASE
+    global FLOOR_PERSPECTIVE_BASE, TITLEPIC_BASE, FLASH_CHECKER_BASE, SPRITE_CACHE_BASE
 
     WALL_ATLAS_TILES = WALL_ATLAS_COLS * WALL_ATLAS_ROWS
     WALL_ALT_ATLAS_BASE = WALL_ATLAS_BASE + WALL_ATLAS_TILES
@@ -160,7 +162,8 @@ def recompute_layout() -> None:
     CEILING_PERSPECTIVE_BASE = HUD_SMALL_DIGIT_BASE + HUD_SMALL_DIGIT_TILES
     FLOOR_PERSPECTIVE_BASE = CEILING_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
     TITLEPIC_BASE = FLOOR_PERSPECTIVE_BASE + PLANE_PERSPECTIVE_TILES
-    SPRITE_CACHE_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+    FLASH_CHECKER_BASE = TITLEPIC_BASE + TITLEPIC_TILES
+    SPRITE_CACHE_BASE = FLASH_CHECKER_BASE + FLASH_CHECKER_TILES
 
 
 def apply_detail_layout(detail: str) -> None:
@@ -216,6 +219,10 @@ def tile_blank():
 
 def tile_solid():
     return [[1] * 16 for _ in range(16)]
+
+
+def tile_checker():
+    return [[1 if ((x ^ y) & 1) == 0 else 0 for x in range(16)] for y in range(16)]
 
 
 DIGIT_GLYPHS = (
@@ -1459,6 +1466,7 @@ def main():
         + ceiling_perspective_tiles
         + floor_perspective_tiles
         + title_tiles
+        + [tile_checker()]
         + sprite_tiles
     )
     assert len(tiles) >= WALL_ATLAS_BASE + WALL_ATLAS_TILES
@@ -1499,6 +1507,10 @@ def main():
         s1 += encode_fix_glyph(glyph)
     for glyph in SECRET_GLYPHS:
         s1 += encode_fix_glyph(glyph)
+    checker = bytearray()
+    for y in range(8):
+        checker += bytes([0xF0 if (y & 1) == 0 else 0x0F]) * 4
+    s1 += checker
     s1 += bytes(S_PAD - len(s1))
 
     files = {

@@ -76,6 +76,12 @@ and emits generated C headers/sources under `build/`:
   split a WAD map into connected `16x16` Neo Geo chunks, then load/swap compact
   generated chunk data around the player instead of scaling the whole WAD map
   into one large runtime grid.
+- `tools/doom_chunk_convert.py` is the first build-time version of that chunk
+  pass. It keeps a fixed Doom-units-per-cell scale, emits `16x16` chunk pages
+  with wall, texture-class, floor visual, damage, light, floor/ceiling height,
+  and chunk-local thing metadata, and writes an ASCII preview for inspection.
+  It does not yet replace the authored active simple map at runtime; it is the
+  generated data shape for the next streaming/swap step.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.

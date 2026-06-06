@@ -35,6 +35,13 @@ readable.
   plane tiles. The converter still runs at build time for assets and support
   metadata, but its default support grid is also `16x16` in this mode. This is
   the current stepping stone toward WAD-to-`16x16` chunk generation.
+- `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
+  map at a fixed cell scale and emits generated `16x16` chunk pages plus
+  `doom_chunks_preview.txt`. The current runtime still uses the authored simple
+  map; the chunk tables are the next data contract for streamed map pages.
+- In simple-map play, pickups are given a foreground/readability bias and a
+  larger minimum projected size so ammo, armor, health, and weapons remain
+  visible among monsters and barrels.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.

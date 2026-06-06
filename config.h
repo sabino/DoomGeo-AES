@@ -175,7 +175,7 @@
  * tier keeps the weapon in front while staying inside the practical budget.
  */
 #if DOOM_SIMPLE_MAP
-#define ENEMY_VISIBLE_COUNT 1       /* wall strips keep original NGRayEx priority */
+#define ENEMY_VISIBLE_COUNT 8       /* 3 monsters + barrel + 4 pickups before HUD palettes */
 #elif defined(DOOM_DETAIL_CLARITY)
 #define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 thing + 7 weapon = 95 */
 #elif defined(DOOM_DETAIL_BALANCED)
@@ -216,6 +216,12 @@
 #define HUD_COUNTER_SHADOW_COUNT 24
 #define HUD_COUNTER_BASE (HUD_COUNTER_SHADOW_BASE + HUD_COUNTER_SHADOW_COUNT)
 #define HUD_COUNTER_COUNT 24
+#define FLASH_OVERLAY_BASE 280
+#define FLASH_OVERLAY_COUNT (SCRW / 16)
+#define FLASH_OVERLAY_WIN (GAME_H / 16)
+#if (FLASH_OVERLAY_BASE + FLASH_OVERLAY_COUNT) > HUD_VALUE_BASE
+#error "flash overlay sprites overlap HUD value sprites"
+#endif
 #define SPR_TOTAL 381               
 
 /* ---- C-ROM tile numbers (see tools/gen_gfx.py) ----------------------- */
@@ -284,7 +290,9 @@
 #define TILE_TITLEPIC_COLS 20
 #define TILE_TITLEPIC_ROWS 13
 #define TILE_TITLEPIC_TILES (TILE_TITLEPIC_COLS * TILE_TITLEPIC_ROWS)
-#define TILE_SPRITE_CACHE_BASE (TILE_TITLEPIC_BASE + TILE_TITLEPIC_TILES)
+#define TILE_FLASH_CHECKER (TILE_TITLEPIC_BASE + TILE_TITLEPIC_TILES)
+#define TILE_FLASH_CHECKER_COUNT 1
+#define TILE_SPRITE_CACHE_BASE (TILE_FLASH_CHECKER + TILE_FLASH_CHECKER_COUNT)
 
 /* ---- fix-layer (S-ROM) tile numbers --------------------------------- */
 #define FIX_BLANK  0                /* transparent (all index 0)             */
@@ -302,6 +310,7 @@
 #define FIX_AMMO_O 65
 #define FIX_SECRET_S 66             /* S,C for compact secret message        */
 #define FIX_SECRET_C 67
+#define FIX_CHECKER 68              /* sparse flash overlay tile             */
 
  
 #define MAP_FIX_COL 1             
@@ -330,6 +339,9 @@
 #define PAL_AMMO_COUNTER_SHADOW 45
 #define PAL_HUD_KEY_BASE 46
 #define PAL_AMMO_COUNTER 49
+#if DOOM_SIMPLE_MAP && (PAL_ENEMY_BASE + ENEMY_VISIBLE_COUNT) > PAL_AMMO_COUNTER_SHADOW
+#error "simple-map enemy palettes overlap HUD ammo/key palettes"
+#endif
 
  
 #if DOOM_SIMPLE_MAP
