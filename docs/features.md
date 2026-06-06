@@ -420,9 +420,12 @@ readable.
   route against `build/doom_chunks_generated.h` and
   `build/doom_chunks_generated.c`. It now checks both the all-interactive route
   and a key-aware route where keycard/skull things must be reachable before
-  matching locked door specials. Accepted routes are also sampled at cell
-  centers and cell-boundary midpoints with the same q8 player radius used by
-  the runtime collision checks. If the exact WAD player start falls on a
+  matching locked door specials. A stricter state route keeps generated lift
+  cells closed until a reachable lift trigger opens them, so converted
+  elevators/platforms cannot silently become always-open route shortcuts.
+  Accepted routes are also sampled at cell centers and cell-boundary midpoints
+  with the same q8 player radius used by the runtime collision checks. If the
+  exact WAD player start falls on a
   coarse-grid wall, chunk conversion moves it to the nearest open cell and
   opens the minimum number of coarse wall cells needed to preserve a playable
   start-to-exit route.

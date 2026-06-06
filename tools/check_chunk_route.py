@@ -118,6 +118,24 @@ def parse_lift_cells(text: str) -> list[tuple[int, int]]:
     return [(ref % grid_w, ref // grid_w) for ref in refs]
 
 
+def parse_lift_triggers(text: str) -> list[tuple[int, int, int, int, int]]:
+    count = parse_define_int(text, "DOOM_CHUNK_LIFT_TRIGGER_COUNT")
+    if count <= 0:
+        return []
+    body = array_initializer(text, "g_chunk_lift_triggers")
+    rows = [
+        (
+            int(match.group(1)),
+            int(match.group(2)),
+            int(match.group(3)),
+            int(match.group(4)),
+            int(match.group(5)),
+        )
+        for match in re.finditer(r"\{(\d+),(\d+),(\d+),(\d+),(\d+)\}", body)
+    ]
+    return rows[:count]
+
+
 def neighbors(x: int, y: int) -> tuple[tuple[int, int], ...]:
     return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
 
@@ -266,6 +284,67 @@ def key_aware_bfs(
     return None
 
 
+def collect_cell_state(
+    cell: tuple[int, int],
+    owned_keys: int,
+    opened_lifts: int,
+    keys: dict[tuple[int, int], int],
+    lift_triggers: dict[tuple[int, int], int],
+) -> tuple[int, int]:
+    owned_keys |= keys.get(cell, 0)
+    x, y = cell
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            opened_lifts |= lift_triggers.get((x + dx, y + dy), 0)
+    return owned_keys, opened_lifts
+
+
+def key_lift_aware_bfs(
+    grid: list[list[int]],
+    start: tuple[int, int],
+    targets: set[tuple[int, int]],
+    normal_interactive: set[tuple[int, int]],
+    locked_doors: dict[tuple[int, int], int],
+    lift_cells: dict[tuple[int, int], int],
+    keys: dict[tuple[int, int], int],
+    lift_triggers: dict[tuple[int, int], int],
+) -> tuple[list[tuple[int, int]], int, int] | None:
+    width = len(grid[0])
+    height = len(grid)
+    start_keys, start_lifts = collect_cell_state(start, 0, 0, keys, lift_triggers)
+    start_state = (start[0], start[1], start_keys, start_lifts)
+    queue: deque[tuple[int, int, int, int]] = deque([start_state])
+    prev: dict[tuple[int, int, int, int], tuple[int, int, int, int] | None] = {start_state: None}
+    while queue:
+        x, y, owned_keys, opened_lifts = queue.popleft()
+        if (x, y) in targets:
+            path: list[tuple[int, int]] = []
+            cur: tuple[int, int, int, int] | None = (x, y, owned_keys, opened_lifts)
+            while cur is not None:
+                path.append((cur[0], cur[1]))
+                cur = prev[cur]
+            return list(reversed(path)), owned_keys, opened_lifts
+        for nx, ny in neighbors(x, y):
+            if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                continue
+            cell = (nx, ny)
+            required_key = locked_doors.get(cell, 0)
+            if required_key and (owned_keys & required_key) == 0:
+                continue
+            required_lift = lift_cells.get(cell, 0)
+            if required_lift and (opened_lifts & required_lift) == 0:
+                continue
+            if grid[ny][nx] and cell not in normal_interactive and not required_key and not required_lift:
+                continue
+            next_keys, next_lifts = collect_cell_state(cell, owned_keys, opened_lifts, keys, lift_triggers)
+            next_state = (nx, ny, next_keys, next_lifts)
+            if next_state in prev:
+                continue
+            prev[next_state] = (x, y, owned_keys, opened_lifts)
+            queue.append(next_state)
+    return None
+
+
 def validate_key_player_path(
     grid: list[list[int]],
     path: list[tuple[int, int]],
@@ -295,6 +374,50 @@ def validate_key_player_path(
                     f"cannot fit player radius with keys 0x{owned_keys:x}"
                 )
         owned_keys |= keys.get(cell, 0)
+    return None
+
+
+def validate_key_lift_player_path(
+    grid: list[list[int]],
+    path: list[tuple[int, int]],
+    normal_interactive: set[tuple[int, int]],
+    locked_doors: dict[tuple[int, int], int],
+    lift_cells: dict[tuple[int, int], int],
+    keys: dict[tuple[int, int], int],
+    lift_triggers: dict[tuple[int, int], int],
+) -> str | None:
+    owned_keys = 0
+    opened_lifts = 0
+    for index, cell in enumerate(path):
+        required_key = locked_doors.get(cell, 0)
+        if required_key and (owned_keys & required_key) == 0:
+            return f"state route cell {index} {cell} crosses locked door without key mask 0x{required_key:x}"
+        required_lift = lift_cells.get(cell, 0)
+        if required_lift and (opened_lifts & required_lift) == 0:
+            return f"state route cell {index} {cell} crosses unopened lift mask 0x{required_lift:x}"
+        passable = set(normal_interactive)
+        for door_cell, key_mask in locked_doors.items():
+            if owned_keys & key_mask:
+                passable.add(door_cell)
+        for lift_cell, lift_mask in lift_cells.items():
+            if opened_lifts & lift_mask:
+                passable.add(lift_cell)
+        if not can_player_occupy_q8(grid, *cell_center_q8(cell), passable):
+            return (
+                f"state route cell {index} {cell} cannot fit player radius "
+                f"with keys 0x{owned_keys:x} lifts 0x{opened_lifts:x}"
+            )
+        if index:
+            prev_x_q8, prev_y_q8 = cell_center_q8(path[index - 1])
+            cell_x_q8, cell_y_q8 = cell_center_q8(cell)
+            mid_x_q8 = (prev_x_q8 + cell_x_q8) // 2
+            mid_y_q8 = (prev_y_q8 + cell_y_q8) // 2
+            if not can_player_occupy_q8(grid, mid_x_q8, mid_y_q8, passable):
+                return (
+                    f"state route edge {index - 1}->{index} {path[index - 1]}->{cell} "
+                    f"cannot fit player radius with keys 0x{owned_keys:x} lifts 0x{opened_lifts:x}"
+                )
+        owned_keys, opened_lifts = collect_cell_state(cell, owned_keys, opened_lifts, keys, lift_triggers)
     return None
 
 
@@ -375,6 +498,7 @@ def main() -> int:
     interactive = {(x, y) for x, y, _special in doors}
     interactive.update(lift_cells)
     normal_interactive = set(lift_cells)
+    normal_doors: set[tuple[int, int]] = set()
     locked_doors: dict[tuple[int, int], int] = {}
     for x, y, special in doors:
         key_mask = KEY_DOOR_MASKS.get(special, 0)
@@ -382,6 +506,18 @@ def main() -> int:
             locked_doors[(x, y)] = key_mask
         else:
             normal_interactive.add((x, y))
+            normal_doors.add((x, y))
+    lift_grid = build_global_grid(parse_u8_chunks(text, "g_chunk_lift_cell"), chunk_cols, chunk_size)
+    lift_cell_masks: dict[tuple[int, int], int] = {}
+    for y, row in enumerate(lift_grid):
+        for x, lift_id in enumerate(row):
+            if lift_id:
+                lift_cell_masks[(x, y)] = 1 << (lift_id - 1)
+    lift_trigger_masks: dict[tuple[int, int], int] = {}
+    for x, y, lift_index, _special, _walk in parse_lift_triggers(text):
+        if lift_index < 0:
+            continue
+        lift_trigger_masks[(x, y)] = lift_trigger_masks.get((x, y), 0) | (1 << lift_index)
     thing_count = parse_define_int(text, "DOOM_CHUNK_THING_COUNT")
     thing_first = parse_int_array(text, "g_chunk_thing_first")
     thing_counts = parse_int_array(text, "g_chunk_thing_count")
@@ -477,15 +613,52 @@ def main() -> int:
     path_lifts = [cell for cell in interactive_path if cell in set(lift_cells)]
     if key_route is None:
         key_route = interactive_path
+    state_route_result = key_lift_aware_bfs(
+        grid,
+        start,
+        targets,
+        normal_doors,
+        locked_doors,
+        lift_cell_masks,
+        keys,
+        lift_trigger_masks,
+    )
+    if state_route_result is None:
+        lift_summary = ", ".join(f"{cell}:0x{mask:x}" for cell, mask in sorted(lift_cell_masks.items())) or "none"
+        trigger_summary = ", ".join(f"{cell}:0x{mask:x}" for cell, mask in sorted(lift_trigger_masks.items())) or "none"
+        print(
+            f"{label}: no key/lift-valid chunk route from start {start} to exits {sorted(targets)} "
+            f"lift_cells=[{lift_summary}] lift_triggers=[{trigger_summary}]",
+            file=sys.stderr,
+        )
+        return 1
+    state_route, state_route_keys, state_route_lifts = state_route_result
+    if args.check_player_radius_route:
+        error = validate_key_lift_player_path(
+            grid,
+            state_route,
+            normal_doors,
+            locked_doors,
+            lift_cell_masks,
+            keys,
+            lift_trigger_masks,
+        )
+        if error:
+            print(f"{label}: player-radius key/lift route failed: {error}", file=sys.stderr)
+            return 1
     key_path_doors = [cell for cell in key_route if cell in {(x, y) for x, y, _special in doors}]
     locked_path_doors = [cell for cell in key_route if cell in locked_doors]
+    state_path_lifts = [cell for cell in state_route if cell in lift_cell_masks]
     print(
         f"{label} chunk route OK: start={start} exit={interactive_path[-1]} "
         f"steps={len(interactive_path) - 1} open_route={'yes' if open_path else 'no'} "
         f"doors={len(path_doors)} lifts={len(path_lifts)} chunks={chunk_count} "
         f"open_forward={open_forward} key_route_steps={len(key_route) - 1} "
         f"key_route_doors={len(key_path_doors)} locked_doors={len(locked_path_doors)} "
-        f"keys=0x{key_route_keys:x} player_radius={'yes' if args.check_player_radius_route else 'no'}"
+        f"keys=0x{key_route_keys:x} state_route_steps={len(state_route) - 1} "
+        f"state_lifts={len(state_path_lifts)} state_keys=0x{state_route_keys:x} "
+        f"state_lift_mask=0x{state_route_lifts:x} "
+        f"player_radius={'yes' if args.check_player_radius_route else 'no'}"
     )
     return 0
 
