@@ -41,6 +41,8 @@ jobs:
           python3 -m py_compile tools/doomgeo_build.py tools/doomgeo_plan.py
           python3 tools/doomgeo_build.py doctor --tools-prefix /usr
           python3 tools/doomgeo_plan.py list
+          make DOOM_MAP=E1M1 BUILDDIR=build/ci-ripdoom-e1m1 ripdoom-check
+          make DOOM_MAP=E1M2 BUILDDIR=build/ci-ripdoom-e1m2 ripdoom-check
 
       - name: Build ROM
         run: python3 tools/doomgeo_build.py build --tools-prefix /usr
