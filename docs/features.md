@@ -20,9 +20,10 @@ readable.
   `1` for easy or `2` for medium placement. The default grid remains centered
   but is now `48x36`, deliberately cutting the runtime map area to one quarter
   of the earlier `96x72` conversion. The default map pass uses
-  `DOOM_MAP_DETAIL_CULL=2.0` to remove solid-line noise, isolated wall specks,
-  and short dead-end wall tails that become false full-height obstacles in the
-  sprite-strip raycaster. Generated visual lines use the separate
+  `DOOM_MAP_DETAIL_CULL=0.5`: low enough to keep short architectural lines such
+  as E1M1's start-room columns and window frame, but still scale-aware so very
+  tiny solid-line noise can be removed before it becomes false full-height
+  obstacles in the sprite-strip raycaster. Generated visual lines use the separate
   `DOOM_RENDER_DETAIL_CULL=1.5` default, preserving larger room-edge and pillar
   cues without requiring those lines to stay as blocking collision cells. The
   defaults were chosen from strict Episode 1 route checks and E1M1 converter

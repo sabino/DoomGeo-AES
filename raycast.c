@@ -110,6 +110,16 @@ static inline int projected_span_height(fix dist, u8 span_height) {
     return h < 2 ? 2 : h;
 }
 
+static inline u8 depth_palette(u8 kind, int side, int h) {
+    int band = ((MAX_H - h) * DEPTH_BANDS) / MAX_H;
+    if (band < 0) band = 0;
+    if (band >= DEPTH_BANDS) band = DEPTH_BANDS - 1;
+    return (u8)(((kind > TILE_WALL_ALT_COUNT)
+        ? PAL_DOOR_DEPTH_BASE
+        : (kind ? PAL_WALL_ALT_DEPTH_BASE + (kind - 1) * PAL_WALL_ALT_DEPTH_STRIDE : PAL_DEPTH_BASE))
+        + (side ? DEPTH_BANDS : 0) + band);
+}
+
 static void update_projection_cache(void) {
     fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
     if (det > -FMIN && det < FMIN) invDet = 0;
@@ -577,10 +587,7 @@ void rc_render(void) {
         scb3buf[x] = scb3_word(top, 0, WALL_WIN);
 
         /* distance shading */
-        int band = ((MAX_H - h) * DEPTH_BANDS) / MAX_H;
-        if (band < 0) band = 0;
-        if (band >= DEPTH_BANDS) band = DEPTH_BANDS - 1;
-        palbuf[x] = (u8)(((kindbuf[x] > TILE_WALL_ALT_COUNT) ? PAL_DOOR_DEPTH_BASE : (kindbuf[x] ? PAL_WALL_ALT_DEPTH_BASE + (kindbuf[x] - 1) * PAL_WALL_ALT_DEPTH_STRIDE : PAL_DEPTH_BASE)) + (side ? DEPTH_BANDS : 0) + band);
+        palbuf[x] = depth_palette(kindbuf[x], side, h);
     }
     view_dirty = 0;
     wall_upload_dirty = 1;

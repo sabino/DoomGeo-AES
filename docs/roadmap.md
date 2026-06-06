@@ -56,7 +56,7 @@ after the current documentation pass.
   are still a main reason the native Doom E1M1 start view does not match exactly
   even though the same map and player start are loaded.
 - Keep checking native-vs-NeoGeo waypoints after converter changes. The centered
-  `48x36` map, route-validated `DOOM_MAP_DETAIL_CULL=2.0` collision grid, and
+  `48x36` map, route-validated `DOOM_MAP_DETAIL_CULL=0.5` collision grid, and
   `DOOM_RENDER_DETAIL_CULL=1.5` visual-line pass deliberately reduce runtime
   map complexity while retaining larger Doom room-edge cues. Current E1M1/E1M2
   start comparisons still show large visual differences from native Doom. The

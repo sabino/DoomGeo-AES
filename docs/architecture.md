@@ -55,13 +55,16 @@ and emits generated C headers/sources under `build/`:
   drifting to one anchored corner of the converted grid.
 - Scale-aware map simplification. The normal build now halves the older
   `96x72` grid to a `48x36` runtime map and uses
-  `DOOM_MAP_DETAIL_CULL=2.0`, opens isolated coarse-grid wall specks, and
+  `DOOM_MAP_DETAIL_CULL=0.5`, opens isolated coarse-grid wall specks, and
   prunes short dead-end wall tails. This reduces the collision, floor, light,
   secret, lift, and damage grids by 75% while keeping strict Episode 1 route
-  coverage with the shareware WAD. Visual WAD-line metadata is generated with
-  the separate `DOOM_RENDER_DETAIL_CULL=1.5` default, so the runtime can still
-  draw larger Doom room-edge and pillar cues without keeping every minor line
-  as a blocking collision cell. `DOOM_MAP_DETAIL_CULL`,
+  coverage with the shareware WAD. The lower default cull is deliberate: the
+  E1M1 start room depends on short solid linedefs for its columns and framed
+  window, and dropping those lines makes the first view collapse into an
+  over-open courtyard. Visual WAD-line metadata is generated with the separate
+  `DOOM_RENDER_DETAIL_CULL=1.5` default, so the runtime can still draw larger
+  Doom room-edge and pillar cues without keeping every minor line as a blocking
+  collision cell. `DOOM_MAP_DETAIL_CULL`,
   `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
   overridden for exact-conversion or higher-resolution experiments.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
