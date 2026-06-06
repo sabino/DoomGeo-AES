@@ -251,14 +251,16 @@ def main() -> int:
             errors.append(f"chunk {chunk}: thing range {first}+{count} exceeds {len(things)}")
             continue
         for thing in things[first : first + count]:
-            cell_x = thing.x_q8 >> 8
-            cell_y = thing.y_q8 >> 8
-            expected_chunk = (cell_y // chunk_size) * chunk_cols + (cell_x // chunk_size)
+            local_cell_x = thing.x_q8 >> 8
+            local_cell_y = thing.y_q8 >> 8
+            cell_x = (chunk % chunk_cols) * chunk_size + local_cell_x
+            cell_y = (chunk // chunk_cols) * chunk_size + local_cell_y
             if thing.chunk != chunk:
                 errors.append(f"chunk {chunk}: thing type {thing.thing_type} has embedded chunk {thing.chunk}")
-            if expected_chunk != chunk:
+            if local_cell_x < 0 or local_cell_y < 0 or local_cell_x >= chunk_size or local_cell_y >= chunk_size:
                 errors.append(
-                    f"chunk {chunk}: thing type {thing.thing_type} at cell {(cell_x, cell_y)} belongs to chunk {expected_chunk}"
+                    f"chunk {chunk}: thing type {thing.thing_type} local cell {(local_cell_x, local_cell_y)} "
+                    f"outside {chunk_size}x{chunk_size}"
                 )
             if cell_x < 0 or cell_y < 0 or cell_y >= len(grid) or cell_x >= len(grid[0]):
                 errors.append(f"chunk {chunk}: thing type {thing.thing_type} out of bounds at {(cell_x, cell_y)}")

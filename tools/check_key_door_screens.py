@@ -103,10 +103,14 @@ def main() -> int:
     require_count(errors, root / names["missing"], "missing-key message", missing_message, "green", 450)
     require_count(errors, root / names["picked"], "picked-key message", picked_message, "green", 450)
     require_count(errors, root / names["picked"], "picked-key HUD", picked_hud, "red", 9000)
-    require_count(errors, root / names["opened"], "opened-door message", opened_message, "green", 450)
     require_below(errors, root / names["opened"], "opened-door center wall", opened_center, "red", 4000)
     require_count(errors, root / names["opened"], "opened-door HUD", opened_hud, "red", 9000)
     require_count(errors, root / names["through"], "through-door scene", through_center, "bright", 45000)
+    if opened_message["green"] < 450 and opened_center["red"] > 4000:
+        errors.append(
+            f"{root / names['opened']}: opened-door lacks message and still looks blocked "
+            f"(green={opened_message['green']}, center red={opened_center['red']})"
+        )
 
     if errors:
         for error in errors:

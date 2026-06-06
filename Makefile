@@ -40,6 +40,7 @@ DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
 DOOM_MAP?=E1M1
 DOOM_SIMPLE_MAP?=0
+DOOM_CHUNKED_SIMPLE_MAP?=0
 ifeq ($(DOOM_SIMPLE_MAP),1)
 DOOM_MAP_WIDTH?=16
 DOOM_MAP_HEIGHT?=16
@@ -68,7 +69,7 @@ DOOM_CHUNK_OBJECT=
 DOOM_CHUNK_DEP=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
-DOOM_CHUNK_CELL_UNITS?=128
+DOOM_CHUNK_CELL_UNITS?=64
 DOOM_ASSETS_HEADER=$(BUILDDIR)/doom_assets_generated.h
 DOOM_ASSETS_SOURCE=$(BUILDDIR)/doom_assets_generated.c
 DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
@@ -98,9 +99,14 @@ ifeq ($(DOOM_SKIP_INTRO),1)
 override CFLAGS += -DDOOM_SKIP_INTRO=1
 endif
 ifeq ($(DOOM_SIMPLE_MAP),1)
-override CFLAGS += -DDOOM_SIMPLE_MAP=1 -DDOOM_CHUNKED_SIMPLE_MAP=1
+override CFLAGS += -DDOOM_SIMPLE_MAP=1
+ifeq ($(DOOM_CHUNKED_SIMPLE_MAP),1)
+override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=1
 DOOM_CHUNK_OBJECT=$(BUILDDIR)/doom_chunks_generated.o
 DOOM_CHUNK_DEP=$(DOOM_CHUNK_HEADER)
+else
+override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=0
+endif
 endif
 ifneq ($(strip $(DOOM_WALL_UPLOAD_COLUMNS)),)
 override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUMNS)
@@ -262,7 +268,7 @@ key-door-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-door-test-rom $(GAMEROM)
 
 chunk-key-door-test-rom:
-	$(MAKE) cart DOOM_MAP=E1M2 DOOM_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-key-door-test ROM=build/chunk-key-door-test-rom GFX_ROM_DIR=build/chunk-key-door-test-assets CFLAGS="-Ibuild/chunk-key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
+	$(MAKE) cart DOOM_MAP=E1M2 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-key-door-test ROM=build/chunk-key-door-test-rom GFX_ROM_DIR=build/chunk-key-door-test-assets CFLAGS="-Ibuild/chunk-key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
 
 chunk-key-door-test-gngeo:
 	$(MAKE) chunk-key-door-test-rom
@@ -352,7 +358,7 @@ death-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
 chunk-death-test-rom:
-	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-death-test ROM=build/chunk-death-test-rom GFX_ROM_DIR=build/chunk-death-test-assets CFLAGS="-Ibuild/chunk-death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-death-test ROM=build/chunk-death-test-rom GFX_ROM_DIR=build/chunk-death-test-assets CFLAGS="-Ibuild/chunk-death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
 
 chunk-death-test-gngeo:
 	$(MAKE) chunk-death-test-rom
@@ -366,7 +372,7 @@ powerup-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/powerup-test-rom $(GAMEROM)
 
 chunk-powerup-test-rom:
-	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-powerup-test ROM=build/chunk-powerup-test-rom GFX_ROM_DIR=build/chunk-powerup-test-assets CFLAGS="-Ibuild/chunk-powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-powerup-test ROM=build/chunk-powerup-test-rom GFX_ROM_DIR=build/chunk-powerup-test-assets CFLAGS="-Ibuild/chunk-powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 
 chunk-powerup-test-gngeo:
 	$(MAKE) chunk-powerup-test-rom

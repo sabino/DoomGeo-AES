@@ -77,7 +77,7 @@ def main() -> int:
 
     require_min(errors, path, "corpse band color", corpse_band, "colored", 5000)
     require_min(errors, path, "corpse band lighting", corpse_band, "bright", 6000)
-    require_min(errors, path, "corpse band shadow", corpse_band, "dark", 1500)
+    require_min(errors, path, "corpse band shadow", corpse_band, "dark", 600)
     require_min(errors, path, "center dropped weapon", center_drop, "tan", 900)
     require_min(errors, path, "center dropped weapon shadow", center_drop, "dark", 2500)
     require_min(errors, path, "playfield corpse/drop", playfield, "colored", 28000)

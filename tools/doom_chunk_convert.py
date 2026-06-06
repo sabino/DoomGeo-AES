@@ -253,10 +253,12 @@ def build_things(
         chunk_x = cell_x // chunk_size
         chunk_y = cell_y // chunk_size
         chunk = chunk_y * chunk_cols + chunk_x
+        local_x = gx - chunk_x * chunk_size
+        local_y = gy - chunk_y * chunk_size
         rows.append(
             ChunkThing(
-                int(round(gx * 256)),
-                int(round(gy * 256)),
+                int(round(local_x * 256)),
+                int(round(local_y * 256)),
                 thing.type,
                 thing.flags,
                 dc.runtime_thing_class(thing.type),
@@ -671,8 +673,11 @@ def write_preview(
     chunk_size: int,
 ) -> None:
     thing_cells: dict[tuple[int, int], str] = {}
+    chunk_cols = math.ceil(len(grid[0]) / chunk_size)
     for thing in things:
-        cell = (thing.x_q8 >> 8, thing.y_q8 >> 8)
+        chunk_x = thing.chunk % chunk_cols
+        chunk_y = thing.chunk // chunk_cols
+        cell = (chunk_x * chunk_size + (thing.x_q8 >> 8), chunk_y * chunk_size + (thing.y_q8 >> 8))
         if thing.thing_class == dc.THING_CLASS_MONSTER:
             marker = "M"
         elif thing.thing_class == dc.THING_CLASS_PICKUP:
@@ -801,7 +806,7 @@ def main() -> int:
     parser.add_argument("--map", default="E1M1")
     parser.add_argument("--skill-mask", type=lambda value: int(value, 0), default=4)
     parser.add_argument("--chunk-size", type=int, default=16)
-    parser.add_argument("--cell-units", type=int, default=128, help="Doom map units represented by one chunk cell")
+    parser.add_argument("--cell-units", type=int, default=64, help="Doom map units represented by one chunk cell")
     parser.add_argument("--out", default="build/doom_chunks_generated.h")
     parser.add_argument("--chunk-source", default="build/doom_chunks_generated.c")
     parser.add_argument("--preview", help="Optional ASCII chunk map preview")

@@ -30,18 +30,19 @@ readable.
   metrics; higher-resolution builds can still override the map size for
   comparison work.
 - `DOOM_SIMPLE_MAP=1` switches to the simplified NGRayEx-style runtime shape:
-  an authored active `16x16` map, 80 wall columns, full-height grid DDA walls,
-  no generated WAD render-line refinement, and full-screen baked floor/ceiling
-  plane tiles. The converter still runs at build time for assets and support
-  metadata, but its default support grid is also `16x16` in this mode. This is
-  the current stepping stone toward WAD-to-`16x16` chunk generation.
+  an active `16x16` map, 80 wall columns, full-height grid DDA walls, no
+  generated WAD render-line refinement, and full-screen baked floor/ceiling
+  plane tiles. The active page can be authored or loaded from WAD-derived
+  `16x16` chunks while HUD/assets/thing metadata continue to come from the
+  offline conversion path.
 - `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
   map at a fixed cell scale and emits generated `16x16` chunk pages plus
-  `doom_chunks_preview.txt`. In `DOOM_SIMPLE_MAP=1`, the runtime streams these
-  generated chunk pages while preserving the original NGRayEx-style 80-column
-  renderer. `make chunk-route-check` verifies the generated chunk start-to-exit
-  route, treating generated doors and lift cells as interactive pass-through
-  cells.
+  `doom_chunks_preview.txt`. The default chunk scale is 64 Doom units per cell:
+  E1M1 becomes a 5x3 set of pages, but the Neo Geo runtime still loads only one
+  `16x16` page into the original NGRayEx-style 80-column renderer. `make
+  chunk-route-check` verifies the generated chunk start-to-exit route, treating
+  generated doors and lift cells as interactive pass-through cells, and `make
+  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
 - In simple-map play, pickups are given a foreground/readability bias and a
   larger minimum projected size so ammo, armor, health, and weapons remain
   visible among monsters and barrels.

@@ -29,6 +29,15 @@
 #undef map_cell_ceiling_height
 #undef map_cell_secret
 
+/* The authored simple map owns its progression fixtures.  The tiny generated
+ * 16x16 WAD projection may not find a usable door, so keep one runtime door
+ * slot for the hand-authored blue-key exit door below. */
+#undef DOOM_CONVERTED_DOORS
+#undef NG_RUNTIME_DOOR_COUNT
+#define DOOM_CONVERTED_DOORS 1
+#define NG_RUNTIME_DOOR_COUNT 1
+extern unsigned char g_runtime_door_open[NG_RUNTIME_DOOR_COUNT ? NG_RUNTIME_DOOR_COUNT : 1];
+
 #if DOOM_CHUNKED_SIMPLE_MAP
 #include "doom_chunks_generated.h"
 #endif
@@ -212,41 +221,40 @@ static inline unsigned char map_cell_secret(int x, int y) {
 
 static const unsigned char g_simple_map[SIMPLE_MAP_H][SIMPLE_MAP_W] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1},
     {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-    {1,0,1,1,0,1,1,1,0,0,1,0,0,0,0,1},
-    {1,0,1,0,0,0,0,1,0,0,1,0,1,1,0,1},
-    {1,0,1,0,1,1,0,1,0,0,1,0,1,0,0,1},
-    {1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1},
-    {1,0,1,1,1,0,0,0,0,0,1,1,1,0,0,1},
-    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-    {1,0,1,0,1,0,0,0,1,1,1,0,1,0,1,1},
-    {1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,1},
-    {1,0,1,1,1,0,1,1,1,0,0,0,1,0,0,1},
-    {1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1},
-    {1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1},
+    {1,0,1,1,1,1,0,1,0,1,1,1,1,0,1,1},
+    {1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1},
+    {1,0,1,1,0,1,1,1,0,1,0,1,0,1,0,1},
+    {1,0,0,1,0,0,0,1,0,1,0,0,0,1,0,1},
+    {1,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1},
     {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
     {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
 static const NgRuntimeThing g_simple_runtime_things[NG_RUNTIME_THING_COUNT] = {
-    { 7 * 256 + 128,  9 * 256 + 128, 3004, 7 },
-    { 8 * 256 + 128,  6 * 256 + 128, 3001, 7 },
-    {13 * 256 + 128,  5 * 256 + 128, 3004, 7 },
-    {11 * 256 + 128, 11 * 256 + 128, 2035, 7 },
-    { 4 * 256 + 128, 12 * 256 + 128, 5,    7 },
-    { 6 * 256 + 128, 12 * 256 + 128, 2011, 7 },
-    { 9 * 256 + 128, 12 * 256 + 128, 2007, 7 },
-    {13 * 256 + 128,  9 * 256 + 128, 2001, 7 },
-    { 2 * 256 + 128,  2 * 256 + 128, 2018, 7 }
+    { 4 * 256 + 128,  9 * 256 + 128, 3004, 7 },
+    {12 * 256 + 128,  7 * 256 + 128, 3001, 7 },
+    { 6 * 256 + 128,  7 * 256 + 128, 2035, 7 },
+    { 3 * 256 + 128, 13 * 256 + 128, 5,    7 },
+    { 5 * 256 + 128, 13 * 256 + 128, 2007, 7 },
+    { 6 * 256 + 128, 13 * 256 + 128, 2011, 7 },
+    {10 * 256 + 128, 13 * 256 + 128, 2018, 7 },
+    {12 * 256 + 128, 13 * 256 + 128, 2001, 7 }
 };
 
 static const NgRuntimeExit g_simple_runtime_exits[NG_RUNTIME_EXIT_COUNT] = {
-    {14 * 256 + 128, 1 * 256 + 128, 11, 1, 1}
+    { 8 * 256 + 128, 3 * 256 + 128, 11, 1, 1}
 };
 
-static const NgRuntimeDoor g_simple_runtime_doors[1] = {
-    {10, 7, 26}
+static const NgRuntimeDoor g_simple_runtime_doors[NG_RUNTIME_DOOR_COUNT] = {
+    {8, 5, 26}
 };
 
 #define g_runtime_things g_simple_runtime_things

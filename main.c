@@ -1458,18 +1458,14 @@ static int active_chunk_origin_y_q8(void) {
 
 static void persist_runtime_slot_to_chunk_state(u16 slot) {
     unsigned short chunk_index;
-    int origin_x;
-    int origin_y;
     u16 type;
     if (slot >= NG_RUNTIME_THING_COUNT) return;
     chunk_index = thing_chunk_index[slot];
     if (chunk_index == 0xFFFF || chunk_index >= DOOM_CHUNK_THING_COUNT) return;
     type = runtime_thing_type(slot);
-    origin_x = active_chunk_origin_x_q8();
-    origin_y = active_chunk_origin_y_q8();
     chunk_thing_state_type[chunk_index] = type;
-    chunk_thing_state_x_q8[chunk_index] = (short)(origin_x + thing_x_q8[slot]);
-    chunk_thing_state_y_q8[chunk_index] = (short)(origin_y + thing_y_q8[slot]);
+    chunk_thing_state_x_q8[chunk_index] = thing_x_q8[slot];
+    chunk_thing_state_y_q8[chunk_index] = thing_y_q8[slot];
     chunk_thing_state_dead[chunk_index] = (u8)(enemy_dead[slot] || type == 0);
     chunk_thing_state_hp[chunk_index] = enemy_hp[slot];
 }
@@ -1499,20 +1495,16 @@ static void init_chunk_thing_state(void) {
 
 static void save_active_chunk_dynamic_drops(void) {
     unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
-    int origin_x = active_chunk_origin_x_q8();
-    int origin_y = active_chunk_origin_y_q8();
     for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
         chunk_drop_active[chunk][slot] = dynamic_drop_active[slot];
         chunk_drop_type[chunk][slot] = dynamic_drop_type[slot];
-        chunk_drop_x_q8[chunk][slot] = (short)(origin_x + dynamic_drop_x_q8[slot]);
-        chunk_drop_y_q8[chunk][slot] = (short)(origin_y + dynamic_drop_y_q8[slot]);
+        chunk_drop_x_q8[chunk][slot] = dynamic_drop_x_q8[slot];
+        chunk_drop_y_q8[chunk][slot] = dynamic_drop_y_q8[slot];
     }
 }
 
 static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local_y_q8) {
     unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
-    int origin_x;
-    int origin_y;
     u8 slot = 0;
     if (!thing_type) return;
     for (u8 i = 0; i < CHUNK_DYNAMIC_DROP_SLOTS; i++) {
@@ -1521,17 +1513,13 @@ static void save_active_chunk_drop(u16 thing_type, short local_x_q8, short local
             break;
         }
     }
-    origin_x = active_chunk_origin_x_q8();
-    origin_y = active_chunk_origin_y_q8();
     chunk_drop_active[chunk][slot] = 1;
     chunk_drop_type[chunk][slot] = thing_type;
-    chunk_drop_x_q8[chunk][slot] = (short)(origin_x + local_x_q8);
-    chunk_drop_y_q8[chunk][slot] = (short)(origin_y + local_y_q8);
+    chunk_drop_x_q8[chunk][slot] = local_x_q8;
+    chunk_drop_y_q8[chunk][slot] = local_y_q8;
 }
 
 static void save_active_chunk_runtime_things(void) {
-    int origin_x = active_chunk_origin_x_q8();
-    int origin_y = active_chunk_origin_y_q8();
     save_active_chunk_dynamic_drops();
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
         unsigned short chunk_index = thing_chunk_index[i];
@@ -1551,8 +1539,8 @@ static void save_active_chunk_runtime_things(void) {
             continue;
         }
         chunk_thing_state_type[chunk_index] = type;
-        chunk_thing_state_x_q8[chunk_index] = (short)(origin_x + thing_x_q8[i]);
-        chunk_thing_state_y_q8[chunk_index] = (short)(origin_y + thing_y_q8[i]);
+        chunk_thing_state_x_q8[chunk_index] = thing_x_q8[i];
+        chunk_thing_state_y_q8[chunk_index] = thing_y_q8[i];
         chunk_thing_state_dead[chunk_index] = 0;
         chunk_thing_state_hp[chunk_index] = enemy_hp[i];
     }
@@ -1569,15 +1557,13 @@ static void clear_dynamic_drops(void) {
 
 static void load_active_chunk_dynamic_drops(void) {
     unsigned short chunk = SIMPLE_ACTIVE_CHUNK;
-    int origin_x = active_chunk_origin_x_q8();
-    int origin_y = active_chunk_origin_y_q8();
     clear_dynamic_drops();
     for (u8 slot = 0; slot < CHUNK_DYNAMIC_DROP_SLOTS; slot++) {
         short local_x;
         short local_y;
         if (!chunk_drop_active[chunk][slot]) continue;
-        local_x = (short)(chunk_drop_x_q8[chunk][slot] - origin_x);
-        local_y = (short)(chunk_drop_y_q8[chunk][slot] - origin_y);
+        local_x = chunk_drop_x_q8[chunk][slot];
+        local_y = chunk_drop_y_q8[chunk][slot];
         if (local_x < 0 || local_y < 0 || local_x >= WORLD_Q8(SIMPLE_MAP_W) || local_y >= WORLD_Q8(SIMPLE_MAP_H)) continue;
         dynamic_drop_active[slot] = 1;
         dynamic_drop_type[slot] = chunk_drop_type[chunk][slot];
@@ -1630,8 +1616,8 @@ static void init_runtime_things(void) {
         {
             unsigned short chunk_index = (unsigned short)(chunk_first + i);
             u16 type = chunk_thing_state_type[chunk_index];
-            short x_q8 = (short)(chunk_thing_state_x_q8[chunk_index] - active_chunk_origin_x_q8());
-            short y_q8 = (short)(chunk_thing_state_y_q8[chunk_index] - active_chunk_origin_y_q8());
+            short x_q8 = chunk_thing_state_x_q8[chunk_index];
+            short y_q8 = chunk_thing_state_y_q8[chunk_index];
             if (chunk_thing_state_dead[chunk_index] || type == 0) {
                 thing_x_q8[i] = 0;
                 thing_y_q8[i] = 0;
@@ -3353,14 +3339,14 @@ typedef struct SimpleMapThingSeed {
 
 static void seed_simple_map_things(void) {
     static const SimpleMapThingSeed seeds[ENEMY_VISIBLE_COUNT] = {
-        {3004, 5, 5, 1},   /* former human in the first corridor */
-        {3001, 8, 5, 0},   /* imp near the central lane */
-        {2035, 9, 6, 0},   /* barrel between the first encounters */
-        {2007, 4, 6, 0},   /* clip */
-        {2048, 5, 6, 0},   /* ammo box */
-        {2018, 6, 6, 0},   /* green armor */
-        {2001, 7, 6, 0},   /* shotgun */
-        {2012, 10, 6, 0},  /* medikit */
+        {3004, 4, 9, 0},   /* former human in the side lane */
+        {3001, 12, 7, 0},  /* imp guarding the side lane */
+        {2035, 6, 7, 0},   /* barrel near the first encounter */
+        {5,    3, 13, 0},  /* blue keycard for the exit door */
+        {2007, 5, 13, 0},  /* clip */
+        {2011, 6, 13, 0},  /* stimpack */
+        {2018, 10, 13, 0}, /* green armor */
+        {2001, 12, 13, 0}, /* shotgun */
     };
     int px;
     int py;

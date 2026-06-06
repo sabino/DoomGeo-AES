@@ -68,20 +68,17 @@ and emits generated C headers/sources under `build/`:
   `DOOM_RENDER_DETAIL_CULL`, and `DOOM_MAP_READABILITY_CLEANUP` can be
   overridden for exact-conversion or higher-resolution experiments.
 - Simple/chunk-shaped renderer baseline. `DOOM_SIMPLE_MAP=1` keeps the
-  NGRayEx-style `16x16` authored active map and asks the WAD converter for only
-  a `16x16` support grid. In that mode the renderer ignores generated
-  render-line refinement and uses pure grid DDA columns, while Doom sprites,
-  weapons, HUD, and baked floor/ceiling assets still come from the normal
-  offline asset path. This is the intended shape for the next converter pass:
-  split a WAD map into connected `16x16` Neo Geo chunks, then load/swap compact
-  generated chunk data around the player instead of scaling the whole WAD map
-  into one large runtime grid.
+  NGRayEx-style active `16x16` map and pure grid DDA columns, while Doom
+  sprites, weapons, HUD, and baked floor/ceiling assets still come from the
+  normal offline asset path. The active page can be authored or loaded from
+  compact WAD-derived chunk data around the player instead of scaling the whole
+  WAD map into one large runtime grid.
 - `tools/doom_chunk_convert.py` is the first build-time version of that chunk
-  pass. It keeps a fixed Doom-units-per-cell scale, emits `16x16` chunk pages
-  with wall, texture-class, floor visual, damage, light, floor/ceiling height,
-  and chunk-local thing metadata, and writes an ASCII preview for inspection.
-  It does not yet replace the authored active simple map at runtime; it is the
-  generated data shape for the next streaming/swap step.
+  pass. It defaults to 64 Doom units per cell, emits `16x16` chunk pages with
+  wall, texture-class, floor visual, damage, light, floor/ceiling height, and
+  chunk-local thing metadata, and writes an ASCII preview for inspection. The
+  runtime streams one generated page at a time into the existing simple-map
+  renderer.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.
