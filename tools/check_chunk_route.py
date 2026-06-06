@@ -18,6 +18,13 @@ def parse_define_int(text: str, name: str) -> int:
     return int(match.group(1))
 
 
+def parse_define_float(text: str, name: str) -> float:
+    match = re.search(rf"^#define\s+{re.escape(name)}\s+(-?\d+(?:\.\d+)?)\b", text, re.MULTILINE)
+    if not match:
+        raise ValueError(f"missing {name}")
+    return float(match.group(1))
+
+
 def parse_define_string(text: str, name: str) -> str:
     match = re.search(rf"^#define\s+{re.escape(name)}\s+\"([^\"]*)\"", text, re.MULTILINE)
     if not match:
@@ -124,6 +131,31 @@ def bfs(
     return None
 
 
+def forward_open_cells(
+    grid: list[list[int]],
+    start_x: float,
+    start_y: float,
+    dir_x: float,
+    dir_y: float,
+    passable_overrides: set[tuple[int, int]],
+) -> int:
+    width = len(grid[0])
+    height = len(grid)
+    open_cells = 0
+    visited: set[tuple[int, int]] = set()
+    for step in (0.50, 0.95, 1.40, 1.85, 2.30, 2.75, 3.20):
+        x = int(start_x + dir_x * step)
+        y = int(start_y + dir_y * step)
+        if x < 0 or y < 0 or x >= width or y >= height:
+            break
+        if grid[y][x] and (x, y) not in passable_overrides:
+            break
+        if (x, y) not in visited:
+            visited.add((x, y))
+            open_cells += 1
+    return open_cells
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--header", default="build/doom_chunks_generated.h")
@@ -141,6 +173,10 @@ def main() -> int:
     start_local = (
         parse_define_int(text, "DOOM_CHUNK_START_X_Q8") >> 8,
         parse_define_int(text, "DOOM_CHUNK_START_Y_Q8") >> 8,
+    )
+    start_local_q8 = (
+        parse_define_int(text, "DOOM_CHUNK_START_X_Q8"),
+        parse_define_int(text, "DOOM_CHUNK_START_Y_Q8"),
     )
     start = (
         (start_chunk % chunk_cols) * chunk_size + start_local[0],
@@ -173,6 +209,18 @@ def main() -> int:
             errors.append(f"exit out of bounds: {exit_cell}")
         elif grid[y][x] and exit_cell not in interactive:
             errors.append(f"exit blocked: {exit_cell} value={grid[y][x]}")
+    start_float = (
+        (start_chunk % chunk_cols) * chunk_size + (start_local_q8[0] / 256.0),
+        (start_chunk // chunk_cols) * chunk_size + (start_local_q8[1] / 256.0),
+    )
+    dir_x = parse_define_float(text, "DOOM_CHUNK_START_DIR_X")
+    dir_y = parse_define_float(text, "DOOM_CHUNK_START_DIR_Y")
+    open_forward = forward_open_cells(grid, start_float[0], start_float[1], dir_x, dir_y, interactive)
+    if open_forward < 2:
+        errors.append(
+            f"start view blocked: start=({start_float[0]:.2f},{start_float[1]:.2f}) "
+            f"dir=({dir_x:.3f},{dir_y:.3f}) open_forward={open_forward}"
+        )
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
@@ -192,7 +240,8 @@ def main() -> int:
     print(
         f"{label} chunk route OK: start={start} exit={interactive_path[-1]} "
         f"steps={len(interactive_path) - 1} open_route={'yes' if open_path else 'no'} "
-        f"doors={len(path_doors)} lifts={len(path_lifts)} chunks={chunk_count}"
+        f"doors={len(path_doors)} lifts={len(path_lifts)} chunks={chunk_count} "
+        f"open_forward={open_forward}"
     )
     return 0
 

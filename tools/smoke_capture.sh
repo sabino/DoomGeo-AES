@@ -14,6 +14,7 @@ XVFB_SCREEN="${SMOKE_XVFB_SCREEN:-1024x768x24}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
 EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
+DIRECT_ROM="${SMOKE_DIRECT_ROM:-}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
@@ -26,6 +27,7 @@ XVFB_PID=""
 MAKE_ARGS=()
 MAKE_ROM_DIR=""
 MAKE_BUILD_DIR=""
+BIOS_SOURCE=".tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -54,7 +56,7 @@ window_for_gngeo() {
 }
 
 kill_old_gngeo() {
-    pgrep -af 'ngdevkit-gngeo|gngeo' | awk '$0 !~ /pgrep/ {print $1}' | xargs -r kill -9 || true
+    ps -eo pid=,comm= | awk '$2 == "ngdevkit-gngeo" || $2 == "gngeo" {print $1}' | xargs -r kill -9 || true
 }
 
 tile_window() {
@@ -146,6 +148,14 @@ fi
 if [ -z "$MAKE_ROM_DIR" ] && [ -n "$MAKE_BUILD_DIR" ]; then
     MAKE_ROM_DIR="$MAKE_BUILD_DIR/rom"
 fi
+if [ -z "$MAKE_ROM_DIR" ]; then
+    case "$BUILD_TARGET" in
+        *-rom) MAKE_ROM_DIR="build/$BUILD_TARGET" ;;
+    esac
+fi
+if [ -n "$MAKE_ROM_DIR" ] && [ ! -e "$MAKE_ROM_DIR/neogeo.zip" ] && [ -e "$BIOS_SOURCE" ]; then
+    ln -nsf "$ROOT/$BIOS_SOURCE" "$MAKE_ROM_DIR/neogeo.zip"
+fi
 kill_old_gngeo
 
 if [ "$USE_XVFB" = "1" ]; then
@@ -154,13 +164,21 @@ if [ "$USE_XVFB" = "1" ]; then
     sleep 1
 fi
 
-run_args=("$RUN_TARGET")
-if [ -n "$EXTRAOPTS_VALUE" ]; then
-    run_args+=("EXTRAOPTS=$EXTRAOPTS_VALUE")
-fi
+if [ -n "$DIRECT_ROM" ]; then
+    setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
+        "$ROOT/.tools/ngdevkit-local/usr/bin/ngdevkit-gngeo" \
+        --datafile="$ROOT/.tools/ngdevkit-local/usr/share/ngdevkit-gngeo/gngeo_data.zip" \
+        --p1control="A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79,MENU=K27" \
+        $EXTRAOPTS_VALUE --screen320 --scale 3 --no-resize -i "$DIRECT_ROM" puzzledp >"$LOG" 2>&1 < /dev/null &
+else
+    run_args=("$RUN_TARGET")
+    if [ -n "$EXTRAOPTS_VALUE" ]; then
+        run_args+=("EXTRAOPTS=$EXTRAOPTS_VALUE")
+    fi
 
-setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
-    "$MAKE_BIN" "${MAKE_ARGS[@]}" "${run_args[@]}" >"$LOG" 2>&1 < /dev/null &
+    setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
+        "$MAKE_BIN" "${MAKE_ARGS[@]}" "${run_args[@]}" >"$LOG" 2>&1 < /dev/null &
+fi
 sleep "$WAIT_SECS"
 
 wid="$(window_for_gngeo)"

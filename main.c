@@ -2302,11 +2302,21 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_p
 }
 
 static void load_enemy_palette(u16 slot, int def) {
+    u8 brighten_pickup;
     if (def == enemy_palette_def[slot]) return;
+    brighten_pickup = thing_is_pickup(g_enemy_sprite_defs[def].thing_type);
     for (int i = 0; i < ENEMY_PALETTE_COLORS; i++) {
         u8 r = g_enemy_palette_rgb[def][i][0];
         u8 g = g_enemy_palette_rgb[def][i][1];
         u8 b = g_enemy_palette_rgb[def][i][2];
+        if (brighten_pickup && (r || g || b)) {
+            r = (u8)((r * 3) / 2 + 4);
+            g = (u8)((g * 3) / 2 + 4);
+            b = (u8)((b * 3) / 2 + 4);
+            if (r > 31) r = 31;
+            if (g > 31) g = 31;
+            if (b > 31) b = 31;
+        }
         pal_set((u16)(PAL_ENEMY_BASE + slot), (u16)(i + 1), RGB(r, g, b));
     }
     enemy_palette_def[slot] = def;
@@ -3814,12 +3824,12 @@ static void configure_death_test(void) {
 static void configure_powerup_test(void) {
     static const u16 power_types[6] = {2013, 2018, 2048, 2012, 2001, 2008};
     static const short power_forward[6] = {
-        WORLD_Q8(360), WORLD_Q8(440), WORLD_Q8(520),
-        WORLD_Q8(600), WORLD_Q8(680), WORLD_Q8(760)
+        WORLD_Q8(176), WORLD_Q8(208), WORLD_Q8(240),
+        WORLD_Q8(272), WORLD_Q8(304), WORLD_Q8(336)
     };
     static const short power_lateral[6] = {
-        -WORLD_Q8(48), WORLD_Q8(48), -WORLD_Q8(48),
-        WORLD_Q8(48), -WORLD_Q8(48), WORLD_Q8(48)
+        -WORLD_Q8(320), -WORLD_Q8(192), -WORLD_Q8(64),
+        WORLD_Q8(64), WORLD_Q8(192), WORLD_Q8(320)
     };
 #if NG_RUNTIME_THING_COUNT > 0
     for (u16 i = 0; i < NG_RUNTIME_THING_COUNT; i++) {
@@ -3831,6 +3841,10 @@ static void configure_powerup_test(void) {
         enemy_ranged_readable_ticks[i] = 0;
         thing_type_override[i] = 0;
     }
+    thing_monster_count = 0;
+    thing_shootable_count = 0;
+    thing_render_count = 0;
+    thing_pickup_count = 0;
 #endif
     for (u8 i = 0; i < 8; i++) {
         dynamic_drop_active[i] = 0;
@@ -3840,21 +3854,16 @@ static void configure_powerup_test(void) {
     player_armor = 50;
     player_armor_class = 1;
     player_ammo = 30;
+    player_kills = 0;
     shown_health = 0xFFFF;
     shown_armor = 0xFFFF;
     shown_ammo = 0xFFFF;
+    shown_frags = 0xFFFF;
 
     for (u8 i = 0; i < 6; i++) {
-        short x;
-        short y;
-        if (!test_position(&x, &y, power_forward[i], power_lateral[i])) continue;
-        dynamic_drop_x_q8[i] = x;
-        dynamic_drop_y_q8[i] = y;
-        dynamic_drop_type[i] = power_types[i];
-        dynamic_drop_active[i] = 1;
+        if (place_test_thing(i, power_types[i], power_forward[i], power_lateral[i])) player_kills++;
     }
-    power_lightamp_timer = 240;                                /* visible tint smoke test */
-    place_powerup_test_imp();
+    power_lightamp_timer = 0;
 }
 #endif
 
@@ -5996,7 +6005,7 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
     if (thing_is_corpse(thing_type)) return origin_y + 2;
     if (thing_is_pickup(thing_type)) {
         int lift = h < 48 ? 14 : (h < 96 ? 18 : 22);
-        if (origin_y > weapon_top + 18) origin_y = weapon_top + 18;
+        if (origin_y > GAME_H - 18) origin_y = GAME_H - 18;
         return origin_y - lift;
     }
     if (thing_is_barrel(thing_type)) return origin_y + 1;
@@ -6038,7 +6047,12 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     if (is_monster && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
         h = fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H;
     }
-    if (is_pickup && h > 0 && h < 44) h = 44;
+#if DOOM_SIMPLE_MAP
+    if (is_pickup && h > 0 && h < 112) h = 112;
+#else
+    if (is_pickup && h > 0 && h < 64) h = 64;
+#endif
+    if (thing_is_corpse(thing_type) && h > 0 && h < 36) h = 36;
     if (is_projectile && h > 0 && h < 18) h = 18;
     if (is_explosion && h > 0 && h < 26) h = 26;
 
@@ -6059,7 +6073,11 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     else if (h > 24) idx = 3;
     else idx = 4;
     if (is_monster && idx > 1) idx = 1;
-    if (is_pickup && idx > 2) idx = 2;
+#if DOOM_SIMPLE_MAP
+    if (is_pickup) idx = 0;
+#else
+    if (is_pickup && idx > 1) idx = 1;
+#endif
     if (is_projectile && idx > 3) idx = 3;
     if (idx >= def->scale_count) idx = def->scale_count - 1;
     meta = &g_enemy_scales[def->first_scale + idx];
@@ -6366,6 +6384,11 @@ static int select_visible_things(int found) {
             fallback_projection = 1;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
+#if DOOM_SIMPLE_MAP
+        if (thing_is_pickup(thing_type) || thing_is_corpse(thing_type)) {
+            fallback_projection = 1;
+        }
+#endif
 
         candidate.thing_index = i;
         candidate.dynamic_index = -1;
@@ -6399,6 +6422,9 @@ static int select_visible_things(int found) {
             fallback_projection = 1;
         }
         if (sx < -48 || sx > SCRW + 48) continue;
+#if DOOM_SIMPLE_MAP
+        fallback_projection = 1;
+#endif
         candidate.thing_index = -1;
         candidate.dynamic_index = (signed char)i;
         candidate.thing_type = thing_type;
@@ -6418,7 +6444,7 @@ static int select_visible_things(int found) {
 #if DOOM_SIMPLE_MAP
         reserve_visible_pickups(candidates, count, selected);
 #endif
-        for (int i = selected - 1; i >= 0 && found < ENEMY_VISIBLE_COUNT; i--) {
+        for (int i = 0; i < selected && found < ENEMY_VISIBLE_COUNT; i++) {
         u8 rendered;
         if (candidates[i].dynamic_index >= 0) {
             rendered = render_type_slot((u16)found, -1, candidates[i].thing_type, candidates[i].x_q8, candidates[i].y_q8,

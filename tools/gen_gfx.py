@@ -27,7 +27,7 @@ from doom_convert import (
     read_wad,
 )
 
-C_PAD = 0x200000  # pad each C ROM to 2 MiB for larger precomputed tile banks
+C_PAD = 0x400000  # pad each C ROM to 4 MiB for the full sprite/item bank
 S_PAD = 0x20000   # 128 KiB fix ROM, all blank
 M_PAD = 0x10000   # 64 KiB Z80 program, all 0x00 (NOP) -> silent
 V_PAD = 0x10000   # 64 KiB ADPCM samples, empty
@@ -105,6 +105,18 @@ WEAPON_FRAMES = (
     "PUNGA0", "PUNGB0", "PUNGC0", "PUNGD0",
     "SAWGA0", "SAWGB0", "SAWGC0", "SAWGD0",
 )
+CRITICAL_SPRITE_TYPES = {
+    5, 6, 8, 13, 17, 38, 39, 40,
+    2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+    2010, 2011, 2012, 2013, 2014, 2015, 2018, 2019,
+    2022, 2023, 2024, 2025, 2026, 2035, 2045, 2046,
+    2047, 2048, 2049,
+    9000, 9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008,
+    9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016, 9017,
+    9018, 9019, 9020, 9021, 9022, 9023, 9024, 9025, 9026,
+    9027, 9028, 9029, 9030, 9031, 9032, 9033, 9034, 9035,
+    9036,
+}
 HUD_KEYCARD_FRAMES = ("BKEYA0", "RKEYA0", "YKEYA0")
 HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 HUD_KEYCARD_TILES = len(HUD_KEYCARD_FRAMES)
@@ -1195,7 +1207,8 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     next_tile = SPRITE_CACHE_BASE
     wad = Wad(read_wad(iwad, zip_member)) if iwad else None
     playpal = playpal_rgb(wad) if wad is not None else None
-    for thing_type, angle, frame, flip_x in specs:
+    specs = sorted(enumerate(specs), key=lambda item: (0 if item[1][0] in CRITICAL_SPRITE_TYPES else 1, item[0]))
+    for _order, (thing_type, angle, frame, flip_x) in specs:
         first_scale = len(metas)
         frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x, wad=wad, playpal=playpal)
         if not frame_meta:

@@ -138,6 +138,10 @@ include build.mk
 # Some default targets for running your project via emulators
 include emu.mk
 
+# The Doom sprite bank now includes monsters, corpses, weapons, keys and item
+# pickups. That crosses the 2 MiB C-ROM default, so package 4 MiB C-ROMs.
+CROMSIZE=4194304
+
 
 
 # program ROM: your main program
@@ -150,7 +154,7 @@ $(ELF):	$(BUILDDIR)/main.o $(BUILDDIR)/raycast.o $(DOOM_MAP_OBJECT) $(DOOM_CHUNK
 $(PROM1): $(ELF)
 
 $(BUILDDIR)/main.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER) $(GFX_HEADER)
-$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_ASSETS_HEADER)
+$(BUILDDIR)/raycast.o: config.h hw.h raycast.h map.h simple_map.h $(DOOM_MAP_HEADER) $(DOOM_CHUNK_DEP) $(DOOM_ASSETS_HEADER)
 $(DOOM_MAP_OBJECT): $(DOOM_MAP_SOURCE) $(DOOM_MAP_HEADER)
 	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $(DOOM_MAP_SOURCE) -o $@
 $(BUILDDIR)/doom_chunks_generated.o: $(DOOM_CHUNK_SOURCE) $(DOOM_CHUNK_HEADER)
@@ -347,12 +351,26 @@ death-test-gngeo:
 	$(MAKE) death-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
+chunk-death-test-rom:
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-death-test ROM=build/chunk-death-test-rom GFX_ROM_DIR=build/chunk-death-test-assets CFLAGS="-Ibuild/chunk-death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
+
+chunk-death-test-gngeo:
+	$(MAKE) chunk-death-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-death-test-rom $(GAMEROM)
+
 powerup-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 
 powerup-test-gngeo:
 	$(MAKE) powerup-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/powerup-test-rom $(GAMEROM)
+
+chunk-powerup-test-rom:
+	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-powerup-test ROM=build/chunk-powerup-test-rom GFX_ROM_DIR=build/chunk-powerup-test-assets CFLAGS="-Ibuild/chunk-powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
+
+chunk-powerup-test-gngeo:
+	$(MAKE) chunk-powerup-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-powerup-test-rom $(GAMEROM)
 
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
@@ -423,7 +441,10 @@ bsp-asset-check: doom-assets
 chunk-route-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 	$(PYTHON) tools/check_chunk_route.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo powerup-test-rom powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check
+chunk-visibility-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+	$(PYTHON) tools/check_chunk_visibility.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
+
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
