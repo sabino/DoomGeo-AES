@@ -166,9 +166,11 @@ static inline unsigned char map_cell_texture(int x, int y) {
 }
 
 static inline unsigned char map_cell_texture_phase(int x, int y) {
-    (void)x;
-    (void)y;
-    return 0;
+    int local_x;
+    int local_y;
+    unsigned short chunk = simple_chunk_for_cell(x, y, &local_x, &local_y);
+    if (chunk == 0xFFFF) return 0;
+    return g_chunk_tex_phase[chunk][simple_chunk_cell_index(local_x, local_y)];
 }
 
 static inline unsigned char map_cell_damage(int x, int y) {

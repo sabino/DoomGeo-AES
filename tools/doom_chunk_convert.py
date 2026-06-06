@@ -159,6 +159,7 @@ def build_bounds(
 
 
 def build_base_grids(
+    wad: dc.Wad,
     vertices: list[dc.Vertex],
     linedefs: list[dc.LineDef],
     sidedefs: list[dc.SideDef],
@@ -168,10 +169,12 @@ def build_base_grids(
     width: int,
     height: int,
     cell_units: int,
-) -> tuple[list[list[int]], list[list[int]], list[list[int]]]:
+) -> tuple[list[list[int]], list[list[int]], list[list[int]], list[list[int]]]:
     grid = [[1 for _ in range(width)] for _ in range(height)]
     tex_grid = [[0 for _ in range(width)] for _ in range(height)]
+    tex_phase_grid = [[0 for _ in range(width)] for _ in range(height)]
     priority_grid = [[0 for _ in range(width)] for _ in range(height)]
+    texture_widths = dc.parse_texture_widths(wad)
     sector_edges = [dc.sector_segments(i, linedefs, sidedefs, vertices) for i in range(len(sectors))]
     sector_bounds: list[tuple[int, int, int, int]] = []
 
@@ -206,12 +209,17 @@ def build_base_grids(
         texture_name = dc.solid_line_texture(line, sidedefs)
         texture_class = dc.wall_texture_class(texture_name)
         texture_priority = dc.wall_texture_priority(texture_class)
-        for cell_x, cell_y in dc.line_cells(grid, x0, y0, x1, y1):
+        texture_width = texture_widths.get(texture_name, 64)
+        texture_x = dc.solid_line_texture_x(line, sidedefs)
+        cells = dc.line_cells(grid, x0, y0, x1, y1)
+        cell_count = max(1, len(cells))
+        for step, (cell_x, cell_y) in enumerate(cells):
             grid[cell_y][cell_x] = 1
             if texture_priority >= priority_grid[cell_y][cell_x]:
                 tex_grid[cell_y][cell_x] = texture_class
+                tex_phase_grid[cell_y][cell_x] = dc.texture_phase_for_cell(texture_x, texture_width, step, cell_count)
                 priority_grid[cell_y][cell_x] = texture_priority
-    return grid, tex_grid, priority_grid
+    return grid, tex_grid, tex_phase_grid, priority_grid
 
 
 def build_sector_grids(
@@ -428,6 +436,7 @@ def minimum_wall_route(
 def repair_start_exit_route(
     grid: list[list[int]],
     tex_grid: list[list[int]],
+    tex_phase_grid: list[list[int]],
     floor_grid: list[list[int]],
     damage_grid: list[list[int]],
     light_grid: list[list[int]],
@@ -452,6 +461,7 @@ def repair_start_exit_route(
             continue
         grid[y][x] = 0
         tex_grid[y][x] = 0
+        tex_phase_grid[y][x] = 0
         floor_grid[y][x] = 0
         damage_grid[y][x] = 0
         light_grid[y][x] = 2
@@ -512,6 +522,7 @@ def write_outputs(
     start_angle: int,
     grid: list[list[int]],
     tex_grid: list[list[int]],
+    tex_phase_grid: list[list[int]],
     floor_grid: list[list[int]],
     damage_grid: list[list[int]],
     light_grid: list[list[int]],
@@ -613,6 +624,7 @@ def write_outputs(
         f.write("extern const unsigned char g_chunk_door_cell[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_lift_cell[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_tex[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
+        f.write("extern const unsigned char g_chunk_tex_phase[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_floor_visual[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_damage[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
         f.write("extern const unsigned char g_chunk_light[DOOM_CHUNK_COUNT][DOOM_CHUNK_CELLS];\n")
@@ -635,6 +647,7 @@ def write_outputs(
         write_u8_chunks(f, "g_chunk_door_cell", door_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_lift_cell", lift_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_tex", tex_grid, chunk_count, chunk_size, chunk_cols)
+        write_u8_chunks(f, "g_chunk_tex_phase", tex_phase_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_floor_visual", floor_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_damage", damage_grid, chunk_count, chunk_size, chunk_cols)
         write_u8_chunks(f, "g_chunk_light", light_grid, chunk_count, chunk_size, chunk_cols)
@@ -737,7 +750,7 @@ def write_preview(
 
 
 def convert(args: argparse.Namespace) -> None:
-    _wad, vertices, linedefs, sidedefs, sectors, things = parse_map(args.iwad, args.zip_member, args.map)
+    wad, vertices, linedefs, sidedefs, sectors, things = parse_map(args.iwad, args.zip_member, args.map)
     player = next((thing for thing in things if thing.type == 1), None)
     if player is None:
         raise ValueError("map has no player 1 start thing")
@@ -753,8 +766,8 @@ def convert(args: argparse.Namespace) -> None:
     chunk_rows = ceil_div(height, args.chunk_size)
     width = chunk_cols * args.chunk_size
     height = chunk_rows * args.chunk_size
-    grid, tex_grid, _priority_grid = build_base_grids(
-        vertices, linedefs, sidedefs, sectors, origin_x, origin_y, width, height, args.cell_units
+    grid, tex_grid, tex_phase_grid, _priority_grid = build_base_grids(
+        wad, vertices, linedefs, sidedefs, sectors, origin_x, origin_y, width, height, args.cell_units
     )
     floor_grid, damage_grid, light_grid, floor_height_grid, ceiling_height_grid = build_sector_grids(
         grid, linedefs, sidedefs, sectors, vertices, origin_x, origin_y, args.cell_units
@@ -785,6 +798,7 @@ def convert(args: argparse.Namespace) -> None:
     route_repair_cells = repair_start_exit_route(
         grid,
         tex_grid,
+        tex_phase_grid,
         floor_grid,
         damage_grid,
         light_grid,
@@ -815,6 +829,7 @@ def convert(args: argparse.Namespace) -> None:
         player.angle,
         grid,
         tex_grid,
+        tex_phase_grid,
         floor_grid,
         damage_grid,
         light_grid,
