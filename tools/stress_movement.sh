@@ -6,6 +6,10 @@ cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-4}"
+USE_XVFB="${SMOKE_XVFB:-0}"
+XVFB_SCREEN="${SMOKE_XVFB_SCREEN:-1024x768x24}"
+XVFB_PID=""
+XVFB_LOG="${SMOKE_XVFB_LOG:-${SMOKE_LOG:-.tools/logs/movement-bench-gngeo.log}.xvfb.log}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
 WAIT_SECS="${SMOKE_WAIT_SECS:-5}"
 FORWARD_SECS="${STRESS_FORWARD_SECS:-2.5}"
@@ -50,17 +54,65 @@ capture_window() {
     local wid="$1"
     local out="$2"
     local xwd_out="${out%.png}.xwd"
-    xwd -silent -id "$wid" -out "$xwd_out"
-    convert "$xwd_out" "$out"
+    local geometry=""
+    if [ "$USE_XVFB" = "1" ]; then
+        geometry="$(DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" | awk '
+            /Absolute upper-left X:/ { x = $NF }
+            /Absolute upper-left Y:/ { y = $NF }
+            /Width:/ { w = $NF }
+            /Height:/ { h = $NF }
+            END {
+                if (w > 0 && h > 0) {
+                    printf "%dx%d+%d+%d", w, h, x, y
+                }
+            }')"
+        DISPLAY="$DISPLAY_VALUE" xwd -silent -root -out "$xwd_out"
+        if [ -n "$geometry" ]; then
+            convert "$xwd_out" -crop "$geometry" +repage "$out"
+        else
+            convert "$xwd_out" "$out"
+        fi
+    else
+        if ! DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
+            wid="$(window_for_gngeo)"
+        fi
+        DISPLAY="$DISPLAY_VALUE" xwd -silent -id "$wid" -out "$xwd_out"
+        convert "$xwd_out" "$out"
+    fi
 }
 
 hold_keys() {
-    local seconds="$1"
-    shift
+    local wid="$1"
+    local seconds="$2"
+    shift 2
+    local key=""
+    trap 'for key in "$@"; do DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key" >/dev/null 2>&1 || true; done' RETURN
     for key in "$@"; do
         DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"
     done
     sleep "$seconds"
+    for key in "$@"; do
+        DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
+    done
+    trap - RETURN
+}
+
+move_and_capture() {
+    local seconds="$1"
+    local out="$2"
+    shift
+    shift
+    local wid=""
+    wid="$(window_for_gngeo)"
+    hold_keys "$wid" "$seconds" "$@"
+    sleep 0.2
+    wid="$(window_for_gngeo)"
+    capture_window "$wid" "$out"
+}
+
+keyup_all() {
+    local wid=""
+    wid="$(window_for_gngeo)" || return 0
     for key in "$@"; do
         DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
     done
@@ -70,30 +122,44 @@ require_cmd xdotool
 require_cmd xwininfo
 require_cmd xwd
 require_cmd convert
+if [ "$USE_XVFB" = "1" ]; then
+    require_cmd Xvfb
+    DISPLAY_VALUE="${SMOKE_XVFB_DISPLAY:-:99}"
+    WORKSPACE=""
+fi
+
+cleanup() {
+    if [ -n "$XVFB_PID" ]; then
+        kill "$XVFB_PID" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT INT TERM
 
 mkdir -p "$OUT_DIR"
+
+if [ "$USE_XVFB" = "1" ]; then
+    mkdir -p "$(dirname "$XVFB_LOG")"
+    Xvfb "$DISPLAY_VALUE" -screen 0 "$XVFB_SCREEN" >"$XVFB_LOG" 2>&1 &
+    XVFB_PID="$!"
+    sleep 1
+fi
 
 SMOKE_OUTPUT="$START_OUT" \
 SMOKE_WAIT_SECS="$WAIT_SECS" \
 SMOKE_START_GAME=1 \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
+SMOKE_XVFB=0 \
 SMOKE_EXTRAOPTS="$EXTRAOPTS_VALUE" \
 tools/smoke_capture.sh >/dev/null
 
-wid="$(window_for_gngeo)"
+keyup_all Up Down Left Right z x a s Return space Escape || true
 
-hold_keys "$FORWARD_SECS" Up
-sleep 0.2
-capture_window "$wid" "$FORWARD_OUT"
+move_and_capture "$FORWARD_SECS" "$FORWARD_OUT" Up
 
-hold_keys "$TURN_SECS" Right
-sleep 0.2
-capture_window "$wid" "$TURN_OUT"
+move_and_capture "$TURN_SECS" "$TURN_OUT" Right
 
-hold_keys "$STRAFE_SECS" z Right
-sleep 0.2
-capture_window "$wid" "$STRAFE_OUT"
+move_and_capture "$STRAFE_SECS" "$STRAFE_OUT" z Right
 
 echo "movement stress screenshots OK:"
 echo "$START_OUT"

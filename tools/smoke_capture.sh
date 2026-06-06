@@ -179,8 +179,23 @@ sleep 0.5
 
 if [ "$USE_XVFB" = "1" ]; then
     DISPLAY="$DISPLAY_VALUE" xwd -silent -root -out "$XWD_OUT"
+    geometry="$(DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" | awk '
+        /Absolute upper-left X:/ { x = $NF }
+        /Absolute upper-left Y:/ { y = $NF }
+        /Width:/ { w = $NF }
+        /Height:/ { h = $NF }
+        END {
+            if (w > 0 && h > 0) {
+                printf "%dx%d+%d+%d", w, h, x, y
+            }
+        }')"
+    if [ -n "$geometry" ]; then
+        convert "$XWD_OUT" -crop "$geometry" +repage "$OUT"
+    else
+        convert "$XWD_OUT" "$OUT"
+    fi
 else
     DISPLAY="$DISPLAY_VALUE" xwd -silent -id "$wid" -out "$XWD_OUT"
+    convert "$XWD_OUT" "$OUT"
 fi
-convert "$XWD_OUT" "$OUT"
 echo "$OUT"

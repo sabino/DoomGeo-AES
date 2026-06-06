@@ -19,9 +19,12 @@ readable.
   default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
   `1` for easy or `2` for medium placement. The default grid remains centered
   at `96x72`, which gives the converter room to preserve original WAD
-  placement, but the default map pass now removes tiny solid-line noise,
-  isolated wall specks, and short dead-end wall tails that become false
-  full-height obstacles in the sprite-strip raycaster.
+  placement, but the default map pass now uses `DOOM_MAP_DETAIL_CULL=6.0` to
+  remove solid-line noise, isolated wall specks, and short dead-end wall tails
+  that become false full-height obstacles in the sprite-strip raycaster. The
+  default was chosen from E1M1 visual captures plus strict Episode 1 route
+  checks; lower values leave more false pillars, while higher values start
+  dropping required map structure.
 - Generated map tables are split into `doom_map_generated.h` and
   `doom_map_generated.c` for Makefile builds so large arrays are compiled once
   instead of duplicated by every file that includes the generated header.

@@ -52,11 +52,12 @@ and emits generated C headers/sources under `build/`:
   starts/things preserve sub-cell WAD positions where possible instead of
   drifting to one anchored corner of the converted grid.
 - Scale-aware map simplification. The normal build keeps the `96x72` coordinate
-  frame but culls very short solid linedefs, opens isolated coarse-grid wall
-  specks, and prunes short dead-end wall tails, because those details read as
-  false full-height columns in the Neo Geo sprite-strip renderer. The pass
-  protects map borders, doors, exits, things, and player-start clearance.
-  `DOOM_MAP_DETAIL_CULL` and
+  frame but now uses a deliberately aggressive `DOOM_MAP_DETAIL_CULL=6.0`,
+  opens isolated coarse-grid wall specks, and prunes short dead-end wall tails,
+  because Doom's minor linedef details read as false full-height columns in the
+  Neo Geo sprite-strip renderer. The pass protects map borders, doors, exits,
+  things, and player-start clearance, and the 6.0 default is the strongest
+  tested value that preserved strict Episode 1 route coverage. `DOOM_MAP_DETAIL_CULL` and
   `DOOM_MAP_READABILITY_CLEANUP` can be overridden for exact-conversion
   experiments.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but

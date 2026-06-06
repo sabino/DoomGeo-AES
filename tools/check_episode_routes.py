@@ -167,7 +167,7 @@ def main() -> int:
     parser.add_argument("--maps", default=",".join(DEFAULT_MAPS))
     parser.add_argument("--width", type=int, default=96)
     parser.add_argument("--height", type=int, default=72)
-    parser.add_argument("--detail-cull", type=float, default=0.20)
+    parser.add_argument("--detail-cull", type=float, default=6.0)
     parser.add_argument("--readability-cleanup", action="store_true")
     parser.add_argument("--skill-mask", type=int, default=4)
     parser.add_argument("--build-dir", default="build/episode-route")
