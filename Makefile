@@ -72,6 +72,10 @@ DOOM_CHUNK_DEP=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
 DOOM_CHUNK_CELL_UNITS?=64
+DOOM_CHUNK_START_LOCAL_X?=8.5
+DOOM_CHUNK_START_LOCAL_Y?=8.5
+DOOM_CHUNK_KEEP_WAD_START_OFFSET?=0
+DOOM_CHUNK_START_ARGS=--start-local-x $(DOOM_CHUNK_START_LOCAL_X) --start-local-y $(DOOM_CHUNK_START_LOCAL_Y) $(if $(filter 1 yes true,$(DOOM_CHUNK_KEEP_WAD_START_OFFSET)),--keep-wad-start-offset,)
 DOOM_RIPDOOM_HEADER=$(BUILDDIR)/doom_ripdoom_generated.h
 DOOM_RIPDOOM_SOURCE=$(BUILDDIR)/doom_ripdoom_generated.c
 DOOM_RIPDOOM_REPORT=$(BUILDDIR)/doom_ripdoom_report.txt
@@ -310,14 +314,14 @@ chunk-key-door-test-gngeo:
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
 
 chunk-movement-test-rom:
-	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=32 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_CHUNK_MOVEMENT_TEST=1 BUILDDIR=build/chunk-movement-test ROM=build/chunk-movement-test-rom GFX_ROM_DIR=build/chunk-movement-test-assets
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=32 DOOM_CHUNK_KEEP_WAD_START_OFFSET=1 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_CHUNK_MOVEMENT_TEST=1 BUILDDIR=build/chunk-movement-test ROM=build/chunk-movement-test-rom GFX_ROM_DIR=build/chunk-movement-test-assets
 
 chunk-movement-test-gngeo:
 	$(MAKE) chunk-movement-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-movement-test-rom $(GAMEROM)
 
 chunk-playable-rom:
-	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=32 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-playable ROM=build/chunk-playable-rom GFX_ROM_DIR=build/chunk-playable-assets
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=32 DOOM_CHUNK_KEEP_WAD_START_OFFSET=1 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-playable ROM=build/chunk-playable-rom GFX_ROM_DIR=build/chunk-playable-assets
 
 chunk-playable-gngeo:
 	$(MAKE) chunk-playable-rom
@@ -532,7 +536,7 @@ $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE): Makefile tools/doom_convert.py $(DOOM_IWA
 	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) --render-detail-cull $(DOOM_RENDER_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE): Makefile tools/doom_chunk_convert.py tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
+	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) $(DOOM_CHUNK_START_ARGS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
 
 chunk-map: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 

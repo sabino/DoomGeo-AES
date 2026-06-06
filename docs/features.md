@@ -61,6 +61,11 @@ readable.
   with the same chunk/RIPDOOM flags as the ROM and samples both the generated
   chunk start and a short forward pose for E1M1, so movement cannot silently
   rotate the real-Doom geometry out from under the simple grid collision.
+- Chunk conversion exposes `DOOM_CHUNK_START_LOCAL_X`,
+  `DOOM_CHUNK_START_LOCAL_Y`, and `DOOM_CHUNK_KEEP_WAD_START_OFFSET` through
+  the Makefile. The playable E1M1 chunk ROM keeps the WAD start aligned to the
+  center of its active `16x16` room page, which gives more visual clearance from
+  the start wall without changing the sprite-strip/RIPDOOM-lite renderer.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
   player input. `make chunk-movement-test-rom` uses the same scale but replaces
