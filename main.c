@@ -3944,6 +3944,9 @@ static void configure_powerup_test(void) {
 #endif
 
 #if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#ifndef DOOM_CHUNK_MOVEMENT_START_DELAY
+#define DOOM_CHUNK_MOVEMENT_START_DELAY 60
+#endif
 static u16 chunk_movement_test_tick = 0;
 
 static void configure_chunk_movement_test(void) {
@@ -3959,7 +3962,7 @@ static void configure_chunk_movement_test(void) {
 }
 
 static u8 chunk_movement_test_pressed(u8 pressed) {
-    enum { UP = 0x01, START_DELAY = 60, WALK_TICKS = 70 };
+    enum { UP = 0x01, START_DELAY = DOOM_CHUNK_MOVEMENT_START_DELAY, WALK_TICKS = 70 };
     (void)pressed;
     if (chunk_movement_test_tick < START_DELAY) {
         chunk_movement_test_tick++;
@@ -6941,7 +6944,11 @@ int main(void) {
                 debug_global_y = active_chunk_origin_y_q8() + debug_py;
                 player_ammo = (u16)(debug_global_x >> 8);
                 player_kills = (u16)(debug_global_y >> 8);
+#if defined(DOOM_CHUNK_MOVEMENT_TEST) && DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+                player_armor = chunk_movement_test_tick;
+#else
                 player_armor = SIMPLE_ACTIVE_CHUNK;
+#endif
             }
             shown_ammo = 0xFFFF;
             shown_armor = 0xFFFF;

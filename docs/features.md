@@ -85,6 +85,11 @@ readable.
   global chunk-grid X/Y and active chunk state, which distinguishes stale ROMs
   or blocked movement from valid chunk streaming where local coordinates
   recenter.
+- `SMOKE_XVFB=1 tools/bench_chunk_debug_movement.sh` pairs the deterministic
+  host `chunk-movement-check` with a `chunk-movement-test-rom` screenshot. The
+  scripted ROM uses a longer pre-walk delay for capture stability and mirrors
+  the script tick in the armor counter, so the smoke can verify a booted ROM and
+  visible debug registers without depending on fragile two-window Xvfb deltas.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated

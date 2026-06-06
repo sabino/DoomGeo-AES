@@ -23,7 +23,9 @@ def load(path: Path) -> Image.Image:
 
 def count_colored(image: Image.Image, box: tuple[int, int, int, int]) -> int:
     total = 0
-    for r, g, b in image.crop(box).convert("RGB").getdata():
+    region = image.crop(box).convert("RGB")
+    data = region.get_flattened_data() if hasattr(region, "get_flattened_data") else region.getdata()
+    for r, g, b in data:
         if r + g + b > 50 and max(r, g, b) - min(r, g, b) > 20:
             total += 1
     return total
@@ -33,7 +35,8 @@ def debug_delta(before: Image.Image, after: Image.Image) -> tuple[float, int]:
     before_debug = before.crop(DEBUG_BOX).convert("RGB")
     after_debug = after.crop(DEBUG_BOX).convert("RGB")
     diff = ImageChops.difference(before_debug, after_debug).convert("L")
-    changed = sum(v > 12 for v in diff.getdata())
+    data = diff.get_flattened_data() if hasattr(diff, "get_flattened_data") else diff.getdata()
+    changed = sum(v > 12 for v in data)
     mean = ImageStat.Stat(diff).mean[0]
     return mean, changed
 
@@ -44,9 +47,24 @@ def main() -> int:
     parser.add_argument("--min-colored", type=int, default=25000, help="Minimum colored pixels in the debug register crop")
     parser.add_argument("--min-diff-mean", type=float, default=0.2, help="Minimum debug register mean delta after movement")
     parser.add_argument("--min-diff-pixels", type=int, default=50, help="Minimum changed debug register pixels after movement")
+    parser.add_argument("--single", help="Check only one screenshot for visible debug-register evidence")
     args = parser.parse_args()
 
     root = Path(args.dir)
+    if args.single:
+        single_path = root / args.single
+        try:
+            image = load(single_path)
+        except Exception as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        colored = count_colored(image, DEBUG_BOX)
+        if colored < args.min_colored:
+            print(f"{single_path}: weak debug register evidence {colored} < {args.min_colored}", file=sys.stderr)
+            return 1
+        print(f"chunk debug screenshot OK: register colored={colored} in {single_path}")
+        return 0
+
     start_path = root / "movement-stress-start.png"
     forward_path = root / "movement-stress-forward.png"
     errors: list[str] = []

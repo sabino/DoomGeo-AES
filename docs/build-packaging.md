@@ -166,13 +166,13 @@ For chunked RIPDOOM movement debugging, run:
 SMOKE_XVFB=1 tools/bench_chunk_debug_movement.sh
 ```
 
-This uses `chunk-playable-debug-rom`, stores captures under
-`.tools/screens/latest/chunk-debug-movement/`, and checks both the usual
-movement screenshot evidence and the visible HUD debug-register delta. In debug
-builds the HUD counters mirror global chunk position and active chunk state, so
-this bench can distinguish stale ROMs, blocked movement, and valid chunk
-recentering without relying on fix-layer rows that can be hidden behind
-playfield sprites.
+This runs the deterministic `chunk-movement-check` host probe first, then boots
+`chunk-movement-test-rom` and stores a debug-register capture under
+`.tools/screens/latest/chunk-debug-movement/`. In debug builds the HUD counters
+mirror global chunk position and active chunk state; in the scripted movement
+ROM the armor counter mirrors the script tick. This keeps movement proof out of
+fragile Xvfb timing while still leaving a visible ROM capture for stale-ROM and
+HUD/register checks.
 
 For a combat interaction regression pass, run `tools/smoke_combat_interaction.sh`.
 It captures the initial visible imp, the shotgun fire frame, and the resulting

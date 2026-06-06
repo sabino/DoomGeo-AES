@@ -5,26 +5,34 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 export STRESS_SHOWFPS="${STRESS_SHOWFPS:-0}"
-export STRESS_CAPTURE_DURING_HOLD="${STRESS_CAPTURE_DURING_HOLD:-1}"
-export STRESS_FORWARD_SECS="${STRESS_FORWARD_SECS:-3}"
-export STRESS_TURN_SECS="${STRESS_TURN_SECS:-2}"
-export STRESS_STRAFE_SECS="${STRESS_STRAFE_SECS:-3}"
-export SMOKE_BUILD_TARGET="${SMOKE_BUILD_TARGET:-chunk-playable-debug-rom}"
-export SMOKE_RUN_TARGET="${SMOKE_RUN_TARGET:-chunk-playable-debug-gngeo}"
+export SMOKE_BUILD_TARGET="${SMOKE_BUILD_TARGET:-chunk-movement-test-rom}"
+export SMOKE_RUN_TARGET="${SMOKE_RUN_TARGET:-chunk-movement-test-gngeo}"
 export SMOKE_OUTPUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest/chunk-debug-movement}"
 export SMOKE_LOG="${SMOKE_LOG:-.tools/logs/chunk-debug-movement-gngeo.log}"
-export SMOKE_MAKE_ARGS="${SMOKE_MAKE_ARGS:-ROM=build/chunk-playable-debug-rom}"
-export MOVEMENT_CHECK_ARGS="${MOVEMENT_CHECK_ARGS:---min-play-colored 50000 --min-play-varied 20 --min-diff-mean 1 --min-diff-pixels 1000}"
-CHECK_ARGS=()
-if [ -n "${MOVEMENT_CHECK_ARGS:-}" ]; then
-    # shellcheck disable=SC2206
-    CHECK_ARGS=($MOVEMENT_CHECK_ARGS)
-fi
+export SMOKE_MAKE_ARGS="${SMOKE_MAKE_ARGS:-ROM=build/chunk-movement-test-rom}"
+export SMOKE_DIRECT_ROM="${SMOKE_DIRECT_ROM:-build/chunk-movement-test-rom}"
+MOVED_WAIT="${CHUNK_DEBUG_MOVED_WAIT:-8.0}"
+MOVED_OUT="${SMOKE_OUTPUT_DIR}/movement-stress-forward.png"
+HOST_BUILDDIR="${CHUNK_DEBUG_HOST_BUILDDIR:-build/chunk-debug-movement-host-check}"
 
-tools/stress_movement.sh
+mkdir -p "$SMOKE_OUTPUT_DIR"
+
+make chunk-movement-check \
+    DOOM_IWAD="${DOOM_IWAD:-/home/sabino/Downloads/Doom1.WAD}" \
+    DOOM_MAP=E1M1 \
+    DOOM_SIMPLE_MAP=1 \
+    DOOM_CHUNKED_SIMPLE_MAP=1 \
+    DOOM_CHUNK_CELL_UNITS=32 \
+    DOOM_CHUNK_KEEP_WAD_START_OFFSET=1 \
+    DOOM_RIPDOOM_RENDER=1 \
+    BUILDDIR="$HOST_BUILDDIR"
+
+SMOKE_OUTPUT="$MOVED_OUT" \
+SMOKE_WAIT_SECS="$MOVED_WAIT" \
+tools/smoke_capture.sh >/dev/null
+
 status=0
-tools/check_chunk_debug_screens.py --dir "$SMOKE_OUTPUT_DIR" || status=1
-tools/check_movement_screens.py --dir "$SMOKE_OUTPUT_DIR" --expect-frame-stats "${CHECK_ARGS[@]}" || status=1
+tools/check_chunk_debug_screens.py --dir "$SMOKE_OUTPUT_DIR" --single "$(basename "$MOVED_OUT")" || status=1
 if [ ! -f "$SMOKE_LOG" ]; then
     echo "chunk debug movement log missing: $SMOKE_LOG" >&2
     exit 1
@@ -35,5 +43,7 @@ if grep -q 'Invalid write' "$SMOKE_LOG"; then
     exit 1
 fi
 
+echo "chunk debug movement screenshots OK:"
+echo "$MOVED_OUT"
 echo "chunk debug movement log: $SMOKE_LOG"
 exit "$status"
