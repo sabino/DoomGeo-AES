@@ -80,6 +80,11 @@ readable.
   Geo sprite strip per column, but platform/stair/window edges can be drawn as
   top- or bottom-anchored partial walls instead of every two-sided hit becoming
   a full-height slab.
+- For short lower/upper spans, the RIPDOOM renderer now probes one additional
+  wall hit behind the span and renders that farther wall instead. This is a
+  one-sprite-budget approximation of Doom's multi-hit columns: it avoids low
+  ledges deleting the room behind them while keeping true stacked wall drawing
+  as a future step.
 - RIPDOOM ray casting keeps the fast local blockmap search first, then falls
   back to sampling blockmap cells along a missed ray. This fills long corridor
   or chunk-edge columns without raising the local line/seg caps for every

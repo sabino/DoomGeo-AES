@@ -144,6 +144,9 @@ For the RIPDOOM/chunked renderer path, `make ripdoom-render-check` now also
 reports `interactive_pass=1` when a generated closed door/lift cell blocks and
 the same cell becomes passable after opening. This keeps the host render probe
 aligned with runtime chunk collision for streamed interactive geometry.
+The same report includes `second_hits=A/B` for the start and moved views when
+the one-sprite far-wall fallback replaces a short lower/upper span with the
+next wall hit behind it.
 
 The default color threshold targets the bright E1M1 start-room path; darker
 maps such as E1M2 can pass a lower `--min-play-colored` value to

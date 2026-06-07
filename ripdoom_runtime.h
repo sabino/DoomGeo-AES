@@ -27,5 +27,6 @@ int ripdoom_blockmap_lines(int block_x, int block_y, unsigned short *out_lines, 
 int ripdoom_collect_local_lines(short x, short y, int block_radius, unsigned short *out_lines, int max_lines);
 int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned short *out_segs, int max_segs);
 int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRayHit *out_hit);
+int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, unsigned short min_distance_q8, NgRipRayHit *out_hit);
 
 #endif /* RIPDOOM_RUNTIME_H */

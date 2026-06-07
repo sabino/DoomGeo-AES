@@ -604,6 +604,21 @@ static int sample_view(int start_x, int start_y, short view_x, short view_y, uns
     return sample_view_columns(start_x, start_y, view_x, view_y, out_min, out_max, out_first, NULL, NULL);
 }
 
+static int last_sample_second_hits = 0;
+
+static int render_probe_cast(short x, short y, short ray_x, short ray_y, NgRipRayHit *hit) {
+    if (!ripdoom_cast_local_ray(x, y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, hit)) return 0;
+    if (hit->span && hit->span_height < 96) {
+        NgRipRayHit far_hit;
+        unsigned short min_dist = hit->distance_q8 > 0xFFF0 ? 0xFFFF : (unsigned short)(hit->distance_q8 + 16);
+        if (ripdoom_cast_local_ray_after(x, y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, min_dist, &far_hit)) {
+            *hit = far_hit;
+            last_sample_second_hits++;
+        }
+    }
+    return 1;
+}
+
 static int sample_view_columns(
     int start_x,
     int start_y,
@@ -622,6 +637,7 @@ static int sample_view_columns(
     *out_min = 0xffff;
     *out_max = 0;
     *out_first = -1;
+    last_sample_second_hits = 0;
 
     for (int column = 0; column < COLUMNS; column++) {
         int camera_q8 = ((2 * 256 * column) / (COLUMNS - 1)) - 256;
@@ -630,7 +646,7 @@ static int sample_view_columns(
         NgRipRayHit hit;
         if (out_dist) out_dist[column] = 0xffff;
         if (out_seg) out_seg[column] = 0xffff;
-        if (!ripdoom_cast_local_ray((short)start_x, (short)start_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) {
+        if (!render_probe_cast((short)start_x, (short)start_y, ray_x, ray_y, &hit)) {
             continue;
         }
         if (*out_first < 0) *out_first = column;
@@ -816,6 +832,8 @@ int main(void) {
             int door_skip = 0;
             int lift_skip = 0;
             int interactive_pass = 0;
+            int start_second_hits = 0;
+            int moved_second_hits = 0;
             long start_global_x_q8 = chunk_global_x_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_X_Q8);
             long start_global_y_q8 = chunk_global_y_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_Y_Q8);
 
@@ -874,6 +892,7 @@ int main(void) {
                 );
                 return 1;
             }
+            start_second_hits = last_sample_second_hits;
             moved_hits = sample_view_columns(
                 moved_rip_x,
                 moved_rip_y,
@@ -902,6 +921,7 @@ int main(void) {
                 );
                 return 1;
             }
+            moved_second_hits = last_sample_second_hits;
             changed_columns = count_changed_render_columns(
                 start_dist_columns,
                 start_seg_columns,
@@ -940,7 +960,7 @@ int main(void) {
             interactive_pass = validate_opened_interactive_cell_passability();
             if (!interactive_pass) return 1;
             printf(
-                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_changed_cols=%d moved_total_delta=%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d interactive_pass=%d\n",
+                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_changed_cols=%d moved_total_delta=%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d interactive_pass=%d second_hits=%d/%d\n",
                 start_angle,
                 mode,
                 hits,
@@ -964,7 +984,9 @@ int main(void) {
                 route_steps,
                 door_skip,
                 lift_skip,
-                interactive_pass
+                interactive_pass,
+                start_second_hits,
+                moved_second_hits
             );
             return 0;
         }

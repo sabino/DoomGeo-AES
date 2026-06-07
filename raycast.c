@@ -226,6 +226,13 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     rip_dir_x = (short)(ray_x >> (FBITS - 8));
     rip_dir_y = (short)((-ray_y) >> (FBITS - 8));
     if (!ripdoom_cast_local_ray(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) return 0;
+    if (hit.span && hit.span_height < 96) {
+        NgRipRayHit far_hit;
+        unsigned short min_dist = hit.distance_q8 > 0xFFF0 ? 0xFFFF : (unsigned short)(hit.distance_q8 + 16);
+        if (ripdoom_cast_local_ray_after(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, min_dist, &far_hit)) {
+            hit = far_hit;
+        }
+    }
 
     perp = (fix)((((long)hit.distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
     if (perp < FMIN) perp = FMIN;

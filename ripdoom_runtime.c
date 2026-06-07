@@ -232,6 +232,7 @@ static void ripdoom_consider_seg_ray(
     short y,
     short dir_x_q8,
     short dir_y_q8,
+    int min_t_q8,
     int *best_seg,
     int *best_t_q8,
     int *best_u_q8,
@@ -249,7 +250,6 @@ static void ripdoom_consider_seg_ray(
     long num_u;
     int t_q8;
     int u_q8;
-    enum { MIN_RAY_DIST_Q8 = 24 };
 
     if (seg_index >= NG_RIP_SEG_COUNT) return;
     seg = &g_rip_segs[seg_index];
@@ -276,7 +276,7 @@ static void ripdoom_consider_seg_ray(
     }
     if (num_t <= 0 || num_u < 0 || num_u > denom) return;
     t_q8 = ripdoom_div_q8(num_t, denom);
-    if (t_q8 < MIN_RAY_DIST_Q8 || t_q8 >= *best_t_q8) return;
+    if (t_q8 < min_t_q8 || t_q8 >= *best_t_q8) return;
     u_q8 = ripdoom_div_q8(num_u, denom);
     *best_seg = seg_index;
     *best_t_q8 = t_q8;
@@ -290,6 +290,7 @@ static void ripdoom_cast_sampled_blocks(
     short dir_x_q8,
     short dir_y_q8,
     int block_radius,
+    int min_t_q8,
     int *best_seg,
     int *best_t_q8,
     int *best_u_q8,
@@ -329,7 +330,7 @@ static void ripdoom_cast_sampled_blocks(
                 if ((int)span->firstseg + (int)span->numsegs > NG_RIP_LINE_SEG_INDEX_COUNT) continue;
                 for (span_index = 0; span_index < span->numsegs; span_index++) {
                     unsigned short seg = g_rip_line_seg_indices[span->firstseg + span_index];
-                    ripdoom_consider_seg_ray(seg, x, y, dir_x_q8, dir_y_q8, best_seg, best_t_q8, best_u_q8, best_side);
+                    ripdoom_consider_seg_ray(seg, x, y, dir_x_q8, dir_y_q8, min_t_q8, best_seg, best_t_q8, best_u_q8, best_side);
                 }
             }
         }
@@ -410,7 +411,7 @@ int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned shor
     return seg_count > max_segs ? max_segs : seg_count;
 }
 
-int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRayHit *out_hit) {
+int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, unsigned short min_distance_q8, NgRipRayHit *out_hit) {
     enum { LOCAL_SEG_LIMIT = 128 };
     unsigned short local_segs[LOCAL_SEG_LIMIT];
     int local_count;
@@ -419,16 +420,17 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
     int best_u_q8 = 0;
     int best_side = 0;
     int i;
+    int min_t_q8 = min_distance_q8 < 24 ? 24 : min_distance_q8;
     if (!out_hit || (dir_x_q8 == 0 && dir_y_q8 == 0)) return 0;
     local_count = ripdoom_collect_local_segs(x, y, block_radius, local_segs, LOCAL_SEG_LIMIT);
 
     for (i = 0; i < local_count; i++) {
         unsigned short seg_index = local_segs[i];
-        ripdoom_consider_seg_ray(seg_index, x, y, dir_x_q8, dir_y_q8, &best_seg, &best_t_q8, &best_u_q8, &best_side);
+        ripdoom_consider_seg_ray(seg_index, x, y, dir_x_q8, dir_y_q8, min_t_q8, &best_seg, &best_t_q8, &best_u_q8, &best_side);
     }
 
     if (best_seg < 0) {
-        ripdoom_cast_sampled_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, &best_seg, &best_t_q8, &best_u_q8, &best_side);
+        ripdoom_cast_sampled_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, min_t_q8, &best_seg, &best_t_q8, &best_u_q8, &best_side);
     }
     if (best_seg < 0) return 0;
     {
@@ -457,4 +459,8 @@ int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int
         out_hit->span_height = span_height;
     }
     return 1;
+}
+
+int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRayHit *out_hit) {
+    return ripdoom_cast_local_ray_after(x, y, dir_x_q8, dir_y_q8, block_radius, 24, out_hit);
 }
