@@ -8,6 +8,37 @@ The initial Neo Geo direction is also directly inspired by Dimitris Giannakis,
 MVG / Modern Vintage Gamer, and his Neo Geo Doom/raycasting video reference:
 https://www.youtube.com/watch?v=4f1-7c6WX10
 
+## SNES Doom / DOOM-FX
+
+Repository: https://github.com/RandalLinden/DOOM-FX
+
+Useful ideas:
+
+- Treat Doom data as a build-time packaging problem instead of a runtime WAD
+  parser.
+- Prefer compact, preprocessed level/render structures over a full PC-style
+  renderer.
+- Keep floors and ceilings visually simple when the hardware budget is better
+  spent on wall readability, sprite visibility, and stable movement.
+- Study RIPDOOM-style tools and generated data as a reference for future map
+  conversion passes.
+
+Why it cannot be copied directly:
+
+- SNES Super FX rendering is framebuffer-oriented; DoomGeo-AES must stay on Neo
+  Geo sprite strips, fix-layer UI, and offline graphics conversion.
+- The assembly/runtime layout is tuned for SNES memory, cartridge mapping, and
+  Super FX behavior, not the Neo Geo 68000/video-chip path.
+- Any direct code import still needs deliberate GPL-compatible attribution and
+  review; current work is using it as architecture guidance.
+
+Potential adaptation:
+
+- Use the toolchain mindset: convert WAD structures into compact runtime tables
+  that already match the renderer's constraints.
+- Revisit map simplification with SNES-like visibility and sector choices, then
+  emit data for the existing simple-map/raycast path.
+
 ## doomgeneric
 
 Repository: https://github.com/ozkl/doomgeneric

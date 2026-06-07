@@ -222,6 +222,9 @@ https://www.youtube.com/watch?v=4f1-7c6WX10
 
 These projects are useful references, but code is not copied into this branch:
 
+- [SNES Doom / DOOM-FX](https://github.com/RandalLinden/DOOM-FX) is the closest
+  low-power console Doom reference for map packaging, preprocessed render data,
+  and the tradeoffs around leaving floors/ceilings simpler than PC Doom.
 - [doomgeneric](https://github.com/ozkl/doomgeneric) shows a compact platform
   API around Doom's tick/frame/input model.
 - [PureDOOM](https://github.com/Daivuk/PureDOOM) shows a single-header,
