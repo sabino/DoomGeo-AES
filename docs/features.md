@@ -96,8 +96,11 @@ readable.
   the start wall without changing the sprite-strip/RIPDOOM-lite renderer.
 - `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
   ROM with `16x16` chunks, 32 Doom units per cell, skipped intro, and normal
-  player input. `make chunk-movement-test-rom` uses the same scale but replaces
-  input with a scripted forward walk, so it is only for regression testing.
+  player input. Simple mode keeps the original NGRayEx wall projection height
+  even when chunk cells represent smaller WAD units, so the 32-unit chunk build
+  does not collapse distant E1M1 walls into unreadable horizon slivers.
+  `make chunk-movement-test-rom` uses the same scale but replaces input with a
+  scripted forward walk, so it is only for regression testing.
 - `make chunk-playable-debug-rom` uses the same playable build but enables
   frame and input debug registers. In chunked builds the HUD counters mirror
   global chunk-grid X/Y and active chunk state, which distinguishes stale ROMs
@@ -553,9 +556,15 @@ readable.
   native Doom holding its speed modifier during forward movement.
   `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
   `COMPARE_NATIVE_ROUTE_*` / `COMPARE_NEO_ROUTE_*` can override individual
-  route timings when matching exact views for visual investigation.
+  route timings when matching exact views for visual investigation. Waypoint
+  input revalidates the target window before each key event and retries stale
+  window IDs so native-vs-NeoGeo captures do not fail on transient X11
+  `BadWindow` replacements.
   `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
-  visual registers when that is the useful evidence.
+  visual registers when that is the useful evidence. `COMPARE_ROUTE_MODE=chunked`
+  captures the current E1M1 `chunk-playable-gngeo` ROM so the simplified
+  `16x16` chunk/RIPDOOM path can be compared directly instead of accidentally
+  measuring the older generated-map renderer.
 - Smoke and comparison captures default to workspace 4 and targeted X11 key
   events so they do not steal focus while the user is working. Direct i3/sway
   tiling remains opt-in (`SMOKE_TILE_WINDOWS=1` or

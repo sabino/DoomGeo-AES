@@ -38,6 +38,7 @@ FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_
 DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
 DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
+NEOGEO_BIOS?=$(CURDIR)/.tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip
 DOOM_MAP?=E1M1
 DOOM_SIMPLE_MAP?=0
 DOOM_CHUNKED_SIMPLE_MAP?=0
@@ -331,6 +332,7 @@ chunk-playable-rom:
 
 chunk-playable-gngeo:
 	$(MAKE) chunk-playable-rom
+	@if [ ! -e build/chunk-playable-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/chunk-playable-rom/neogeo.zip; fi
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-rom $(GAMEROM)
 
 chunk-playable-debug-rom:
@@ -380,6 +382,7 @@ episode-map-rom:
 
 episode-map-gngeo:
 	$(MAKE) episode-map-rom
+	@if [ ! -e build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip; fi
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/episode-roms/$(EPISODE_MAP)-rom $(GAMEROM)
 
 episode-roms:

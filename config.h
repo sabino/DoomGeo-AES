@@ -54,16 +54,9 @@
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #if DOOM_SIMPLE_MAP
 #ifndef DOOM_SIMPLE_WALLH
-#if DOOM_CHUNKED_SIMPLE_MAP
-#ifndef DOOM_CHUNK_CELL_UNITS
-#define DOOM_CHUNK_CELL_UNITS 64
-#endif
-#define DOOM_SIMPLE_WALLH ((SCRH * DOOM_CHUNK_CELL_UNITS) / 128)
-#else
 #define DOOM_SIMPLE_WALLH SCRH
 #endif
-#endif
-#define WALLH    DOOM_SIMPLE_WALLH  /* original NGRayEx scale, adjusted for chunk cell size */
+#define WALLH    DOOM_SIMPLE_WALLH  /* original NGRayEx wall projection scale */
 #define MAX_H    SCRH               /* original NGRayEx full-height clamp */
 #else
 #ifndef DOOM_WALL_PROJECTION_NUM
@@ -183,8 +176,8 @@
  * correctly overlays them. HUD lives on non-gameplay rows.
  * Sprite #0 is unusable on this hardware.
  */
-#define BG_BASE   1                
 #define BG_COUNT  (SCRW / 16)       
+#define BG_BASE   1
 #if DOOM_SIMPLE_MAP
 #define BG_WIN    14                /* original NGRayEx full-screen backdrop */
 #else
