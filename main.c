@@ -6211,9 +6211,8 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
 
     if (thing_is_corpse(thing_type)) return origin_y + 2;
     if (thing_is_pickup(thing_type)) {
-        int lift = h < 48 ? 14 : (h < 96 ? 18 : 22);
-        if (origin_y > GAME_H - 18) origin_y = GAME_H - 18;
-        return origin_y - lift;
+        if (origin_y > GAME_H - 10) origin_y = GAME_H - 10;
+        return origin_y + 1;
     }
     if (thing_is_barrel(thing_type)) return origin_y + 1;
 

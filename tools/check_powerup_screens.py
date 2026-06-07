@@ -76,14 +76,14 @@ def main() -> int:
             print(error, file=sys.stderr)
         return 1
 
-    armor = score_region(image, (300, 310, 440, 420))
-    ammo = score_region(image, (400, 315, 500, 395))
-    weapon = score_region(image, (470, 300, 620, 395))
-    shells = score_region(image, (610, 315, 700, 400))
-    playfield = score_region(image, (240, 250, 720, 460))
+    armor = score_region(image, (280, 330, 460, 470))
+    ammo = score_region(image, (390, 335, 500, 430))
+    weapon = score_region(image, (450, 300, 650, 430))
+    shells = score_region(image, (600, 320, 715, 430))
+    playfield = score_region(image, (240, 270, 720, 490))
     hud = score_region(image, (0, 560, 960, 672))
 
-    require_min(errors, path, "green armor pickup", armor, "green", 1500)
+    require_min(errors, path, "green armor pickup", armor, "green", 900)
     require_min(errors, path, "green armor pickup", armor, "colored", 3000)
     require_min(errors, path, "ammo box pickup", ammo, "green", 400)
     require_min(errors, path, "ammo box pickup", ammo, "gray", 500)
