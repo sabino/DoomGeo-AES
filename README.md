@@ -106,6 +106,10 @@ for future converter work.
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart compiled level |
 
+Default GnGeo keyboard mapping used by the repo launchers: Neo Geo A=`Z`,
+B=`X`, C=`A`, D=`S`, Start=`1`, Coin=`3`, and movement uses the arrow keys.
+That means the minimap toggle is keyboard `Z + A`.
+
 ## Manual Chunk Test Build
 
 The default `make cart` path now boots the hand-authored sample map. For the

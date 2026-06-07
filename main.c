@@ -5353,6 +5353,20 @@ static int minimap_view_y(int map_y) {
     return (map_y * MINIMAP_H) / ACTIVE_MAP_H;
 }
 
+static int minimap_view_x_q8(int map_x_q8) {
+    long map_span_q8 = (long)ACTIVE_MAP_W << 8;
+    if (map_x_q8 < 0) return 0;
+    if (map_x_q8 >= map_span_q8) return MINIMAP_W - 1;
+    return (int)(((long)map_x_q8 * MINIMAP_W) / map_span_q8);
+}
+
+static int minimap_view_y_q8(int map_y_q8) {
+    long map_span_q8 = (long)ACTIVE_MAP_H << 8;
+    if (map_y_q8 < 0) return 0;
+    if (map_y_q8 >= map_span_q8) return MINIMAP_H - 1;
+    return (int)(((long)map_y_q8 * MINIMAP_H) / map_span_q8);
+}
+
 static int minimap_src_x0(int view_x) {
     return (view_x * ACTIVE_MAP_W) / MINIMAP_W;
 }
@@ -5565,9 +5579,9 @@ static void close_minimap_for_terminal_message(void) {
 static void update_marker(void) {
     int px, py;
     if (!map_on) return;
-    rc_player_cell(&px, &py);
-    px = minimap_view_x(px);
-    py = minimap_view_y(py);
+    rc_player_q8(&px, &py);
+    px = minimap_view_x_q8(px);
+    py = minimap_view_y_q8(py);
     if (px == prev_px && py == prev_py && !minimap_redraw_active) return;
     if (prev_px >= 0) {                 /* repaint old cell as its map content */
         draw_minimap_cell(prev_px, prev_py);
@@ -6701,6 +6715,9 @@ static int select_visible_things(int found) {
 }
 
 static int render_visible_projectile(int found) {
+#if DOOM_SIMPLE_MAP
+    return found;
+#else
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) {
@@ -6709,9 +6726,13 @@ static int render_visible_projectile(int found) {
     if (render_type_slot((u16)found, -1, projectile_type, projectile_x_q8, projectile_y_q8,
                          sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
+#endif
 }
 
 static int render_visible_impact(int found) {
+#if DOOM_SIMPLE_MAP
+    return found;
+#else
     int sx, h, dist_q8;
     if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) {
@@ -6720,6 +6741,7 @@ static int render_visible_impact(int found) {
     if (render_type_slot((u16)found, -1, 9000, impact_x_q8, impact_y_q8,
                          sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
+#endif
 }
 
 static void update_enemy_ranged_readiness(void) {
