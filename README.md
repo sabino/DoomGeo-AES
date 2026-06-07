@@ -106,6 +106,10 @@ for future converter work.
 | Hold A + C | Toggle minimap |
 | D after DEAD/EXIT | Restart compiled level |
 
+Default GnGeo keyboard mapping used by the repo launchers: Neo Geo A=`Z`,
+B=`X`, C=`A`, D=`S`, Start=`1`, Coin=`3`, and movement uses the arrow keys.
+That means the minimap toggle is keyboard `Z + A`.
+
 ## Manual Chunk Test Build
 
 The default `make cart` path now boots the hand-authored sample map. For the
@@ -222,6 +226,9 @@ https://www.youtube.com/watch?v=4f1-7c6WX10
 
 These projects are useful references, but code is not copied into this branch:
 
+- [SNES Doom / DOOM-FX](https://github.com/RandalLinden/DOOM-FX) is the closest
+  low-power console Doom reference for map packaging, preprocessed render data,
+  and the tradeoffs around leaving floors/ceilings simpler than PC Doom.
 - [doomgeneric](https://github.com/ozkl/doomgeneric) shows a compact platform
   API around Doom's tick/frame/input model.
 - [PureDOOM](https://github.com/Daivuk/PureDOOM) shows a single-header,

@@ -5337,8 +5337,13 @@ static void force_fix_hud_redraw(void) {
 }
 
 enum {
+#if DOOM_SIMPLE_MAP
+    MINIMAP_W = ACTIVE_MAP_W,
+    MINIMAP_H = ACTIVE_MAP_H
+#else
     MINIMAP_W = 38,
     MINIMAP_H = 23
+#endif
 };
 
 static int minimap_view_x(int map_x) {
@@ -5351,6 +5356,20 @@ static int minimap_view_y(int map_y) {
     if (map_y < 0) return 0;
     if (map_y >= ACTIVE_MAP_H) return MINIMAP_H - 1;
     return (map_y * MINIMAP_H) / ACTIVE_MAP_H;
+}
+
+static int minimap_view_x_q8(int map_x_q8) {
+    long map_span_q8 = (long)ACTIVE_MAP_W << 8;
+    if (map_x_q8 < 0) return 0;
+    if (map_x_q8 >= map_span_q8) return MINIMAP_W - 1;
+    return (int)(((long)map_x_q8 * MINIMAP_W) / map_span_q8);
+}
+
+static int minimap_view_y_q8(int map_y_q8) {
+    long map_span_q8 = (long)ACTIVE_MAP_H << 8;
+    if (map_y_q8 < 0) return 0;
+    if (map_y_q8 >= map_span_q8) return MINIMAP_H - 1;
+    return (int)(((long)map_y_q8 * MINIMAP_H) / map_span_q8);
 }
 
 static int minimap_src_x0(int view_x) {
@@ -5565,9 +5584,9 @@ static void close_minimap_for_terminal_message(void) {
 static void update_marker(void) {
     int px, py;
     if (!map_on) return;
-    rc_player_cell(&px, &py);
-    px = minimap_view_x(px);
-    py = minimap_view_y(py);
+    rc_player_q8(&px, &py);
+    px = minimap_view_x_q8(px);
+    py = minimap_view_y_q8(py);
     if (px == prev_px && py == prev_py && !minimap_redraw_active) return;
     if (prev_px >= 0) {                 /* repaint old cell as its map content */
         draw_minimap_cell(prev_px, prev_py);
@@ -6212,6 +6231,62 @@ static int projected_floor_screen_offset(short world_x_q8, short world_y_q8, int
     return offset;
 }
 
+static int thing_min_screen_height(u16 thing_type) {
+#if DOOM_SIMPLE_MAP
+    switch (thing_type) {
+    case 5:
+    case 6:
+    case 13:
+    case 38:
+    case 39:
+    case 40:
+        return 28;
+    case 2007:
+    case 2008:
+    case 2010:
+    case 2011:
+    case 2014:
+    case 2015:
+    case 2048:
+    case 2049:
+        return 30;
+    case 2012:
+    case 2018:
+    case 2019:
+        return 38;
+    case 2001:
+    case 2002:
+    case 2003:
+    case 2004:
+    case 2005:
+    case 2006:
+        return 42;
+    case 2022:
+    case 2023:
+    case 2024:
+    case 2025:
+    case 2026:
+    case 2045:
+    case 2046:
+    case 2047:
+        return 36;
+    case 2035:
+        return 44;
+    default:
+        break;
+    }
+#else
+    (void)thing_type;
+#endif
+    return 0;
+}
+
+static int thing_adjusted_screen_height(u16 thing_type, int h) {
+    int min_h = thing_min_screen_height(thing_type);
+    if (min_h && h > 0 && h < min_h) return min_h;
+    return h;
+}
+
 static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short world_x_q8, short world_y_q8,
                            int sx, int h, int dist_q8,
                            u8 flash, u8 fallback_projection, int view_px, int view_py) {
@@ -6235,9 +6310,8 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     if (is_monster && h > 0 && h < (fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H)) {
         h = fallback_projection ? MONSTER_FALLBACK_MIN_H : MONSTER_MIN_H;
     }
-#if DOOM_SIMPLE_MAP
-    if (is_pickup && h > 0 && h < 112) h = 112;
-#else
+    h = thing_adjusted_screen_height(thing_type, h);
+#if !DOOM_SIMPLE_MAP
     if (is_pickup && h > 0 && h < 64) h = 64;
 #endif
     if (thing_is_corpse(thing_type) && h > 0 && h < 36) h = 36;
@@ -6261,9 +6335,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     else if (h > 24) idx = 3;
     else idx = 4;
     if (is_monster && idx > 1) idx = 1;
-#if DOOM_SIMPLE_MAP
-    if (is_pickup) idx = 0;
-#else
+#if !DOOM_SIMPLE_MAP
     if (is_pickup && idx > 1) idx = 1;
 #endif
     if (is_projectile && idx > 3) idx = 3;
@@ -6413,10 +6485,8 @@ static void reserve_visible_pickups(ThingCandidate *candidates, int count, int s
 #endif
 
 static int thing_candidate_visual_width(const ThingCandidate *candidate) {
-    int h = candidate->h;
-#if DOOM_SIMPLE_MAP
-    if (thing_is_pickup(candidate->thing_type) && h < 112) h = 112;
-#else
+    int h = thing_adjusted_screen_height(candidate->thing_type, candidate->h);
+#if !DOOM_SIMPLE_MAP
     if (thing_is_pickup(candidate->thing_type) && h < 64) h = 64;
 #endif
     if (thing_is_corpse(candidate->thing_type) && h < 36) h = 36;
@@ -6448,7 +6518,13 @@ static u8 thing_candidate_hidden_by_selected(const ThingCandidate *candidate,
                                              const ThingCandidate *selected,
                                              int selected_count) {
     for (int i = 0; i < selected_count; i++) {
+#if DOOM_SIMPLE_MAP
+        if (thing_is_pickup(candidate->thing_type) && thing_is_pickup(selected[i].thing_type)) continue;
+#endif
         if (!thing_candidate_overlaps_screen(candidate, &selected[i])) continue;
+#if DOOM_SIMPLE_MAP
+        if (thing_is_pickup(candidate->thing_type) && !candidate_is_threat(&selected[i])) continue;
+#endif
         if (selected[i].dist_q8 <= candidate->dist_q8 + WORLD_Q8(96)) return 1;
     }
     return 0;
@@ -6701,6 +6777,9 @@ static int select_visible_things(int found) {
 }
 
 static int render_visible_projectile(int found) {
+#if DOOM_SIMPLE_MAP
+    return found;
+#else
     int sx, h, dist_q8;
     if (!projectile_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!rc_project_point(projectile_x_q8, projectile_y_q8, &sx, &h, &dist_q8)) {
@@ -6709,9 +6788,13 @@ static int render_visible_projectile(int found) {
     if (render_type_slot((u16)found, -1, projectile_type, projectile_x_q8, projectile_y_q8,
                          sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
+#endif
 }
 
 static int render_visible_impact(int found) {
+#if DOOM_SIMPLE_MAP
+    return found;
+#else
     int sx, h, dist_q8;
     if (!impact_active || found >= ENEMY_VISIBLE_COUNT) return found;
     if (!rc_project_point(impact_x_q8, impact_y_q8, &sx, &h, &dist_q8)) {
@@ -6720,6 +6803,7 @@ static int render_visible_impact(int found) {
     if (render_type_slot((u16)found, -1, 9000, impact_x_q8, impact_y_q8,
                          sx, h, dist_q8, 0, 0, 0, 0)) return found + 1;
     return found;
+#endif
 }
 
 static void update_enemy_ranged_readiness(void) {
