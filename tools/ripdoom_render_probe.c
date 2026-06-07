@@ -96,10 +96,14 @@ static int map_at_cell(unsigned short active_chunk, int x, int y) {
     int local_y;
     unsigned short chunk = chunk_for_cell(active_chunk, x, y, &local_x, &local_y);
     unsigned short cell;
+    unsigned char door_id;
+    unsigned char lift_id;
     if (chunk == 0xFFFF) return 1;
     cell = (unsigned short)(local_y * SIMPLE_MAP_W + local_x);
-    if (g_chunk_door_cell[chunk][cell] >= 2) return 1;
-    if (g_chunk_lift_cell[chunk][cell]) return 1;
+    door_id = g_chunk_door_cell[chunk][cell];
+    if (door_id >= 2) return g_chunk_door_open[door_id - 2] ? 0 : 1;
+    lift_id = g_chunk_lift_cell[chunk][cell];
+    if (lift_id) return g_chunk_lift_open[lift_id - 1] ? 0 : 1;
     return g_chunk_solid[chunk][cell] ? 1 : 0;
 }
 
@@ -215,6 +219,65 @@ static unsigned char global_cell_lift_id(int x, int y) {
     chunk = (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
     cell = (unsigned short)((y % SIMPLE_MAP_H) * SIMPLE_MAP_W + (x % SIMPLE_MAP_W));
     return g_chunk_lift_cell[chunk][cell];
+}
+
+static unsigned short active_chunk_for_global_cell(int x, int y, int *local_x, int *local_y) {
+    int width = global_grid_w();
+    int height = global_grid_h();
+    if (x < 0 || y < 0 || x >= width || y >= height) return 0xFFFF;
+    *local_x = x % SIMPLE_MAP_W;
+    *local_y = y % SIMPLE_MAP_H;
+    return (unsigned short)((y / SIMPLE_MAP_H) * DOOM_CHUNK_COLS + (x / SIMPLE_MAP_W));
+}
+
+static int validate_opened_interactive_cell_passability(void) {
+    int checked = 0;
+    for (unsigned short door_index = 0; door_index < DOOM_CHUNK_DOOR_COUNT; door_index++) {
+        int local_x;
+        int local_y;
+        unsigned short active_chunk = active_chunk_for_global_cell(g_chunk_doors[door_index].x, g_chunk_doors[door_index].y, &local_x, &local_y);
+        if (active_chunk == 0xFFFF) continue;
+        for (unsigned short i = 0; i < DOOM_CHUNK_DOOR_COUNT; i++) g_chunk_door_open[i] = 0;
+        if (!map_at_cell(active_chunk, local_x, local_y)) {
+            fprintf(stderr, "RIPDOOM render probe failed: closed chunk door cell was passable door=%u cell=(%u,%u)\n", (unsigned)door_index, g_chunk_doors[door_index].x, g_chunk_doors[door_index].y);
+            return 0;
+        }
+        g_chunk_door_open[door_index] = 1;
+        if (map_at_cell(active_chunk, local_x, local_y)) {
+            fprintf(stderr, "RIPDOOM render probe failed: opened chunk door cell stayed blocked door=%u cell=(%u,%u)\n", (unsigned)door_index, g_chunk_doors[door_index].x, g_chunk_doors[door_index].y);
+            return 0;
+        }
+        g_chunk_door_open[door_index] = 0;
+        checked++;
+        break;
+    }
+
+    for (unsigned short ref_index = 0; ref_index < DOOM_CHUNK_LIFT_CELL_REF_COUNT; ref_index++) {
+        int lift_x = g_chunk_lift_cells[ref_index] % DOOM_CHUNK_GRID_W;
+        int lift_y = g_chunk_lift_cells[ref_index] / DOOM_CHUNK_GRID_W;
+        unsigned char lift_id = global_cell_lift_id(lift_x, lift_y);
+        int local_x;
+        int local_y;
+        unsigned short active_chunk;
+        if (!lift_id) continue;
+        active_chunk = active_chunk_for_global_cell(lift_x, lift_y, &local_x, &local_y);
+        if (active_chunk == 0xFFFF) continue;
+        for (unsigned short i = 0; i < DOOM_CHUNK_LIFT_COUNT; i++) g_chunk_lift_open[i] = 0;
+        if (!map_at_cell(active_chunk, local_x, local_y)) {
+            fprintf(stderr, "RIPDOOM render probe failed: closed chunk lift cell was passable cell=(%d,%d) lift=%u\n", lift_x, lift_y, (unsigned)lift_id - 1);
+            return 0;
+        }
+        g_chunk_lift_open[lift_id - 1] = 1;
+        if (map_at_cell(active_chunk, local_x, local_y)) {
+            fprintf(stderr, "RIPDOOM render probe failed: opened chunk lift cell stayed blocked cell=(%d,%d) lift=%u\n", lift_x, lift_y, (unsigned)lift_id - 1);
+            return 0;
+        }
+        g_chunk_lift_open[lift_id - 1] = 0;
+        checked++;
+        break;
+    }
+
+    return checked > 0;
 }
 
 static short cell_center_doom_x(int grid_x) {
@@ -752,6 +815,7 @@ int main(void) {
             int route_steps = 0;
             int door_skip = 0;
             int lift_skip = 0;
+            int interactive_pass = 0;
             long start_global_x_q8 = chunk_global_x_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_X_Q8);
             long start_global_y_q8 = chunk_global_y_q8(DOOM_CHUNK_START_CHUNK, DOOM_CHUNK_START_Y_Q8);
 
@@ -873,8 +937,10 @@ int main(void) {
             if (!door_skip) return 1;
             lift_skip = validate_opened_lift_ray_skip();
             if (!lift_skip) return 1;
+            interactive_pass = validate_opened_interactive_cell_passability();
+            if (!interactive_pass) return 1;
             printf(
-                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_changed_cols=%d moved_total_delta=%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d\n",
+                "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u moved_hits=%d/%d moved_dist=%u..%u moved_changed_cols=%d moved_total_delta=%u moved_progress_q8=%d moved_ticks=%d route_waypoints=%d route_steps=%d door_skip=%d lift_skip=%d interactive_pass=%d\n",
                 start_angle,
                 mode,
                 hits,
@@ -897,7 +963,8 @@ int main(void) {
                 route_waypoints,
                 route_steps,
                 door_skip,
-                lift_skip
+                lift_skip,
+                interactive_pass
             );
             return 0;
         }

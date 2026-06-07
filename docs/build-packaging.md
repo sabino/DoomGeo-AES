@@ -138,8 +138,13 @@ GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
 `tools/check_movement_screens.py`, which rejects missing, blank, static, or
 obviously wrong movement captures before treating the run as useful evidence.
 It also rejects GnGeo logs containing `Invalid write`, so palette or VRAM range
-mistakes cannot pass as a clean movement run just because the screenshots look
-plausible.
+errors do not pass as normal movement evidence.
+
+For the RIPDOOM/chunked renderer path, `make ripdoom-render-check` now also
+reports `interactive_pass=1` when a generated closed door/lift cell blocks and
+the same cell becomes passable after opening. This keeps the host render probe
+aligned with runtime chunk collision for streamed interactive geometry.
+
 The default color threshold targets the bright E1M1 start-room path; darker
 maps such as E1M2 can pass a lower `--min-play-colored` value to
 `tools/check_movement_screens.py` through `MOVEMENT_CHECK_ARGS` while still
