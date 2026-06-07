@@ -95,10 +95,14 @@ static u16 door_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
 static u8  view_dirty = 1;
 static u8  wall_upload_dirty = 1;
 static u8  wall_upload_scan = 0;
+static u8  wall_render_scan = 0;
 static u8  wall_first_upload = 1;
 static u8  wall_frame_overrun = 0;
 static u8  render_motion_active = 0;
+static u8  moved_last_input = 0;
 #if DOOM_RIPDOOM_RENDER
+static long ripdoom_start_global_x_q8 = 0;
+static long ripdoom_start_global_y_q8 = 0;
 static short ripdoom_view_start_x = 0;
 static short ripdoom_view_start_y = 0;
 static u8 ripdoom_view_ready = 0;
@@ -130,24 +134,73 @@ static inline u8 depth_palette(u8 kind, int side, int h) {
 }
 
 #if DOOM_RIPDOOM_RENDER
+static long ripdoom_global_start_x_q8(void) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long chunk_x = DOOM_CHUNK_START_CHUNK % DOOM_CHUNK_COLS;
+    return (chunk_x * DOOM_CHUNK_SIZE * 256L) + DOOM_CHUNK_START_X_Q8;
+#else
+    return (long)(FIX(DOOM_START_X) >> (FBITS - 8));
+#endif
+}
+
+static long ripdoom_global_start_y_q8(void) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long chunk_y = DOOM_CHUNK_START_CHUNK / DOOM_CHUNK_COLS;
+    return (chunk_y * DOOM_CHUNK_SIZE * 256L) + DOOM_CHUNK_START_Y_Q8;
+#else
+    return (long)(FIX(DOOM_START_Y) >> (FBITS - 8));
+#endif
+}
+
+static void ripdoom_start_coord_from_chunk(short *x, short *y) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long global_x_q8 = ripdoom_global_start_x_q8();
+    long global_y_q8 = ripdoom_global_start_y_q8();
+    *x = (short)(DOOM_CHUNK_ORIGIN_X + ((global_x_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+    *y = (short)(DOOM_CHUNK_ORIGIN_Y - ((global_y_q8 * DOOM_CHUNK_CELL_DOOM_UNITS + 128) >> 8));
+#else
+    *x = (short)0;
+    *y = (short)0;
+#endif
+}
+
 static void ripdoom_init_view_anchor(void) {
-    int i;
     ripdoom_view_ready = 0;
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    ripdoom_start_global_x_q8 = ripdoom_global_start_x_q8();
+    ripdoom_start_global_y_q8 = ripdoom_global_start_y_q8();
+    ripdoom_start_coord_from_chunk(&ripdoom_view_start_x, &ripdoom_view_start_y);
+    ripdoom_view_ready = 1;
+    return;
+#else
+    int i;
     for (i = 0; i < NG_RIP_THING_COUNT; i++) {
         if (g_rip_things[i].type == 1) {
+            ripdoom_start_global_x_q8 = ripdoom_global_start_x_q8();
+            ripdoom_start_global_y_q8 = ripdoom_global_start_y_q8();
             ripdoom_view_start_x = g_rip_things[i].x;
             ripdoom_view_start_y = g_rip_things[i].y;
             ripdoom_view_ready = 1;
             return;
         }
     }
+#endif
 }
 
 static void ripdoom_visual_pose(short *x, short *y) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long active_chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+    long active_chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+    long pos_x_q8 = (posX >> (FBITS - 8)) + active_chunk_x * DOOM_CHUNK_SIZE * 256L;
+    long pos_y_q8 = (posY >> (FBITS - 8)) + active_chunk_y * DOOM_CHUNK_SIZE * 256L;
+    long dx = ((pos_x_q8 - ripdoom_start_global_x_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+    long dy = ((pos_y_q8 - ripdoom_start_global_y_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+#else
     long dx = ((long)(posX - FIX(DOOM_START_X)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
     long dy = ((long)(posY - FIX(DOOM_START_Y)) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> FBITS;
-    *x = (short)(ripdoom_view_start_x - dy);
-    *y = (short)(ripdoom_view_start_y + dx);
+#endif
+    *x = (short)(ripdoom_view_start_x + dx);
+    *y = (short)(ripdoom_view_start_y - dy);
 }
 
 static u8 ripdoom_kind_for_hit(const NgRipRayHit *hit) {
@@ -163,6 +216,7 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     short rip_dir_x;
     short rip_dir_y;
     fix perp;
+    int full_h;
     int h;
     int top;
     int vsh;
@@ -170,13 +224,22 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     if (!ripdoom_view_ready) return 0;
 
     ripdoom_visual_pose(&rip_x, &rip_y);
-    rip_dir_x = (short)(-ray_y >> (FBITS - 8));
-    rip_dir_y = (short)(ray_x >> (FBITS - 8));
+    rip_dir_x = (short)(ray_x >> (FBITS - 8));
+    rip_dir_y = (short)((-ray_y) >> (FBITS - 8));
     if (!ripdoom_cast_local_ray(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) return 0;
+    if (hit.span && hit.span_height < 96) {
+        NgRipRayHit far_hit;
+        unsigned short min_dist = hit.distance_q8 > 0xFFF0 ? 0xFFFF : (unsigned short)(hit.distance_q8 + 16);
+        if (ripdoom_cast_local_ray_after(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, min_dist, &far_hit)) {
+            hit = far_hit;
+        }
+    }
 
     perp = (fix)((((long)hit.distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
     if (perp < FMIN) perp = FMIN;
-    h = projected_height(perp);
+    full_h = projected_height(perp);
+    h = full_h;
+    if (hit.span && hit.span_height) h = projected_span_height(perp, hit.span_height);
     if (h < 1) h = 1;
     if (h > MAX_H) h = MAX_H;
     kindbuf[column] = ripdoom_kind_for_hit(&hit);
@@ -191,6 +254,13 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     view_h = GAME_H;
 #endif
     top = (view_h - h) / 2;
+    if (hit.span == 1) {
+        int bottom = (view_h + full_h) / 2;
+        if (bottom > view_h) bottom = view_h;
+        top = bottom - h;
+    } else if (hit.span == 2) {
+        top = (view_h - full_h) / 2;
+    }
     if (top < 0) top = 0;
     if (top > view_h - 1) top = view_h - 1;
     vsh = h - 1;
@@ -199,7 +269,7 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
 
     scb2buf[column] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
     scb3buf[column] = scb3_word(top, 0, WALL_WIN);
-    wall_full_cover[column] = (u8)(top <= 0 && h >= view_h);
+    wall_full_cover[column] = (u8)(!hit.span && top <= 0 && h >= view_h);
     palbuf[column] = depth_palette(kindbuf[column], hit.side, h);
     return 1;
 }
@@ -311,12 +381,16 @@ static u8 player_can_occupy(fix x, fix y) {
     return 1;
 }
 
-static void try_move(fix dx, fix dy) {
+static u8 try_move(fix dx, fix dy) {
     fix nx = posX + dx, ny = posY + dy;
     fix ox = posX, oy = posY;
     if (player_can_occupy(nx, posY)) posX = nx;
     if (player_can_occupy(posX, ny)) posY = ny;
-    if (posX != ox || posY != oy) rc_invalidate_view();
+    if (posX != ox || posY != oy) {
+        rc_invalidate_view();
+        return 1;
+    }
+    return 0;
 }
 
 static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
@@ -326,18 +400,19 @@ static inline signed char input_axis(u8 pressed, u8 neg, u8 pos) {
     return n ? -1 : 1;
 }
 
-void rc_input(u8 pressed) {
+u8 rc_input(u8 pressed) {
     enum { UP=1, DOWN=2, LEFT=4, RIGHT=8, A=16 };
     fix spd = FIX(MOVE_SPEED * MAP_RENDER_SCALE);
     signed char forward = input_axis(pressed, DOWN, UP);
     signed char side = 0;
     signed char turn = 0;
+    u8 camera_changed = 0;
+    moved_last_input = 0;
     if (pressed & A) {                              /* strafe with A held    */
         side = input_axis(pressed, LEFT, RIGHT);
     } else {
         turn = input_axis(pressed, LEFT, RIGHT);
     }
-    render_motion_active = (u8)((forward || side || turn) ? 1 : 0);
     if (forward || side) {
         fix dx = 0;
         fix dy = 0;
@@ -354,9 +429,19 @@ void rc_input(u8 pressed) {
             if (side > 0) { dx += step_x; dy += step_y; }
             else          { dx -= step_x; dy -= step_y; }
         }
-        try_move(dx, dy);
+        moved_last_input = try_move(dx, dy);
+        camera_changed |= moved_last_input;
     }
-    if (turn) rotate(turn);
+    if (turn) {
+        rotate(turn);
+        camera_changed = 1;
+    }
+    render_motion_active = camera_changed;
+    return camera_changed;
+}
+
+u8 rc_moved_last_input(void) {
+    return moved_last_input;
 }
 
 void rc_player_cell(int *cx, int *cy) {
@@ -439,34 +524,6 @@ u8 rc_sprite_strip_visible(int left, int right, int dist_q8) {
         if (sprite_dist <= distbuf[c] + (FONE >> 3)) return 1;
     }
     return 0;
-}
-
-void rc_reserve_sprite_budget_for_screen_range(int left, int right) {
-#if DOOM_SIMPLE_MAP
-    int first_col;
-    int last_col;
-    u16 hidden_scb3;
-    if (right < 0 || left >= SCRW) return;
-    if (left < 0) left = 0;
-    if (right >= SCRW) right = SCRW - 1;
-    if (right < left) return;
-    first_col = left / COLW;
-    last_col = right / COLW;
-    if (first_col < 0) first_col = 0;
-    if (last_col >= NUM_COLS) last_col = NUM_COLS - 1;
-    hidden_scb3 = scb3_word(SCRH + 32, 0, 1);
-    for (int c = first_col; c <= last_col; c++) {
-        u16 spr = WALL_BASE + c;
-        u16 hidden_scb2 = (u16)((HSHRINK << 8) | 0x00);
-        vram_poke((u16)(VRAM_SCB2 + spr), hidden_scb2);
-        vram_poke((u16)(VRAM_SCB3 + spr), hidden_scb3);
-        curscb2[c] = hidden_scb2;
-        curscb3[c] = hidden_scb3;
-    }
-#else
-    (void)left;
-    (void)right;
-#endif
 }
 
 u8 rc_background_column_hidden(u8 col) {
@@ -590,8 +647,17 @@ void rc_render(void) {
     update_ray_cache();
     int baseMapX = posX >> FBITS;
     int baseMapY = posY >> FBITS;
+    int render_start = 0;
+    int render_count = NUM_COLS;
     u8 allow_span_refinement = 1;
     u8 near_refinement_cells = DOOM_NEAR_LINE_REFINEMENT_CELLS;
+#if DOOM_MOVING_RENDER_COLUMNS < NUM_COLS
+    if (!wall_first_upload && (render_motion_active || wall_render_scan != 0)) {
+        render_start = wall_render_scan;
+        render_count = DOOM_MOVING_RENDER_COLUMNS;
+        if (render_count < 1) render_count = 1;
+    }
+#endif
 #if DOOM_ADAPTIVE_LINE_REFINEMENT
     if (wall_frame_overrun) {
         allow_span_refinement = 0;
@@ -603,7 +669,9 @@ void rc_render(void) {
         near_refinement_cells = DOOM_MOVING_LINE_REFINEMENT_CELLS;
     }
 #endif
-    for (int x = 0; x < NUM_COLS; x++) {
+    for (int render_i = 0; render_i < render_count; render_i++) {
+        int x = render_start + render_i;
+        while (x >= NUM_COLS) x -= NUM_COLS;
         fix rayX = rayXbuf[x];
         fix rayY = rayYbuf[x];
 #if DOOM_RIPDOOM_RENDER
@@ -766,7 +834,19 @@ void rc_render(void) {
         /* distance shading */
         palbuf[x] = depth_palette(kindbuf[x], side, h);
     }
+#if DOOM_MOVING_RENDER_COLUMNS < NUM_COLS
+    if (render_count < NUM_COLS) {
+        wall_render_scan = (u8)(render_start + render_count);
+        while (wall_render_scan >= NUM_COLS) wall_render_scan -= NUM_COLS;
+        view_dirty = (u8)(wall_render_scan != 0);
+    } else {
+        wall_render_scan = 0;
+        view_dirty = 0;
+    }
+#else
+    wall_render_scan = 0;
     view_dirty = 0;
+#endif
     wall_upload_dirty = 1;
 }
 

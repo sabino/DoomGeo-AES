@@ -38,8 +38,9 @@ FREEDOOM_URL=https://github.com/freedoom/freedoom/releases/download/v$(FREEDOOM_
 DOOM_SHAREWARE_ZIP=.tools/assets/doom1.wad.zip
 DOOM_SHAREWARE_URL=https://www.libsdl.org/projects/doom/data/doom1.wad.zip
 DOOM_IWAD?=$(DOOM_SHAREWARE_ZIP)
+NEOGEO_BIOS?=$(CURDIR)/.tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip
 DOOM_MAP?=E1M1
-DOOM_SIMPLE_MAP?=0
+DOOM_SIMPLE_MAP?=1
 DOOM_CHUNKED_SIMPLE_MAP?=0
 ifeq ($(DOOM_SIMPLE_MAP),1)
 DOOM_MAP_WIDTH?=16
@@ -55,6 +56,9 @@ DOOM_SKILL_MASK?=4
 DOOM_WALL_TEXTURE?=STARTAN3
 DOOM_DETAIL?=quality
 DOOM_FRAME_STATS?=0
+DOOM_INPUT_DEBUG?=0
+DOOM_CHUNK_MOVEMENT_TEST?=0
+DOOM_CHUNK_MOVEMENT_START_DELAY?=0
 DOOM_SKIP_INTRO?=0
 DOOM_WALL_UPLOAD_COLUMNS?=
 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
@@ -67,9 +71,17 @@ DOOM_CHUNK_HEADER=$(BUILDDIR)/doom_chunks_generated.h
 DOOM_CHUNK_SOURCE=$(BUILDDIR)/doom_chunks_generated.c
 DOOM_CHUNK_OBJECT=
 DOOM_CHUNK_DEP=
+DOOM_CHUNK_RENDER_SOURCE=
 DOOM_CHUNK_PREVIEW=$(BUILDDIR)/doom_chunks_preview.txt
 DOOM_CHUNK_SIZE?=16
-DOOM_CHUNK_CELL_UNITS?=64
+DOOM_CHUNK_CELL_UNITS?=256
+DOOM_CHUNK_START_LOCAL_X?=8.5
+DOOM_CHUNK_START_LOCAL_Y?=8.5
+DOOM_CHUNK_KEEP_WAD_START_OFFSET?=0
+DOOM_CHUNK_START_ARGS=--start-local-x $(DOOM_CHUNK_START_LOCAL_X) --start-local-y $(DOOM_CHUNK_START_LOCAL_Y) $(if $(filter 1 yes true,$(DOOM_CHUNK_KEEP_WAD_START_OFFSET)),--keep-wad-start-offset,)
+DOOM_CHUNK_MAX_THINGS_PER_CHUNK?=12
+DOOM_CHUNK_CLEAR_START_THING_RADIUS?=2.0
+DOOM_CHUNK_THING_ARGS=$(if $(DOOM_CHUNK_MAX_THINGS_PER_CHUNK),--max-things-per-chunk $(DOOM_CHUNK_MAX_THINGS_PER_CHUNK),) $(if $(DOOM_CHUNK_CLEAR_START_THING_RADIUS),--clear-start-thing-radius $(DOOM_CHUNK_CLEAR_START_THING_RADIUS),)
 DOOM_RIPDOOM_HEADER=$(BUILDDIR)/doom_ripdoom_generated.h
 DOOM_RIPDOOM_SOURCE=$(BUILDDIR)/doom_ripdoom_generated.c
 DOOM_RIPDOOM_REPORT=$(BUILDDIR)/doom_ripdoom_report.txt
@@ -104,6 +116,15 @@ override CFLAGS += $(DOOM_DETAIL_DEFINE)
 ifeq ($(DOOM_FRAME_STATS),1)
 override CFLAGS += -DDOOM_FRAME_STATS=1
 endif
+ifeq ($(DOOM_INPUT_DEBUG),1)
+override CFLAGS += -DDOOM_INPUT_DEBUG=1
+endif
+ifeq ($(DOOM_CHUNK_MOVEMENT_TEST),1)
+override CFLAGS += -DDOOM_CHUNK_MOVEMENT_TEST=1
+endif
+ifneq ($(DOOM_CHUNK_MOVEMENT_START_DELAY),0)
+override CFLAGS += -DDOOM_CHUNK_MOVEMENT_START_DELAY=$(DOOM_CHUNK_MOVEMENT_START_DELAY)
+endif
 ifeq ($(DOOM_SKIP_INTRO),1)
 override CFLAGS += -DDOOM_SKIP_INTRO=1
 endif
@@ -111,8 +132,10 @@ ifeq ($(DOOM_SIMPLE_MAP),1)
 override CFLAGS += -DDOOM_SIMPLE_MAP=1
 ifeq ($(DOOM_CHUNKED_SIMPLE_MAP),1)
 override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=1
+override CFLAGS += -DDOOM_CHUNK_CELL_UNITS=$(DOOM_CHUNK_CELL_UNITS)
 DOOM_CHUNK_OBJECT=$(BUILDDIR)/doom_chunks_generated.o
 DOOM_CHUNK_DEP=$(DOOM_CHUNK_HEADER)
+DOOM_CHUNK_RENDER_SOURCE=$(DOOM_CHUNK_SOURCE)
 else
 override CFLAGS += -DDOOM_CHUNKED_SIMPLE_MAP=0
 endif
@@ -122,6 +145,9 @@ override CFLAGS += -DWALL_TILE_UPLOAD_COLUMNS_PER_FRAME=$(DOOM_WALL_UPLOAD_COLUM
 endif
 ifeq ($(DOOM_RIPDOOM_RENDER),1)
 override CFLAGS += -DDOOM_RIPDOOM_RENDER=1
+ifeq ($(DOOM_CHUNKED_SIMPLE_MAP),1)
+override CFLAGS += -DDOOM_RIPDOOM_RENDER_UNITS_PER_CELL=$(DOOM_CHUNK_CELL_UNITS)
+endif
 DOOM_RIPDOOM_RUNTIME=1
 endif
 ifeq ($(DOOM_RIPDOOM_RUNTIME),1)
@@ -297,6 +323,28 @@ chunk-key-door-test-gngeo:
 	$(MAKE) chunk-key-door-test-rom
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
 
+chunk-movement-test-rom:
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_CHUNK_MOVEMENT_TEST=1 DOOM_CHUNK_MOVEMENT_START_DELAY=300 BUILDDIR=build/chunk-movement-test ROM=build/chunk-movement-test-rom GFX_ROM_DIR=build/chunk-movement-test-assets
+
+chunk-movement-test-gngeo:
+	$(MAKE) chunk-movement-test-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-movement-test-rom $(GAMEROM)
+
+chunk-playable-rom:
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-playable ROM=build/chunk-playable-rom GFX_ROM_DIR=build/chunk-playable-assets
+
+chunk-playable-gngeo:
+	$(MAKE) chunk-playable-rom
+	@if [ ! -e build/chunk-playable-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/chunk-playable-rom/neogeo.zip; fi
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-rom $(GAMEROM)
+
+chunk-playable-debug-rom:
+	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_FRAME_STATS=1 BUILDDIR=build/chunk-playable-debug ROM=build/chunk-playable-debug-rom GFX_ROM_DIR=build/chunk-playable-debug-assets
+
+chunk-playable-debug-gngeo:
+	$(MAKE) chunk-playable-debug-rom
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-debug-rom $(GAMEROM)
+
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
 
@@ -337,6 +385,7 @@ episode-map-rom:
 
 episode-map-gngeo:
 	$(MAKE) episode-map-rom
+	@if [ ! -e build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip; fi
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/episode-roms/$(EPISODE_MAP)-rom $(GAMEROM)
 
 episode-roms:
@@ -473,6 +522,14 @@ chunk-route-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 chunk-visibility-check: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 	$(PYTHON) tools/check_chunk_visibility.py --header $(DOOM_CHUNK_HEADER) --source $(DOOM_CHUNK_SOURCE)
 
+chunk-stream-check: $(DOOM_CHUNK_HEADER)
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) tools/chunk_stream_probe.c -o $(BUILDDIR)/chunk_stream_probe
+	$(BUILDDIR)/chunk_stream_probe
+
+chunk-movement-check: $(DOOM_MAP_HEADER) $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) tools/chunk_movement_probe.c $(DOOM_CHUNK_SOURCE) -o $(BUILDDIR)/chunk_movement_probe
+	$(BUILDDIR)/chunk_movement_probe
+
 ripdoom-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(PYTHON) tools/check_ripdoom_assets.py --header $(DOOM_RIPDOOM_HEADER) --source $(DOOM_RIPDOOM_SOURCE)
 
@@ -480,11 +537,11 @@ ripdoom-runtime-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_runtime_probe.c -o $(BUILDDIR)/ripdoom_runtime_probe
 	$(BUILDDIR)/ripdoom_runtime_probe
 
-ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE)
-	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
+ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_DEP)
+	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
@@ -498,7 +555,7 @@ $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE): Makefile tools/doom_convert.py $(DOOM_IWA
 	$(PYTHON) tools/doom_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --width $(DOOM_MAP_WIDTH) --height $(DOOM_MAP_HEIGHT) --detail-cull $(DOOM_MAP_DETAIL_CULL) --render-detail-cull $(DOOM_RENDER_DETAIL_CULL) $(DOOM_MAP_CLEANUP_ARGS) --out $(DOOM_MAP_HEADER) --map-source $(DOOM_MAP_SOURCE) --assets-header $(DOOM_ASSETS_HEADER) --assets-source $(DOOM_ASSETS_SOURCE)
 
 $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE): Makefile tools/doom_chunk_convert.py tools/doom_convert.py $(DOOM_IWAD) | $(BUILDDIR)
-	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
+	$(PYTHON) tools/doom_chunk_convert.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --skill-mask $(DOOM_SKILL_MASK) --chunk-size $(DOOM_CHUNK_SIZE) --cell-units $(DOOM_CHUNK_CELL_UNITS) $(DOOM_CHUNK_START_ARGS) $(DOOM_CHUNK_THING_ARGS) --out $(DOOM_CHUNK_HEADER) --chunk-source $(DOOM_CHUNK_SOURCE) --preview $(DOOM_CHUNK_PREVIEW)
 
 chunk-map: $(DOOM_CHUNK_HEADER) $(DOOM_CHUNK_SOURCE)
 

@@ -13,7 +13,11 @@ readable.
   sector, secret sector, floor/ceiling height, door, exit, and thing data.
 - Keeps richer generated map arrays for future work, but the runtime path uses
   Neo Geo-friendly fixed-size structures instead of a generic WAD directory.
-- Defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
+- The normal cart build now defaults to `DOOM_SIMPLE_MAP=1`, a compact handmade
+  `16x16` showcase map that keeps the NGRayEx-style proportions and exercises
+  enemies, pickups, a key door, and an exit from the real menu flow. The WAD
+  converter remains available by building with `DOOM_SIMPLE_MAP=0`.
+- The converted-WAD path defaults to E1M1 and supports changing `DOOM_MAP`, `DOOM_MAP_WIDTH`,
   `DOOM_MAP_HEIGHT`, `DOOM_MAP_DETAIL_CULL`, `DOOM_RENDER_DETAIL_CULL`,
   `DOOM_MAP_READABILITY_CLEANUP`, and `DOOM_SKILL_MASK` at build time. The
   default skill mask is `4`, matching hard/Ultra-Violence THING placement; use
@@ -37,12 +41,80 @@ readable.
   offline conversion path.
 - `make chunk-map` runs `tools/doom_chunk_convert.py`, which converts the WAD
   map at a fixed cell scale and emits generated `16x16` chunk pages plus
-  `doom_chunks_preview.txt`. The default chunk scale is 64 Doom units per cell:
+  `doom_chunks_preview.txt`. The default chunk scale is 256 Doom units per cell:
   E1M1 becomes a 5x3 set of pages, but the Neo Geo runtime still loads only one
   `16x16` page into the original NGRayEx-style 80-column renderer. `make
   chunk-route-check` verifies the generated chunk start-to-exit route, treating
-  generated doors and lift cells as interactive pass-through cells, and `make
-  chunk-visibility-check` verifies generated monster/pickup/weapon coverage.
+  generated doors and lift cells as interactive pass-through cells, and also
+  runs a key-aware route pass so locked door cells require a reachable matching
+  key first. `make chunk-movement-check` mirrors the runtime player-radius
+  collision and chunk-stream update enough to prove the generated start can
+  walk forward instead of spawning wedged against a wall. `make
+  chunk-visibility-check` verifies generated monster/pickup/weapon coverage
+  and the generated maximum active 3x3 chunk-window thing count. Chunked runtime
+  actor arrays use that active-window cap instead of the full converted map's
+  thing count, so E1M1 keeps persistent state for all things but scans only the
+  currently streamable actor set.
+- The chunk converter now repairs tiny coarse-grid gaps between reachable lift
+  triggers and their target lift sectors. Lifts still remain blocking until
+  triggered, but once opened their coarse `16x16` platform cells have a playable
+  route instead of being stranded by rasterization.
+- Chunked runtime collision now treats generated lift-cell metadata as the
+  authority after activation, even when the lift cell is in a neighboring
+  streamed page. This keeps opened platforms passable after a chunk transition
+  instead of falling back to the coarse solid wall bit.
+- Chunk start placement still prefers an open centered cell in the player's
+  source sector, but now also scores exact forward visual clearance against WAD
+  linedefs. This keeps the E1M1 playable start from being pushed into a coarse
+  cell that looks open in the `16x16` grid while the RIPDOOM wall renderer is
+  actually too close to the front wall.
+- The RIPDOOM wall renderer now maps chunk/grid movement directly back to WAD
+  coordinates with the expected Y inversion. `ripdoom-render-check` compiles
+  with the same chunk/RIPDOOM flags as the ROM and samples both the generated
+  chunk start and a short forward pose for E1M1, so movement cannot silently
+  rotate the real-Doom geometry out from under the simple grid collision.
+  In chunked builds it also simulates accepted forward movement through the
+  `16x16` collision/streaming rules and verifies the moved RIPDOOM pose still
+  renders after the same 70-tick movement span used by `chunk-movement-check`,
+  then compares per-column wall distance/seg samples so the harness catches
+  regressions where the weapon bobs but the rendered wall state appears fixed
+  in place.
+- RIPDOOM wall hits now carry a one-span lower/upper wall approximation from
+  front/back sector floor and ceiling deltas. The renderer still uses one Neo
+  Geo sprite strip per column, but platform/stair/window edges can be drawn as
+  top- or bottom-anchored partial walls instead of every two-sided hit becoming
+  a full-height slab.
+- For short lower/upper spans, the RIPDOOM renderer now probes one additional
+  wall hit behind the span and renders that farther wall instead. This is a
+  one-sprite-budget approximation of Doom's multi-hit columns: it avoids low
+  ledges deleting the room behind them while keeping true stacked wall drawing
+  as a future step.
+- RIPDOOM ray casting keeps the fast local blockmap search first, then falls
+  back to sampling blockmap cells along a missed ray. This fills long corridor
+  or chunk-edge columns without raising the local line/seg caps for every
+  column.
+- Chunk conversion exposes `DOOM_CHUNK_START_LOCAL_X`,
+  `DOOM_CHUNK_START_LOCAL_Y`, and `DOOM_CHUNK_KEEP_WAD_START_OFFSET` through
+  the Makefile. The playable E1M1 chunk ROM keeps the WAD start aligned to the
+  center of its active `16x16` room page, which gives more visual clearance from
+  the start wall without changing the sprite-strip/RIPDOOM-lite renderer.
+- `make chunk-playable-rom` builds the current manual E1M1 chunk/RIPDOOM-lite
+  ROM with `16x16` chunks, 256 Doom units per cell, skipped intro, and normal
+  player input. Simple mode keeps the original NGRayEx wall projection height
+  even when chunk cells represent smaller WAD units, so the chunk build
+  does not collapse distant E1M1 walls into unreadable horizon slivers.
+  `make chunk-movement-test-rom` uses the same scale but replaces input with a
+  scripted forward walk, so it is only for regression testing.
+- `make chunk-playable-debug-rom` uses the same playable build but enables
+  frame and input debug registers. In chunked builds the HUD counters mirror
+  global chunk-grid X/Y and active chunk state, which distinguishes stale ROMs
+  or blocked movement from valid chunk streaming where local coordinates
+  recenter.
+- `SMOKE_XVFB=1 tools/bench_chunk_debug_movement.sh` pairs the deterministic
+  host `chunk-movement-check` with a `chunk-movement-test-rom` screenshot. The
+  scripted ROM uses a longer pre-walk delay for capture stability and mirrors
+  the script tick in the armor counter, so the smoke can verify a booted ROM and
+  visible debug registers without depending on fragile two-window Xvfb deltas.
 - `make ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check` runs the RIPDOOM-lite geometry converter.
   This path preserves Doom's real BSP/seg/subsector/blockmap data in compact C
   tables with SNES-style hard caps, semantic wall-span flags, and a generated
@@ -82,7 +154,7 @@ readable.
 
 ## Rendering
 
-- The default `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
+- The converted-WAD `DOOM_DETAIL=quality` renderer uses 40 wall-column sprites over
   the 320-pixel playfield, giving 8-pixel logical columns backed by 16-pixel
   Neo Geo strips. This is the normal readable-navigation mode; `balanced` and
   `speed` remain lower-cost stress tiers, while the heavier 64-column
@@ -124,7 +196,7 @@ readable.
   direction changes. Movement-only frames reuse those values before running
   DDA, avoiding two fixed-point multiplies and two reciprocal lookups per wall
   column.
-- The default renderer spends more active playfield sprites on walls: 20
+- The converted-WAD renderer spends more active playfield sprites on walls: 20
   backdrop strips, 40 wall columns, seven 4-strip world things, and seven weapon
   strips fit inside the first 95 active sprites. Alternate build tiers are
   available for different tradeoffs: `DOOM_DETAIL=clarity` uses 64 wall columns
@@ -414,10 +486,28 @@ readable.
   depends on generated door cells.
 - `make chunk-route-check` statically verifies the generated `16x16` chunk map
   route against `build/doom_chunks_generated.h` and
-  `build/doom_chunks_generated.c`. If the exact WAD player start falls on a
+  `build/doom_chunks_generated.c`. It now checks both the all-interactive route
+  and a key-aware route where keycard/skull things must be reachable before
+  matching locked door specials. A stricter state route keeps generated lift
+  cells closed until a reachable lift trigger opens them, so converted
+  elevators/platforms cannot silently become always-open route shortcuts.
+  Accepted routes are also sampled at cell centers and cell-boundary midpoints
+  with the same q8 player radius used by the runtime collision checks. The
+  accepted state route is also replayed through the shared `16x16` chunk
+  streaming convention, so start-to-exit validation catches page-wrap mistakes
+  before they become runtime movement traps. If the
+  exact WAD player start falls on a
   coarse-grid wall, chunk conversion moves it to the nearest open cell and
   opens the minimum number of coarse wall cells needed to preserve a playable
   start-to-exit route.
+- `make chunk-stream-check` compiles a host probe against the generated chunk
+  header and the same inline streaming helper used by the 68000 runtime. It
+  verifies that local player coordinates wrap by full `16x16` q8 pages when the
+  active chunk changes, guarding against tiny-shift chunk drift.
+- `make chunk-movement-check` compiles a host probe against the generated chunk
+  header/source and runs the same start pose, player-radius solid checks, and
+  chunk-stream wrapping convention used by the runtime. It fails if the player
+  cannot occupy the generated start or cannot make useful forward progress.
 - `make episode-route-report` converts shareware `E1M1` through `E1M9` into
   isolated generated headers and reports whether each map has a coarse-grid
   start-to-exit route. `make episode-route-check` runs the same pass in strict
@@ -427,14 +517,13 @@ readable.
   EPISODE_MAP=E1M3` build or launch a standalone ROM for a specific Episode 1
   map under `build/episode-roms/`. `make episode-roms` loops through E1M1-E1M9
   and builds one standalone ROM output per map.
-- The default ROM starts on shareware `E1M1`; `make key-test-rom` and
-  `make key-test-gngeo` build shareware `E1M2` into an isolated output tree so
-  the real red keycard and red locked-door path can be verified without
-  changing the default map.
-- `make key-door-test-rom` and `make key-door-test-gngeo` build a focused E1M2
-  key/door verification ROM. It starts beside the real red locked-door group,
-  faces the door, hides unrelated things, and places a real WAD red keycard in
-  front of the player so pickup and locked-door behavior can be tested quickly.
+- The default ROM starts on the hand-authored `DOOM_SIMPLE_MAP=1` sample map.
+  `make key-test-rom` and `make key-test-gngeo` now use that same sample-map
+  geometry by default while keeping the normal Doom asset conversion path.
+- `make key-door-test-rom` and `make key-door-test-gngeo` build a focused
+  key/door verification ROM. In the default sample-map build it stages the
+  authored blue-key door; building with `DOOM_SIMPLE_MAP=0` still exercises the
+  converted E1M2 red-key path.
 - `tools/smoke_key_door.sh` automates that focused ROM through missing-key,
   key pickup, and successful door-open stages, producing comparison screenshots
   under `.tools/screens/latest`. It now runs a focused PNG checker that verifies
@@ -470,9 +559,15 @@ readable.
   native Doom holding its speed modifier during forward movement.
   `COMPARE_NATIVE_MOVE_MODIFIER=` disables that speed modifier, and
   `COMPARE_NATIVE_ROUTE_*` / `COMPARE_NEO_ROUTE_*` can override individual
-  route timings when matching exact views for visual investigation.
+  route timings when matching exact views for visual investigation. Waypoint
+  input revalidates the target window before each key event and retries stale
+  window IDs so native-vs-NeoGeo captures do not fail on transient X11
+  `BadWindow` replacements.
   `COMPARE_ROUTE_MODE=focused` keeps the older focused Neo Geo verification ROM
-  visual registers when that is the useful evidence.
+  visual registers when that is the useful evidence. `COMPARE_ROUTE_MODE=chunked`
+  captures the current E1M1 `chunk-playable-gngeo` ROM so the simplified
+  `16x16` chunk/RIPDOOM path can be compared directly instead of accidentally
+  measuring the older generated-map renderer.
 - Smoke and comparison captures default to workspace 4 and targeted X11 key
   events so they do not steal focus while the user is working. Direct i3/sway
   tiling remains opt-in (`SMOKE_TILE_WINDOWS=1` or
@@ -487,11 +582,10 @@ readable.
   computer, light, and brown variants into those existing classes so E1M2 walls
   retain more Doom identity without adding runtime WAD parsing or more wall
   sprites.
-- `make exit-test-rom` and `make exit-test-gngeo` build a focused E1M1 exit
-  completion ROM. It starts two converted cells left of the real generated
-  E1M1 exit trigger, and `tools/smoke_e1m1_exit.sh` walks into that trigger,
-  captures the completed frame, and checks the `EXIT` plus kill/item/secret
-  percentage overlay.
+- `make exit-test-rom` and `make exit-test-gngeo` build a focused exit
+  completion ROM. In the default sample-map build it walks into the authored
+  exit trigger; building with `DOOM_SIMPLE_MAP=0` keeps the converted E1M1 exit
+  trigger path available for converter checks.
 - `make e1m8-boss-test-rom` and `make e1m8-boss-test-gngeo` build a focused
   E1M8 boss-exit verification ROM. It stages the two real E1M8 Baron things in
   front of the player with low HP, and `tools/smoke_e1m8_boss_exit.sh` fires

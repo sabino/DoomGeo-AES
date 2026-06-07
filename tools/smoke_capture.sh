@@ -24,10 +24,12 @@ LOCKDIR="${SMOKE_LOCKDIR:-.tools/locks/smoke-capture.lock}"
 LOCK_OWNER="$LOCKDIR/pid"
 LOCK_ACQUIRED=0
 XVFB_PID=""
+RUN_PID=""
 MAKE_ARGS=()
 MAKE_ROM_DIR=""
 MAKE_BUILD_DIR=""
 BIOS_SOURCE=".tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip"
+KILL_OLD_GNGEO="${SMOKE_KILL_OLD_GNGEO:-1}"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -102,9 +104,18 @@ if [ "$USE_XVFB" = "1" ]; then
     DISPLAY_VALUE="${SMOKE_XVFB_DISPLAY:-:99}"
     WORKSPACE=""
     TILE_WINDOWS=0
+    KILL_OLD_GNGEO="${SMOKE_KILL_OLD_GNGEO:-0}"
 fi
 
 cleanup() {
+    if [ -n "$RUN_PID" ]; then
+        kill -TERM "-$RUN_PID" >/dev/null 2>&1 || kill "$RUN_PID" >/dev/null 2>&1 || true
+        sleep 0.2
+        if kill -0 "$RUN_PID" >/dev/null 2>&1; then
+            kill -KILL "-$RUN_PID" >/dev/null 2>&1 || kill -KILL "$RUN_PID" >/dev/null 2>&1 || true
+        fi
+        wait "$RUN_PID" >/dev/null 2>&1 || true
+    fi
     if [ -n "$XVFB_PID" ]; then
         kill "$XVFB_PID" >/dev/null 2>&1 || true
     fi
@@ -156,7 +167,9 @@ fi
 if [ -n "$MAKE_ROM_DIR" ] && [ ! -e "$MAKE_ROM_DIR/neogeo.zip" ] && [ -e "$BIOS_SOURCE" ]; then
     ln -nsf "$ROOT/$BIOS_SOURCE" "$MAKE_ROM_DIR/neogeo.zip"
 fi
-kill_old_gngeo
+if [ "$KILL_OLD_GNGEO" = "1" ]; then
+    kill_old_gngeo
+fi
 
 if [ "$USE_XVFB" = "1" ]; then
     Xvfb "$DISPLAY_VALUE" -screen 0 "$XVFB_SCREEN" >"${LOG%.log}-xvfb.log" 2>&1 &
@@ -170,6 +183,7 @@ if [ -n "$DIRECT_ROM" ]; then
         --datafile="$ROOT/.tools/ngdevkit-local/usr/share/ngdevkit-gngeo/gngeo_data.zip" \
         --p1control="A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79,MENU=K27" \
         $EXTRAOPTS_VALUE --screen320 --scale 3 --no-resize -i "$DIRECT_ROM" puzzledp >"$LOG" 2>&1 < /dev/null &
+    RUN_PID="$!"
 else
     run_args=("$RUN_TARGET")
     if [ -n "$EXTRAOPTS_VALUE" ]; then
@@ -178,6 +192,7 @@ else
 
     setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
         "$MAKE_BIN" "${MAKE_ARGS[@]}" "${run_args[@]}" >"$LOG" 2>&1 < /dev/null &
+    RUN_PID="$!"
 fi
 sleep "$WAIT_SECS"
 
@@ -185,6 +200,10 @@ wid="$(window_for_gngeo)"
 tile_window "$wid"
 if [ "$START_GAME" = "1" ]; then
     sleep 0.2
+    if [ "$USE_XVFB" = "1" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool windowfocus "$wid" >/dev/null 2>&1 || true
+        DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+    fi
     DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" x
     sleep 0.25
     DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" x

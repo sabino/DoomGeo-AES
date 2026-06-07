@@ -30,7 +30,12 @@
 #error "Select exactly one Doom detail tier"
 #endif
 
-#if DOOM_SIMPLE_MAP
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#ifndef DOOM_CHUNK_WALL_COLS
+#define DOOM_CHUNK_WALL_COLS 80     /* original NGRayEx 4px strips */
+#endif
+#define NUM_COLS DOOM_CHUNK_WALL_COLS
+#elif DOOM_SIMPLE_MAP
 #define NUM_COLS 80                 /* original NGRayEx: 4px wall strips */
 #elif defined(DOOM_DETAIL_CLARITY)
 #define NUM_COLS 64                 /* 5px wall strips: readable navigation */
@@ -49,11 +54,20 @@
 #define COLW     (SCRW / NUM_COLS)
 #define HSHRINK  (COLW - 1)        
  
-#define BG_SPLIT  (BG_WIN / 2)
+#if DOOM_SIMPLE_MAP
+#define BG_CEILING_ROWS 6
+#else
+#define BG_CEILING_ROWS (BG_WIN / 2)
+#endif
+#define BG_SPLIT  BG_CEILING_ROWS
+#define BG_FLOOR_ROWS (BG_WIN - BG_SPLIT)
 
 #define WALL_WIN 15                 /* tiles in the wall sprite window       */
 #if DOOM_SIMPLE_MAP
-#define WALLH    SCRH               /* original NGRayEx projection scale */
+#ifndef DOOM_SIMPLE_WALLH
+#define DOOM_SIMPLE_WALLH SCRH
+#endif
+#define WALLH    DOOM_SIMPLE_WALLH  /* original NGRayEx wall projection scale */
 #define MAX_H    SCRH               /* original NGRayEx full-height clamp */
 #else
 #ifndef DOOM_WALL_PROJECTION_NUM
@@ -129,7 +143,18 @@
 #define DOOM_RIPDOOM_RENDER_UNITS_PER_CELL 64
 #endif
 #ifndef DOOM_RIPDOOM_RENDER_BLOCK_RADIUS
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 4
+#else
 #define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 8
+#endif
+#endif
+#ifndef DOOM_MOVING_RENDER_COLUMNS
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#define DOOM_MOVING_RENDER_COLUMNS 10
+#else
+#define DOOM_MOVING_RENDER_COLUMNS NUM_COLS
+#endif
 #endif
 
 /* Floor/ceiling tiles are whole-row Neo Geo backdrop sprites, not Doom's
@@ -173,8 +198,8 @@
  * correctly overlays them. HUD lives on non-gameplay rows.
  * Sprite #0 is unusable on this hardware.
  */
-#define BG_BASE   1                
 #define BG_COUNT  (SCRW / 16)       
+#define BG_BASE   1
 #if DOOM_SIMPLE_MAP
 #define BG_WIN    14                /* original NGRayEx full-screen backdrop */
 #else
@@ -187,7 +212,9 @@
  * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
  * tier keeps the weapon in front while staying inside the practical budget.
  */
-#if DOOM_SIMPLE_MAP
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#define ENEMY_VISIBLE_COUNT 4       /* 20 backdrop + 80 walls + 16 things + 7 weapon = 123 */
+#elif DOOM_SIMPLE_MAP
 #define ENEMY_VISIBLE_COUNT 8       /* 3 monsters + barrel + 4 pickups before HUD palettes */
 #elif defined(DOOM_DETAIL_CLARITY)
 #define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 thing + 7 weapon = 95 */
@@ -263,9 +290,11 @@
 #define TILE_PLANE_PERSPECTIVE_DIRS 16
 #endif
 #define TILE_PLANE_PERSPECTIVE_PHASES 1
-#define TILE_PLANE_PERSPECTIVE_ROWS BG_SPLIT
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT
-#define TILE_PLANE_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
+#define TILE_CEILING_PERSPECTIVE_ROWS BG_CEILING_ROWS
+#define TILE_FLOOR_PERSPECTIVE_ROWS BG_FLOOR_ROWS
+#define TILE_CEILING_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_CEILING_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
+#define TILE_FLOOR_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES * TILE_FLOOR_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
 #ifndef BG_SCROLL_COLUMNS_PER_FRAME
 #define BG_SCROLL_COLUMNS_PER_FRAME 10
 #endif
@@ -273,7 +302,11 @@
 #define BG_SCROLL_COLUMNS_OVERRUN 4
 #endif
 #ifndef DOOM_FLAT_PLANES
+#if DOOM_SIMPLE_MAP
+#define DOOM_FLAT_PLANES 0          /* use baked NGRayEx-style floor/ceiling texture planes */
+#else
 #define DOOM_FLAT_PLANES 0          /* pre-baked moving floor/ceiling cache */
+#endif
 #endif
 #define TILE_CEILING_FLAT_BASE (TILE_DOOR_ATLAS_BASE + TILE_WALL_ATLAS_TILES)
 #define TILE_FLOOR_FLAT_BASE (TILE_CEILING_FLAT_BASE + TILE_FLAT_TILES)
@@ -298,8 +331,8 @@
 #define TILE_HUD_SMALL_DIGIT_BASE (TILE_HUD_DIGIT_BASE + TILE_HUD_DIGIT_COUNT)
 #define TILE_HUD_SMALL_DIGIT_COUNT 10
 #define TILE_CEILING_PERSPECTIVE_BASE (TILE_HUD_SMALL_DIGIT_BASE + TILE_HUD_SMALL_DIGIT_COUNT)
-#define TILE_FLOOR_PERSPECTIVE_BASE (TILE_CEILING_PERSPECTIVE_BASE + TILE_PLANE_PERSPECTIVE_TILES)
-#define TILE_TITLEPIC_BASE (TILE_FLOOR_PERSPECTIVE_BASE + TILE_PLANE_PERSPECTIVE_TILES)
+#define TILE_FLOOR_PERSPECTIVE_BASE (TILE_CEILING_PERSPECTIVE_BASE + TILE_CEILING_PERSPECTIVE_TILES)
+#define TILE_TITLEPIC_BASE (TILE_FLOOR_PERSPECTIVE_BASE + TILE_FLOOR_PERSPECTIVE_TILES)
 #define TILE_TITLEPIC_COLS 20
 #define TILE_TITLEPIC_ROWS 13
 #define TILE_TITLEPIC_TILES (TILE_TITLEPIC_COLS * TILE_TITLEPIC_ROWS)
@@ -339,7 +372,11 @@
 #define PAL_HUD       7
 #define PAL_CEILING_GRAD_BASE 50
 #define PAL_FLOOR_GRAD_BASE   56
+#if DOOM_SIMPLE_MAP
+#define PAL_DOOR_DEPTH_BASE   64
+#else
 #define PAL_DOOR_DEPTH_BASE   62
+#endif
 #define PAL_WALL_ALT_DEPTH_BASE 90
 #if DOOM_SIMPLE_MAP
 #define PAL_WALL_ALT_DEPTH_STRIDE 1  /* alt walls are not used by original map */

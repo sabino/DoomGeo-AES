@@ -78,6 +78,7 @@ def main() -> int:
         default=75000,
         help="Minimum colored playfield pixels per capture; darker wall-heavy poses still need variation, HUD, FPS, and frame-stat evidence",
     )
+    parser.add_argument("--min-play-varied", type=int, default=24, help="Minimum coarse playfield color variation per capture")
     args = parser.parse_args()
 
     root = Path(args.dir)
@@ -102,8 +103,8 @@ def main() -> int:
         hud = image_counts(image, HUD_BOX)
         fps = image_counts(image, FPS_BOX)
         frame_stats = image_counts(image, FRAME_STATS_BOX)
-        if play["varied"] < 24:
-            errors.append(f"{path}: weak playfield color variation {play['varied']} < 24")
+        if play["varied"] < args.min_play_varied:
+            errors.append(f"{path}: weak playfield color variation {play['varied']} < {args.min_play_varied}")
         if play["colored"] < args.min_play_colored:
             errors.append(f"{path}: weak playfield colored evidence {play['colored']} < {args.min_play_colored}")
         if hud["bright"] < 30000:

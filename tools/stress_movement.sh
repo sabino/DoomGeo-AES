@@ -16,6 +16,7 @@ FORWARD_SECS="${STRESS_FORWARD_SECS:-2.5}"
 TURN_SECS="${STRESS_TURN_SECS:-2.0}"
 STRAFE_SECS="${STRESS_STRAFE_SECS:-2.5}"
 EXTRAOPTS_VALUE="${STRESS_EXTRAOPTS:-}"
+CAPTURE_DURING_HOLD="${STRESS_CAPTURE_DURING_HOLD:-0}"
 if [ "${STRESS_SHOWFPS:-0}" = "1" ]; then
     EXTRAOPTS_VALUE="${EXTRAOPTS_VALUE:+$EXTRAOPTS_VALUE }--showfps"
 fi
@@ -86,13 +87,26 @@ hold_keys() {
     local seconds="$2"
     shift 2
     local key=""
-    trap 'for key in "$@"; do DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key" >/dev/null 2>&1 || true; done' RETURN
+    if [ "$USE_XVFB" = "1" ]; then
+        DISPLAY="$DISPLAY_VALUE" xdotool windowfocus "$wid" >/dev/null 2>&1 || true
+        DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+        DISPLAY="$DISPLAY_VALUE" xdotool mousemove --window "$wid" 20 20 click 1 >/dev/null 2>&1 || true
+    fi
+    trap 'for key in "$@"; do if [ "$USE_XVFB" = "1" ]; then DISPLAY="$DISPLAY_VALUE" xdotool keyup "$key" >/dev/null 2>&1 || true; else DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key" >/dev/null 2>&1 || true; fi; done' RETURN
     for key in "$@"; do
-        DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"
+        if [ "$USE_XVFB" = "1" ]; then
+            DISPLAY="$DISPLAY_VALUE" xdotool keydown "$key"
+        else
+            DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"
+        fi
     done
     sleep "$seconds"
     for key in "$@"; do
-        DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
+        if [ "$USE_XVFB" = "1" ]; then
+            DISPLAY="$DISPLAY_VALUE" xdotool keyup "$key"
+        else
+            DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
+        fi
     done
     trap - RETURN
 }
@@ -104,10 +118,38 @@ move_and_capture() {
     shift
     local wid=""
     wid="$(window_for_gngeo)"
-    hold_keys "$wid" "$seconds" "$@"
-    sleep 0.2
-    wid="$(window_for_gngeo)"
-    capture_window "$wid" "$out"
+    if [ "$CAPTURE_DURING_HOLD" = "1" ]; then
+        local key=""
+        if [ "$USE_XVFB" = "1" ]; then
+            DISPLAY="$DISPLAY_VALUE" xdotool windowfocus "$wid" >/dev/null 2>&1 || true
+            DISPLAY="$DISPLAY_VALUE" xdotool windowactivate "$wid" >/dev/null 2>&1 || true
+            DISPLAY="$DISPLAY_VALUE" xdotool mousemove --window "$wid" 20 20 click 1 >/dev/null 2>&1 || true
+        fi
+        trap 'for key in "$@"; do if [ "$USE_XVFB" = "1" ]; then DISPLAY="$DISPLAY_VALUE" xdotool keyup "$key" >/dev/null 2>&1 || true; else DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key" >/dev/null 2>&1 || true; fi; done' RETURN
+        for key in "$@"; do
+            if [ "$USE_XVFB" = "1" ]; then
+                DISPLAY="$DISPLAY_VALUE" xdotool keydown "$key"
+            else
+                DISPLAY="$DISPLAY_VALUE" xdotool keydown --window "$wid" "$key"
+            fi
+        done
+        sleep "$seconds"
+        wid="$(window_for_gngeo)"
+        capture_window "$wid" "$out"
+        for key in "$@"; do
+            if [ "$USE_XVFB" = "1" ]; then
+                DISPLAY="$DISPLAY_VALUE" xdotool keyup "$key"
+            else
+                DISPLAY="$DISPLAY_VALUE" xdotool keyup --window "$wid" "$key"
+            fi
+        done
+        trap - RETURN
+    else
+        hold_keys "$wid" "$seconds" "$@"
+        sleep 0.2
+        wid="$(window_for_gngeo)"
+        capture_window "$wid" "$out"
+    fi
 }
 
 keyup_all() {

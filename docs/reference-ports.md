@@ -4,6 +4,10 @@ These repositories are useful research material for DoomGeo-AES, but they are
 not drop-in solutions for Neo Geo hardware. The current branch does not copy
 their code.
 
+The initial Neo Geo direction is also directly inspired by Dimitris Giannakis,
+MVG / Modern Vintage Gamer, and his Neo Geo Doom/raycasting video reference:
+https://www.youtube.com/watch?v=4f1-7c6WX10
+
 ## doomgeneric
 
 Repository: https://github.com/ozkl/doomgeneric

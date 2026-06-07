@@ -82,6 +82,29 @@ window_for_pid_or_name() {
     return 1
 }
 
+window_alive() {
+    local wid="$1"
+    [ -n "$wid" ] && xwininfo -id "$wid" >/dev/null 2>&1
+}
+
+send_window_key() {
+    local wid="$1"
+    local action="$2"
+    local key="$3"
+    if ! window_alive "$wid"; then
+        echo "window disappeared before ${action} ${key}: ${wid}" >&2
+        return 1
+    fi
+    if ! xdotool "$action" --window "$wid" "$key" >/dev/null 2>&1; then
+        if ! window_alive "$wid"; then
+            echo "window disappeared during ${action} ${key}: ${wid}" >&2
+        else
+            echo "xdotool ${action} failed for key=${key} window=${wid}" >&2
+        fi
+        return 1
+    fi
+}
+
 kill_old_runners() {
     pkill -9 -x ngdevkit-gngeo >/dev/null 2>&1 || true
     pkill -9 -x crispy-doom >/dev/null 2>&1 || true
@@ -190,9 +213,9 @@ hold_key() {
     local wid="$1"
     local key="$2"
     local secs="$3"
-    xdotool keydown --window "$wid" "$key"
+    send_window_key "$wid" keydown "$key" || return 1
     sleep "$secs"
-    xdotool keyup --window "$wid" "$key"
+    send_window_key "$wid" keyup "$key" || return 1
     sleep 0.15
 }
 
@@ -202,13 +225,18 @@ hold_move_key() {
     local secs="$3"
     local modifier="${4:-}"
     if [ -n "$modifier" ]; then
-        xdotool keydown --window "$wid" "$modifier"
+        send_window_key "$wid" keydown "$modifier" || return 1
     fi
-    xdotool keydown --window "$wid" "$key"
+    send_window_key "$wid" keydown "$key" || {
+        if [ -n "$modifier" ]; then
+            send_window_key "$wid" keyup "$modifier" || true
+        fi
+        return 1
+    }
     sleep "$secs"
-    xdotool keyup --window "$wid" "$key"
+    send_window_key "$wid" keyup "$key" || return 1
     if [ -n "$modifier" ]; then
-        xdotool keyup --window "$wid" "$modifier"
+        send_window_key "$wid" keyup "$modifier" || return 1
     fi
     sleep 0.15
 }
@@ -216,7 +244,7 @@ hold_move_key() {
 tap_key() {
     local wid="$1"
     local key="$2"
-    xdotool key --window "$wid" "$key"
+    send_window_key "$wid" key "$key" || return 1
     sleep 0.15
 }
 
@@ -238,19 +266,19 @@ drive_waypoint_script() {
             return 0
             ;;
         e1m1-encounter)
-            hold_move_key "$wid" Up "${!e1m1_encounter_forward:-1.0}" "$move_modifier"
-            hold_key "$wid" Right "${!e1m1_encounter_turn:-0.35}"
+            hold_move_key "$wid" Up "${!e1m1_encounter_forward:-1.0}" "$move_modifier" || return 1
+            hold_key "$wid" Right "${!e1m1_encounter_turn:-0.35}" || return 1
             ;;
         e1m1-scout)
-            hold_move_key "$wid" Up "${!e1m1_scout_forward1:-1.8}" "$move_modifier"
-            hold_key "$wid" Left "${!e1m1_scout_turn:-0.85}"
-            hold_move_key "$wid" Up "${!e1m1_scout_forward2:-0.55}" "$move_modifier"
+            hold_move_key "$wid" Up "${!e1m1_scout_forward1:-1.8}" "$move_modifier" || return 1
+            hold_key "$wid" Left "${!e1m1_scout_turn:-0.85}" || return 1
+            hold_move_key "$wid" Up "${!e1m1_scout_forward2:-0.55}" "$move_modifier" || return 1
             ;;
         e1m2-keydoor)
-            hold_move_key "$wid" Up "${!e1m2_keydoor_forward1:-1.2}" "$move_modifier"
-            hold_key "$wid" Left "${!e1m2_keydoor_turn:-0.45}"
-            hold_move_key "$wid" Up "${!e1m2_keydoor_forward2:-0.8}" "$move_modifier"
-            tap_key "$wid" "$use_key"
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward1:-1.2}" "$move_modifier" || return 1
+            hold_key "$wid" Left "${!e1m2_keydoor_turn:-0.45}" || return 1
+            hold_move_key "$wid" Up "${!e1m2_keydoor_forward2:-0.8}" "$move_modifier" || return 1
+            tap_key "$wid" "$use_key" || return 1
             ;;
         *)
             echo "unknown COMPARE_WAYPOINT=${WAYPOINT}" >&2
@@ -263,37 +291,75 @@ drive_native_waypoint() {
     local pid="$1"
     local title="$2"
     local wid=""
+    local attempt=""
     case "$WAYPOINT" in
         start|e1m1-start|e1m2-start)
             return 0
             ;;
     esac
-    wid="$(window_for_pid_or_name "$pid" "$title")"
-    drive_waypoint_script "$wid" space "$native_move_modifier" COMPARE_NATIVE_ROUTE
+    for attempt in 1 2 3; do
+        wid="$(window_for_pid_or_name "$pid" "$title" || true)"
+        if [ -n "$wid" ] && drive_waypoint_script "$wid" space "$native_move_modifier" COMPARE_NATIVE_ROUTE; then
+            return 0
+        fi
+        echo "retrying native waypoint input (${attempt}/3)" >&2
+        sleep 0.3
+    done
+    echo "failed to drive native waypoint ${WAYPOINT}" >&2
+    return 1
 }
 
 drive_neo_waypoint() {
     local pid="$1"
     local wid=""
+    local attempt=""
     case "$WAYPOINT" in
         start|e1m1-start|e1m2-start)
             return 0
             ;;
     esac
-    wid="$(window_for_pid_or_name "$pid" "")"
-    drive_waypoint_script "$wid" s "" COMPARE_NEO_ROUTE
+    for attempt in 1 2 3; do
+        wid="$(window_for_pid_or_name "$pid" "" || true)"
+        if [ -n "$wid" ] && drive_waypoint_script "$wid" s "" COMPARE_NEO_ROUTE; then
+            return 0
+        fi
+        echo "retrying Neo Geo waypoint input (${attempt}/3)" >&2
+        sleep 0.3
+    done
+    echo "failed to drive Neo Geo waypoint ${WAYPOINT}" >&2
+    return 1
+}
+
+use_chunked_playable_neo() {
+    if [ "$MAP" != "E1M1" ]; then
+        echo "COMPARE_ROUTE_MODE=chunked currently supports E1M1 only; got ${MAP}" >&2
+        exit 1
+    fi
+    neo_make_target="chunk-playable-gngeo"
+    neo_make_args=()
+    neo_press_start="0"
+    neo_settle_secs="${neo_settle_secs:-1.5}"
+    waypoint_note="chunked mode compares native Doom against the current E1M1 16x16 chunk/RIPDOOM playable ROM; route timings are approximate because the Neo Geo map scale is intentionally simplified"
 }
 
 configure_waypoint() {
     case "$WAYPOINT" in
         start)
-            neo_make_target="episode-map-gngeo"
-            neo_make_args=("EPISODE_MAP=${MAP}")
+            if [ "$route_mode" = "chunked" ]; then
+                use_chunked_playable_neo
+            else
+                neo_make_target="episode-map-gngeo"
+                neo_make_args=("EPISODE_MAP=${MAP}")
+            fi
             ;;
         e1m1-start)
             MAP="E1M1"
-            neo_make_target="episode-map-gngeo"
-            neo_make_args=("EPISODE_MAP=E1M1")
+            if [ "$route_mode" = "chunked" ]; then
+                use_chunked_playable_neo
+            else
+                neo_make_target="episode-map-gngeo"
+                neo_make_args=("EPISODE_MAP=E1M1")
+            fi
             ;;
         e1m2-start)
             MAP="E1M2"
@@ -302,7 +368,9 @@ configure_waypoint() {
             ;;
         e1m1-encounter)
             MAP="E1M1"
-            if [ "$route_mode" = "focused" ]; then
+            if [ "$route_mode" = "chunked" ]; then
+                use_chunked_playable_neo
+            elif [ "$route_mode" = "focused" ]; then
                 neo_make_target="encounter-test-gngeo"
                 neo_press_start="0"
                 waypoint_note="focused mode uses scripted native movement and a staged Neo Geo verification ROM; camera poses are not exact"
@@ -316,7 +384,9 @@ configure_waypoint() {
             ;;
         e1m1-scout)
             MAP="E1M1"
-            if [ "$route_mode" = "focused" ]; then
+            if [ "$route_mode" = "chunked" ]; then
+                use_chunked_playable_neo
+            elif [ "$route_mode" = "focused" ]; then
                 neo_make_target="scout-test-gngeo"
                 neo_press_start="0"
                 waypoint_note="focused mode uses scripted native movement and a staged Neo Geo verification ROM; camera poses are not exact"

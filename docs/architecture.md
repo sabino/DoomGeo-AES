@@ -19,8 +19,13 @@ the video chip scale vertical sprite strips.
 
 ## Build-Time WAD Conversion
 
-`tools/doom_convert.py` is the map bridge. It reads the WAD on the host machine
-and emits generated C headers/sources under `build/`:
+`tools/doom_convert.py` is the map bridge for WAD-backed builds. It reads the
+WAD on the host machine and emits generated C headers/sources under `build/`.
+The default playable ROM currently compiles the handmade `DOOM_SIMPLE_MAP=1`
+showcase so the menu boots the stable `16x16` NGRayEx-style level; build with
+`DOOM_SIMPLE_MAP=0` to exercise the converted-WAD grid renderer.
+
+The converter emits:
 
 - Coarse grid collision/render map.
 - Per-cell wall texture class and texture phase.
@@ -74,7 +79,7 @@ and emits generated C headers/sources under `build/`:
   compact WAD-derived chunk data around the player instead of scaling the whole
   WAD map into one large runtime grid.
 - `tools/doom_chunk_convert.py` is the first build-time version of that chunk
-  pass. It defaults to 64 Doom units per cell, emits `16x16` chunk pages with
+  pass. It defaults to 256 Doom units per cell, emits `16x16` chunk pages with
   wall, texture-class, floor visual, damage, light, floor/ceiling height, and
   chunk-local thing metadata, and writes an ASCII preview for inspection. The
   runtime streams one generated page at a time into the existing simple-map
@@ -92,11 +97,23 @@ and emits generated C headers/sources under `build/`:
   runtime-facing query helpers for BSP point-to-subsector/sector lookup,
   blockmap cell line counts, local line/seg collection, and nearest local ray
   hits; `make ripdoom-runtime-check` compiles those helpers as a host probe,
-  and `make ripdoom-render-check` verifies start-view ray coverage. With
-  `DOOM_RIPDOOM_RENDER=1`, the sprite-strip wall renderer can use those local
-  ray hits for an experimental WAD-native wall view while preserving the
-  existing simple-map collision/gameplay path. This render mode is not the
+  and `make ripdoom-render-check` verifies start-view, moved-view,
+  per-column movement delta, route waypoint, and opened chunk-door ray
+  coverage. With `DOOM_RIPDOOM_RENDER=1`, the sprite-strip wall renderer can
+  use those local ray hits for an experimental WAD-native wall view while
+  preserving the existing simple-map collision/gameplay path. Opened generated
+  chunk doors and lifts are also skipped by the RIPDOOM ray candidate path, so
+  a door or platform cell that becomes passable no longer remains a static
+  visual blocker in the sprite-strip renderer. This render mode is not the
   default gameplay path yet.
+- Chunk movement validation mirrors the runtime stream contract. The
+  `chunk-movement-check` host probe still verifies that the real start pose can
+  move forward for the first scripted ticks, and now also follows a generated
+  start-to-exit route across 16x16 pages while opening generated door/lift
+  state and checking player-radius occupancy at each route cell and edge
+  midpoint. This catches cases where the static route checker says a path
+  exists but the runtime chunk window, door/lift state, or player body cannot
+  actually traverse it.
 - Doom-like two-sided opening tests. Small floor deltas stay passable, but
   openings lower than player height or taller than the configured step height
   remain blocking, which keeps high ledges/platform sides from becoming holes.
