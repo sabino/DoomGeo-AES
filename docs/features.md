@@ -215,10 +215,14 @@ readable.
   close doors and panels retain more horizontal texture detail after hardware
   shrink.
 - Floor and ceiling default to compact pre-baked perspective tile caches selected
-  by player direction and camera-lateral coarse position. The runtime wraps
-  columns incrementally so strafing moves the planes while keeping the tile bank
-  inside the hardware-safe range. `DOOM_FLAT_PLANES=1` switches back to static
-  solid planes for debugging.
+  by player direction, camera-lateral coarse position, and a coarse forward
+  phase derived from the player position projected onto the current view
+  direction. Simple-map builds default to two floor phases and two ceiling
+  phases so forward walking visibly advances the backdrop texture without
+  runtime floor casting. `DOOM_PLANE_FLOOR_FORWARD_PHASES`,
+  `DOOM_PLANE_CEILING_FORWARD_PHASES`, and `DOOM_PLANE_PHASE_SHIFT` expose the
+  phase budget and cadence; `DOOM_FLAT_PLANES=1` switches back to static solid
+  planes for debugging.
 - Sector floor/liquid preview is deliberately local. The current floor is a
   whole-row Neo Geo backdrop palette, so distant hazards no longer recolor the
   whole room through coarse-grid openings before the player reaches them.
@@ -792,10 +796,16 @@ readable.
   intersection scans in the lower-cost stress tier. The quality default keeps
   the richer solid-line path for readable close walls.
 - The cached floor/ceiling updater refreshes 10 of its 20 backdrop columns per
-  normal frame and four after a late frame, so turn/strafe plane changes settle
-  quickly without runtime floor casting. `DOOM_BG_SCROLL_COLUMNS` and
-  `DOOM_BG_SCROLL_OVERRUN_COLUMNS` expose that budget to the same movement bench
-  path.
+  normal frame and four after a late frame, so turn/strafe/forward phase changes
+  settle quickly without runtime floor casting. The updater keeps hidden
+  backdrop columns skipped behind full-cover wall columns, and late phase-only
+  changes do not restart an in-flight update until the pending update has made
+  progress. `DOOM_BG_SCROLL_COLUMNS` and `DOOM_BG_SCROLL_OVERRUN_COLUMNS`
+  expose that budget to the same movement bench path.
+- `tools/bench_movement.sh` now also runs
+  `tools/check_plane_motion_screens.py`, which compares the start and held
+  forward captures in ceiling and floor side bands and writes a marked
+  side-by-side image under `.tools/screens/latest/plane-motion-compare/`.
 - Smoke and movement capture helpers accept `SMOKE_MAKE_ARGS`, which is passed
   to both the build and GnGeo run targets. This lets the same stress path test
   isolated builds such as `DOOM_DETAIL=speed BUILDDIR=build/speed-movement

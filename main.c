@@ -1055,6 +1055,7 @@ static u32 bg_pending_key = 0xFFFFFFFFUL;
 static u32 bg_col_key[BG_COUNT];
 static u8  bg_col_hidden[BG_COUNT];
 static u8  bg_update_col = 0;
+static u8  bg_pending_progress = 0;
 static int bg_direction_dir_x = 0x7FFFFFFF;
 static int bg_direction_dir_y = 0x7FFFFFFF;
 static u8  bg_direction_bucket = 0;
@@ -2246,6 +2247,7 @@ static void invalidate_background_cache(void) {
     bg_scroll_key = 0xFFFFFFFFUL;
     bg_pending_key = 0xFFFFFFFFUL;
     bg_update_col = 0;
+    bg_pending_progress = 0;
     bg_direction_dir_x = 0x7FFFFFFF;
     bg_direction_dir_y = 0x7FFFFFFF;
     bg_direction_bucket = 0;
@@ -5644,6 +5646,18 @@ static u8 wrap_background_scroll(int scroll) {
     return (u8)scroll;
 }
 
+static u8 wrap_plane_forward_phase(long phase, u8 phase_count) {
+    if (phase_count <= 1) return 0;
+    phase %= phase_count;
+    if (phase < 0) phase += phase_count;
+    return (u8)phase;
+}
+
+static u8 plane_forward_phase(int px, int py, int dir_x, int dir_y, u8 phase_count) {
+    long forward = ((long)px * dir_x + (long)py * dir_y) >> DOOM_PLANE_PHASE_SHIFT;
+    return wrap_plane_forward_phase(forward, phase_count);
+}
+
 static void init_background(void) {
     for (u16 i = 0; i < BG_COUNT; i++) {
         u16 spr = BG_BASE + i;
@@ -5710,6 +5724,8 @@ static void update_background_scroll(u8 frame_overrun) {
     int dir_x, dir_y, plane_x, plane_y;
     u8 direction;
     u8 scroll_col;
+    u8 ceiling_phase;
+    u8 floor_phase;
     u16 ceiling_direction_tile_offset;
     u16 floor_direction_tile_offset;
     u16 ceiling_direction_base;
@@ -5729,14 +5745,26 @@ static void update_background_scroll(u8 frame_overrun) {
     /* Horizontal column wrapping is driven by camera-lateral motion so walking
      * forward does not force unrelated floor/ceiling column shifts. */
     scroll_col = wrap_background_scroll((int)(((long)px * plane_x + (long)py * plane_y) >> 14));
-    key = (u32)direction | ((u32)scroll_col << 8);
+    floor_phase = plane_forward_phase(px, py, dir_x, dir_y, DOOM_PLANE_FLOOR_FORWARD_PHASES);
+    ceiling_phase = plane_forward_phase(px, py, dir_x, dir_y, DOOM_PLANE_CEILING_FORWARD_PHASES);
+    key = (u32)direction | ((u32)scroll_col << 8) | ((u32)floor_phase << 16) | ((u32)ceiling_phase << 24);
     if (key != bg_pending_key) {
-        bg_pending_key = key;
-        bg_update_col = 0;
+        u8 phase_only_change = (u8)(((key & 0x0000FFFFUL) == (bg_pending_key & 0x0000FFFFUL)) ? 1 : 0);
+        if (frame_overrun && bg_scroll_key != bg_pending_key && !bg_pending_progress && phase_only_change) {
+            key = bg_pending_key;
+            direction = (u8)(key & 0xFF);
+            scroll_col = (u8)((key >> 8) & 0xFF);
+            floor_phase = (u8)((key >> 16) & 0xFF);
+            ceiling_phase = (u8)((key >> 24) & 0xFF);
+        } else {
+            bg_pending_key = key;
+            bg_update_col = 0;
+            bg_pending_progress = 0;
+        }
     }
-    ceiling_direction_tile_offset = (u16)(direction * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES
+    ceiling_direction_tile_offset = (u16)(((u16)direction * DOOM_PLANE_CEILING_FORWARD_PHASES + ceiling_phase)
         * TILE_CEILING_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
-    floor_direction_tile_offset = (u16)(direction * TILE_PLANE_PERSPECTIVE_PHASES * TILE_PLANE_PERSPECTIVE_PHASES
+    floor_direction_tile_offset = (u16)(((u16)direction * DOOM_PLANE_FLOOR_FORWARD_PHASES + floor_phase)
         * TILE_FLOOR_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
     ceiling_direction_base = (u16)(TILE_CEILING_PERSPECTIVE_BASE + ceiling_direction_tile_offset);
     floor_direction_base = (u16)(TILE_FLOOR_PERSPECTIVE_BASE + floor_direction_tile_offset);
@@ -5758,6 +5786,7 @@ static void update_background_scroll(u8 frame_overrun) {
             if (!bg_col_hidden[col] && bg_col_key[col] != key) {
                 write_background_column_tiles(col, scroll_col, ceiling_direction_base, floor_direction_base);
                 bg_col_key[col] = key;
+                bg_pending_progress = 1;
                 columns_this_frame--;
             }
             col++;

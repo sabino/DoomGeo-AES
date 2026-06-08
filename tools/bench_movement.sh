@@ -23,6 +23,7 @@ fi
 
 tools/stress_movement.sh
 tools/check_movement_screens.py --dir "$SMOKE_OUTPUT_DIR" --expect-fps --expect-frame-stats "${CHECK_ARGS[@]}"
+tools/check_plane_motion_screens.py --dir "$SMOKE_OUTPUT_DIR" --out-dir "${PLANE_MOTION_COMPARE_DIR:-.tools/screens/latest/plane-motion-compare}"
 if [ ! -f "$SMOKE_LOG" ]; then
     echo "movement bench log missing: $SMOKE_LOG" >&2
     exit 1

@@ -51,21 +51,20 @@ FLAT_COLS = 16
 FLAT_ROWS = 16
 FLAT_TILES = FLAT_COLS * FLAT_ROWS
 PLANE_PERSPECTIVE_DIRS = 16
-PLANE_PERSPECTIVE_PHASES = 1
+PLANE_FLOOR_FORWARD_PHASES = 1
+PLANE_CEILING_FORWARD_PHASES = 1
 CEILING_PERSPECTIVE_ROWS = BG_HALF_ROWS
 FLOOR_PERSPECTIVE_ROWS = BG_FLOOR_ROWS
 PLANE_PERSPECTIVE_COLS = BG_COLS
 CEILING_PERSPECTIVE_TILES = (
     PLANE_PERSPECTIVE_DIRS
-    * PLANE_PERSPECTIVE_PHASES
-    * PLANE_PERSPECTIVE_PHASES
+    * PLANE_CEILING_FORWARD_PHASES
     * CEILING_PERSPECTIVE_ROWS
     * PLANE_PERSPECTIVE_COLS
 )
 FLOOR_PERSPECTIVE_TILES = (
     PLANE_PERSPECTIVE_DIRS
-    * PLANE_PERSPECTIVE_PHASES
-    * PLANE_PERSPECTIVE_PHASES
+    * PLANE_FLOOR_FORWARD_PHASES
     * FLOOR_PERSPECTIVE_ROWS
     * PLANE_PERSPECTIVE_COLS
 )
@@ -169,15 +168,13 @@ def recompute_layout() -> None:
     FLOOR_PERSPECTIVE_ROWS = BG_FLOOR_ROWS
     CEILING_PERSPECTIVE_TILES = (
         PLANE_PERSPECTIVE_DIRS
-        * PLANE_PERSPECTIVE_PHASES
-        * PLANE_PERSPECTIVE_PHASES
+        * PLANE_CEILING_FORWARD_PHASES
         * CEILING_PERSPECTIVE_ROWS
         * PLANE_PERSPECTIVE_COLS
     )
     FLOOR_PERSPECTIVE_TILES = (
         PLANE_PERSPECTIVE_DIRS
-        * PLANE_PERSPECTIVE_PHASES
-        * PLANE_PERSPECTIVE_PHASES
+        * PLANE_FLOOR_FORWARD_PHASES
         * FLOOR_PERSPECTIVE_ROWS
         * PLANE_PERSPECTIVE_COLS
     )
@@ -223,6 +220,16 @@ def apply_simple_map_layout(simple_map: bool) -> None:
         BG_FLOOR_ROWS = 6
         PLANE_HORIZON = 96
         PLANE_GAME_H = 192
+    recompute_layout()
+
+
+def apply_plane_forward_phases(floor_phases: int, ceiling_phases: int) -> None:
+    global PLANE_FLOOR_FORWARD_PHASES, PLANE_CEILING_FORWARD_PHASES
+
+    if floor_phases < 1 or ceiling_phases < 1:
+        raise ValueError("plane forward phase counts must be at least 1")
+    PLANE_FLOOR_FORWARD_PHASES = floor_phases
+    PLANE_CEILING_FORWARD_PHASES = ceiling_phases
     recompute_layout()
 
 
@@ -702,48 +709,49 @@ def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False)
     ceiling_blend = (32, 35, 58)
 
     row_count = CEILING_PERSPECTIVE_ROWS if ceiling else FLOOR_PERSPECTIVE_ROWS
+    forward_phases = PLANE_CEILING_FORWARD_PHASES if ceiling else PLANE_FLOOR_FORWARD_PHASES
     for direction in range(PLANE_PERSPECTIVE_DIRS):
         angle = (direction / PLANE_PERSPECTIVE_DIRS) * math.tau
         dir_x = math.cos(angle)
         dir_y = math.sin(angle)
         plane_x = -dir_y * fov_plane
         plane_y = dir_x * fov_plane
-        for phase_y in range(PLANE_PERSPECTIVE_PHASES):
-            origin_y = (phase_y * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
-            for phase_x in range(PLANE_PERSPECTIVE_PHASES):
-                origin_x = (phase_x * 64 * PLANE_TEXEL_Q8_DIV) // PLANE_PERSPECTIVE_PHASES
-                for row in range(row_count):
-                    screen_tile_y = row if ceiling else BG_HALF_ROWS + row
-                    for col in range(PLANE_PERSPECTIVE_COLS):
-                        tile = [[0] * 16 for _ in range(16)]
-                        for y in range(16):
-                            screen_y = screen_tile_y * 16 + y
-                            p = abs(screen_y - horizon)
-                            if p < 8:
-                                p = 8
-                            row_ratio = min(1.0, p / 96.0)
-                            dist_q8 = (game_h << 7) / (p + 8)
-                            for x in range(16):
-                                screen_x = col * 16 + x
-                                camera_x = (2.0 * screen_x / 320.0) - 1.0
-                                ray_x = dir_x + plane_x * camera_x
-                                ray_y = dir_y + plane_y * camera_x
-                                if ceiling:
-                                    world_x = origin_x - ray_x * dist_q8
-                                    world_y = origin_y - ray_y * dist_q8
-                                else:
-                                    world_x = origin_x + ray_x * dist_q8
-                                    world_y = origin_y + ray_y * dist_q8
-                                sx = int(world_x / PLANE_TEXEL_Q8_DIV) & 63
-                                sy = int(world_y / PLANE_TEXEL_Q8_DIV) & 63
-                                rgb = playpal[flat[sy][sx]]
-                                if ceiling:
-                                    rgb = shade_rgb(mix_rgb(rgb, ceiling_blend, 0.28), 0.62 + row_ratio * 0.22)
-                                else:
-                                    rgb = shade_rgb(mix_rgb(rgb, base_rgb, 0.22), 0.45 + row_ratio * 0.38)
-                                    rgb = mix_rgb(rgb, floor_blend, 0.12)
-                                tile[y][x] = quantize_rgb(rgb, palette)
-                        tiles.append(tile)
+        for forward_phase in range(forward_phases):
+            forward_offset = (forward_phase * 64 * PLANE_TEXEL_Q8_DIV) / forward_phases
+            origin_x = dir_x * forward_offset
+            origin_y = dir_y * forward_offset
+            for row in range(row_count):
+                screen_tile_y = row if ceiling else BG_HALF_ROWS + row
+                for col in range(PLANE_PERSPECTIVE_COLS):
+                    tile = [[0] * 16 for _ in range(16)]
+                    for y in range(16):
+                        screen_y = screen_tile_y * 16 + y
+                        p = abs(screen_y - horizon)
+                        if p < 8:
+                            p = 8
+                        row_ratio = min(1.0, p / 96.0)
+                        dist_q8 = (game_h << 7) / (p + 8)
+                        for x in range(16):
+                            screen_x = col * 16 + x
+                            camera_x = (2.0 * screen_x / 320.0) - 1.0
+                            ray_x = dir_x + plane_x * camera_x
+                            ray_y = dir_y + plane_y * camera_x
+                            if ceiling:
+                                world_x = origin_x - ray_x * dist_q8
+                                world_y = origin_y - ray_y * dist_q8
+                            else:
+                                world_x = origin_x + ray_x * dist_q8
+                                world_y = origin_y + ray_y * dist_q8
+                            sx = int(world_x / PLANE_TEXEL_Q8_DIV) & 63
+                            sy = int(world_y / PLANE_TEXEL_Q8_DIV) & 63
+                            rgb = playpal[flat[sy][sx]]
+                            if ceiling:
+                                rgb = shade_rgb(mix_rgb(rgb, ceiling_blend, 0.28), 0.62 + row_ratio * 0.22)
+                            else:
+                                rgb = shade_rgb(mix_rgb(rgb, base_rgb, 0.22), 0.45 + row_ratio * 0.38)
+                                rgb = mix_rgb(rgb, floor_blend, 0.12)
+                            tile[y][x] = quantize_rgb(rgb, palette)
+                    tiles.append(tile)
     return tiles
 
 
@@ -1370,6 +1378,8 @@ def main():
     ap.add_argument("--door-texture", default=DOOR_TEXTURE, help="Doom door texture to precompose into the second wall atlas")
     ap.add_argument("--detail", choices=("clarity", "quality", "balanced", "speed"), default="quality", help="Tile layout tier; quality/clarity double wall atlas sampling, clarity also trims the plane direction cache")
     ap.add_argument("--simple-map", action="store_true", help="Bake full-screen NGRayEx-style floor/ceiling plane tiles")
+    ap.add_argument("--floor-forward-phases", type=int, help="Forward-motion floor plane cache phases")
+    ap.add_argument("--ceiling-forward-phases", type=int, help="Forward-motion ceiling plane cache phases")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
@@ -1424,6 +1434,10 @@ def main():
     args = ap.parse_args()
     apply_detail_layout(args.detail)
     apply_simple_map_layout(args.simple_map)
+    apply_plane_forward_phases(
+        args.floor_forward_phases if args.floor_forward_phases is not None else (2 if args.simple_map else 1),
+        args.ceiling_forward_phases if args.ceiling_forward_phases is not None else (2 if args.simple_map else 1),
+    )
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
@@ -1570,8 +1584,8 @@ def main():
     print(f"  door texture: {door_source} atlas={DOOR_ATLAS_BASE}..{DOOR_ATLAS_BASE + WALL_ATLAS_TILES - 1} ({WALL_ATLAS_COLS}x{WALL_ATLAS_ROWS})")
     print(f"  ceiling flat: {ceiling_source} tile={CEILING_FLAT_BASE}..{CEILING_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
     print(f"  floor flat: {floor_source} tile={FLOOR_FLAT_BASE}..{FLOOR_FLAT_BASE + FLAT_TILES - 1} ({FLAT_COLS}x{FLAT_ROWS})")
-    print(f"  ceiling perspective: tile={CEILING_PERSPECTIVE_BASE}..{CEILING_PERSPECTIVE_BASE + CEILING_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {CEILING_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
-    print(f"  floor perspective: tile={FLOOR_PERSPECTIVE_BASE}..{FLOOR_PERSPECTIVE_BASE + FLOOR_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_PERSPECTIVE_PHASES}x{PLANE_PERSPECTIVE_PHASES} phases x {FLOOR_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
+    print(f"  ceiling perspective: tile={CEILING_PERSPECTIVE_BASE}..{CEILING_PERSPECTIVE_BASE + CEILING_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_CEILING_FORWARD_PHASES} forward phases x {CEILING_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
+    print(f"  floor perspective: tile={FLOOR_PERSPECTIVE_BASE}..{FLOOR_PERSPECTIVE_BASE + FLOOR_PERSPECTIVE_TILES - 1} ({PLANE_PERSPECTIVE_DIRS} dirs x {PLANE_FLOOR_FORWARD_PHASES} forward phases x {FLOOR_PERSPECTIVE_ROWS}x{PLANE_PERSPECTIVE_COLS})")
     print(f"  titlepic: {title_source} tile={TITLEPIC_BASE}..{TITLEPIC_BASE + TITLEPIC_TILES - 1} ({TITLEPIC_COLS}x{TITLEPIC_ROWS}) source={title_w}x{title_h}")
     print(f"  hud patch: {hud_source} tile={HUD_BASE}..{HUD_BASE + HUD_TILES - 1} ({HUD_COLS}x{HUD_ROWS}) source={hud_w}x{hud_h}")
     print(f"  hud faces: {face_source} tile={HUD_FACE_BASE}..{HUD_FACE_BASE + len(face_frames) * HUD_FACE_TILES - 1} ({HUD_FACE_COLS}x{HUD_FACE_ROWS}x{len(face_frames)})")

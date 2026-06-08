@@ -134,8 +134,11 @@ GnGeo's `--showfps` overlay enabled and longer held inputs; outputs land under
 `.tools/logs/movement-bench-gngeo.log`. The bench finishes with
 `tools/check_movement_screens.py`, which rejects missing, blank, static, or
 obviously wrong movement captures before treating the run as useful evidence.
-It also rejects GnGeo logs containing `Invalid write`, so palette or VRAM range
-errors do not pass as normal movement evidence.
+It also runs `tools/check_plane_motion_screens.py`, which compares the start and
+held-forward captures in floor side bands and the ceiling band, then writes a
+marked side-by-side image to `.tools/screens/latest/plane-motion-compare/`.
+The bench rejects GnGeo logs containing `Invalid write`, so palette or VRAM
+range errors do not pass as normal movement evidence.
 
 For the RIPDOOM/chunked renderer path, `make ripdoom-render-check` now also
 reports `interactive_pass=1` when a generated closed door/lift cell blocks and
@@ -158,8 +161,10 @@ for example `DOOM_DETAIL=speed BUILDDIR=build/speed-movement
 ROM=build/speed-movement-rom GFX_ROM_DIR=build/speed-movement-assets`. When a
 movement run needs renderer-budget experiments, the same variable can carry
 `DOOM_WALL_UPLOAD_COLUMNS`, `DOOM_WALL_UPLOAD_OVERRUN_COLUMNS`,
-`DOOM_BG_SCROLL_COLUMNS`, or `DOOM_BG_SCROLL_OVERRUN_COLUMNS` without editing
-source. For CPU-side wall intersection tuning, pass
+`DOOM_BG_SCROLL_COLUMNS`, `DOOM_BG_SCROLL_OVERRUN_COLUMNS`,
+`DOOM_PLANE_FLOOR_FORWARD_PHASES`, `DOOM_PLANE_CEILING_FORWARD_PHASES`, or
+`DOOM_PLANE_PHASE_SHIFT` without editing source. For CPU-side wall intersection
+tuning, pass
 `DOOM_ADAPTIVE_LINE_REFINEMENT`, `DOOM_MOVING_LINE_REFINEMENT_CELLS`, or
 `DOOM_OVERRUN_LINE_REFINEMENT_CELLS` through the same path. When a custom
 `ROM=...` directory is used, the smoke helper copies the local

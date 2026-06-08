@@ -149,19 +149,25 @@ ROM directory so `make key-test-gngeo` can boot that ROM directly.
   the quality default and clarity mode emit 32-phase wall/door atlases for
   close-wall readability, while balanced/speed keep the 16-phase wall atlases.
   Clarity also uses a four-direction plane cache; the other tiers keep the
-  16-direction plane cache. The runtime defaults to the cached perspective plane
-  upload path; `DOOM_FLAT_PLANES=1` enables static solid planes for debugging.
+  16-direction plane cache. Simple-map builds also default to two forward
+  phases each for floor and ceiling, while converted-WAD builds keep one phase
+  unless `DOOM_PLANE_FLOOR_FORWARD_PHASES` or
+  `DOOM_PLANE_CEILING_FORWARD_PHASES` is overridden. The runtime defaults to
+  the cached perspective plane upload path; `DOOM_FLAT_PLANES=1` enables static
+  solid planes for debugging.
 - Doom flats are sampled into tile banks and perspective plane caches at build
   time. Normal runtime floor identity remains a palette-level cue over those
-  cached planes. Runtime column phase is driven from the camera plane rather
-  than raw map X/Y, which keeps the cached floor/ceiling bank inside the
-  hardware-safe tile range while avoiding runtime floor casting. The player cell
-  and a few wall-stopped forward view samples choose a representative visible
-  sector class, so nearby hazards/liquids can read before contact. The preview
-  distance is capped because the Neo Geo floor is a whole-row palette cue; a
-  distant sector should not recolor the entire current room through a coarse
-  opening. Liquid classes add a slow palette pulse over the same floor gradients
-  instead of animating flat pixels.
+  cached planes. Runtime column wrapping is driven from the camera-lateral
+  projection so strafing still shifts columns, while forward movement selects a
+  coarse phase from the player position projected onto the view direction using
+  `DOOM_PLANE_PHASE_SHIFT`. This keeps the cached floor/ceiling bank inside the
+  hardware-safe tile range while avoiding runtime floor casting. The player
+  cell and a few wall-stopped forward view samples choose a representative
+  visible sector class, so nearby hazards/liquids can read before contact. The
+  preview distance is capped because the Neo Geo floor is a whole-row palette
+  cue; a distant sector should not recolor the entire current room through a
+  coarse opening. Liquid classes add a slow palette pulse over the same floor
+  gradients instead of animating flat pixels.
 - The floor/ceiling path intentionally follows the same performance trade seen
   in the Super FX Doom source: spend active runtime budget on wall visibility and
   control response, while floors remain a cheap solid/palette/pre-baked cue
@@ -246,7 +252,9 @@ current runtime accepts several compromises:
 - The cached floor/ceiling backdrop has a separate `BG_SCROLL_COLUMNS_PER_FRAME`
   budget. Balanced defaults update 10 of 20 backdrop columns per normal frame
   and four after a late frame, keeping plane catch-up short without turning the
-  planes into a runtime span renderer.
+  planes into a runtime span renderer. If a late frame has not yet refreshed any
+  pending backdrop columns, phase-only forward changes wait for that pending
+  update to make progress instead of repeatedly restarting the same work.
 - Thing projection first samples neighboring wall columns before culling, then
   falls back to a q8 player/view-vector projection when map line-of-sight says
   the thing should be visible. Slots that do not draw any strips are treated as
