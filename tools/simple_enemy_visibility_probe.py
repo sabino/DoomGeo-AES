@@ -168,6 +168,13 @@ def max_scale_tile(scale: tuple[int, int, int, int, int, int, int]) -> int:
     return tile_base + strips * rows - 1
 
 
+def angle_distance(a: int, b: int) -> int:
+    if not (1 <= a <= 8 and 1 <= b <= 8):
+        return 255
+    delta = abs(a - b)
+    return min(delta, 8 - delta)
+
+
 def assert_sprite_fits(
     label: str,
     defs: list[tuple[int, int, int, int]],
@@ -176,17 +183,38 @@ def assert_sprite_fits(
     allowed_angles: set[int],
     crom_file_bytes: int,
 ) -> None:
-    matches = [
+    available = [
         (thing, angle, first_scale, scale_count)
         for thing, angle, first_scale, scale_count in defs
-        if thing == thing_type and angle in allowed_angles
+        if thing == thing_type
     ]
-    if not matches:
+    if not available:
         raise ValueError(f"{label} missing from generated sprite defs")
 
     max_visible_tile = crom_file_bytes // BYTES_PER_CROM_TILE - 1
     worst_tile = -1
-    for _thing, _angle, first_scale, scale_count in matches:
+    selected: list[tuple[int, int, int, int]] = []
+    for allowed_angle in allowed_angles:
+        exact = [item for item in available if item[1] == allowed_angle]
+        if exact:
+            selected.extend(exact)
+            continue
+        nearest = sorted(
+            (
+                (angle_distance(allowed_angle, angle), thing, angle, first_scale, scale_count)
+                for thing, angle, first_scale, scale_count in available
+                if 1 <= allowed_angle <= 8 and 1 <= angle <= 8
+            ),
+            key=lambda item: item[0],
+        )
+        if nearest and nearest[0][0] <= 2:
+            _distance, thing, angle, first_scale, scale_count = nearest[0]
+            selected.append((thing, angle, first_scale, scale_count))
+
+    if not selected:
+        raise ValueError(f"{label} has no usable angle coverage")
+
+    for _thing, _angle, first_scale, scale_count in selected:
         if first_scale < 0 or first_scale + scale_count > len(scales):
             raise ValueError(f"{label} has an invalid scale range {first_scale}..{first_scale + scale_count - 1}")
         for scale in scales[first_scale : first_scale + scale_count]:

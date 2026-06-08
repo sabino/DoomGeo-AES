@@ -2382,6 +2382,42 @@ static u8 monster_view_angle_bucket(int thing_index, int px, int py) {
     return cross >= 0 ? 4 : 6;
 }
 
+static u8 sprite_angle_distance(u8 a, u8 b) {
+    u8 d;
+    if (a < 1 || a > 8 || b < 1 || b > 8) return 255;
+    d = (a > b) ? (u8)(a - b) : (u8)(b - a);
+    return d > 4 ? (u8)(8 - d) : d;
+}
+
+static int nearest_enemy_walk_sprite_def(u16 thing_type, u8 wanted_angle, u8 wanted_anim) {
+    u8 best_angle = 0;
+    u8 best_distance = 255;
+    int first_angle = -1;
+    u8 angle_hits = 0;
+
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        u8 angle;
+        u8 distance;
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        angle = g_enemy_sprite_defs[i].angle;
+        if (angle < 1 || angle > 8) continue;
+        distance = sprite_angle_distance(wanted_angle, angle);
+        if (distance < best_distance) {
+            best_distance = distance;
+            best_angle = angle;
+        }
+    }
+    if (!best_angle) return -1;
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        if (g_enemy_sprite_defs[i].angle != best_angle) continue;
+        if (first_angle < 0) first_angle = i;
+        if (angle_hits == wanted_anim) return i;
+        angle_hits++;
+    }
+    return first_angle;
+}
+
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_px, int view_py) {
     int first = -1;
     int first_walk_angle = -1;
@@ -2426,6 +2462,10 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_p
             int fallback = first_sprite_def_for_type(fallback_type);
             if (fallback >= 0) return fallback;
         }
+    }
+    if (is_monster) {
+        int nearest = nearest_enemy_walk_sprite_def(thing_type, walk_angle, wanted_anim);
+        if (nearest >= 0) return nearest;
     }
     if (first_walk_angle >= 0) return first_walk_angle;
     return first >= 0 ? first : -1;
@@ -3546,7 +3586,7 @@ static void seed_simple_map_things(void) {
 }
 #endif
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_E1M8_BOSS_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) || defined(DOOM_E1M8_BOSS_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -3764,6 +3804,9 @@ static void configure_combat_test(void) {
     player_has_shotgun = 1;
     player_shells = 24;
     current_weapon = WEAPON_SHOTGUN;
+#if DOOM_SIMPLE_MAP
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((13 << 8) + 128), 0, -256);
+#endif
     place_test_imp();
 }
 #endif
@@ -3791,6 +3834,16 @@ static void configure_hidden_attack_test(void) {
 
 #ifdef DOOM_E1M1_ENCOUNTER_TEST
 static void configure_e1m1_encounter_test(void) {
+#if DOOM_SIMPLE_MAP
+    player_ammo = 50;
+    current_weapon = WEAPON_PISTOL;
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((12 << 8) + 128), 0, -256);
+    place_test_imp();
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#else
 #if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((17 << 8) + 128), (short)((18 << 8) + 128), 0, 256);
@@ -3809,11 +3862,33 @@ static void configure_e1m1_encounter_test(void) {
     reset_enemy_slot_cache();
     hide_enemies();
 #endif
+#endif
 }
 #endif
 
 #ifdef DOOM_E1M1_SCOUT_TEST
 static void configure_e1m1_scout_test(void) {
+#if DOOM_SIMPLE_MAP
+    player_ammo = 50;
+    current_weapon = WEAPON_PISTOL;
+    rc_set_pose_q8((short)((9 << 8) + 128), (short)((13 << 8) + 128), 181, -181);
+    if (place_test_thing(0, 3001, WORLD_Q8(760), -WORLD_Q8(160))) {
+        int px;
+        int py;
+        rc_player_q8(&px, &py);
+        enemy_hp[0] = monster_start_hp(3001);
+        enemy_awake[0] = 1;
+        enemy_attack_cooldown[0] = 72;
+        enemy_hit_flash[0] = 0;
+        enemy_attack_anim[0] = 0;
+        enemy_ranged_readable_ticks[0] = 0;
+        set_monster_facing_from_delta(0, px - thing_x_q8[0], py - thing_y_q8[0]);
+    }
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#else
 #if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((23 << 8) + 128), (short)((20 << 8) + 128), -243, 81);
@@ -3831,6 +3906,7 @@ static void configure_e1m1_scout_test(void) {
     shown_weapon_status = 0xFFFF;
     reset_enemy_slot_cache();
     hide_enemies();
+#endif
 #endif
 }
 #endif
@@ -3949,6 +4025,10 @@ static void configure_monster_gallery_test(void) {
     current_weapon = WEAPON_PISTOL;
     shown_ammo = 0xFFFF;
     shown_weapon_status = 0xFFFF;
+#if DOOM_SIMPLE_MAP
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((13 << 8) + 128), 0, -256);
+    rc_player_q8(&px, &py);
+#endif
 
     for (u8 i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
         if (!place_test_thing(i, types[i], WORLD_Q8(880), laterals[i])) continue;

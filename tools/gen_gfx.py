@@ -126,6 +126,20 @@ CRITICAL_SPRITE_TYPES = {
     9027, 9028, 9029, 9030, 9031, 9032, 9033, 9034, 9035,
     9036,
 }
+LIVE_MONSTER_PRIORITY_TYPES = {
+    3004, 9, 3001, 3002, 58, 3003, 69, 3005, 3006,
+    65, 84, 66, 67, 68, 64, 71, 16, 7,
+}
+EARLY_ROUTE_MONSTER_STATE_PRIORITY = {
+    3004: 0, 9001: 1, 9010: 2,  # former human: walk, corpse, death
+    3001: 3, 9003: 4, 9012: 5,  # imp: walk, corpse, death
+    9: 6, 9002: 7, 9011: 8,     # shotgun guy: walk, corpse, death
+}
+EARLY_ROUTE_LIVE_WALK_PREFIXES = {
+    3004: ("POSSA", "POSSB"),
+    3001: ("TROOA", "TROOB"),
+    9: ("SPOSA", "SPOSB"),
+}
 HUD_KEYCARD_FRAMES = ("BKEYA0", "RKEYA0", "YKEYA0")
 HUD_KEYCARD_BASE = WEAPON_BASE + len(WEAPON_FRAMES) * WEAPON_TILES
 HUD_KEYCARD_TILES = len(HUD_KEYCARD_FRAMES)
@@ -1264,7 +1278,30 @@ def monster_sprite_tiles(iwad, zip_member, specs, scales):
     next_tile = SPRITE_CACHE_BASE
     wad = Wad(read_wad(iwad, zip_member)) if iwad else None
     playpal = playpal_rgb(wad) if wad is not None else None
-    specs = sorted(enumerate(specs), key=lambda item: (0 if item[1][0] in CRITICAL_SPRITE_TYPES else 1, item[0]))
+    def sprite_priority(item):
+        order, spec = item
+        thing_type, _angle, frame, _flip_x = spec
+        early_state = EARLY_ROUTE_MONSTER_STATE_PRIORITY.get(thing_type)
+        if early_state is not None:
+            early_prefixes = EARLY_ROUTE_LIVE_WALK_PREFIXES.get(thing_type)
+            if early_prefixes:
+                for state_order, prefix in enumerate(early_prefixes):
+                    if frame.startswith(prefix):
+                        return (0, early_state, state_order, order)
+            else:
+                return (0, early_state, 0, order)
+        if thing_type in EARLY_ROUTE_LIVE_WALK_PREFIXES:
+            early_prefixes = EARLY_ROUTE_LIVE_WALK_PREFIXES[thing_type]
+            for state_order, prefix in enumerate(early_prefixes):
+                if frame.startswith(prefix):
+                    return (0, EARLY_ROUTE_MONSTER_STATE_PRIORITY[thing_type], state_order, order)
+        if thing_type in LIVE_MONSTER_PRIORITY_TYPES:
+            return (1, order)
+        if thing_type in CRITICAL_SPRITE_TYPES:
+            return (2, order)
+        return (3, order)
+
+    specs = sorted(enumerate(specs), key=sprite_priority)
     for _order, (thing_type, angle, frame, flip_x) in specs:
         first_scale = len(metas)
         frame_tiles, frame_meta, palette, next_tile = sprite_scale_tiles(iwad, zip_member, frame, scales, next_tile, flip_x=flip_x, wad=wad, playpal=playpal)

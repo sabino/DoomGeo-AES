@@ -28,21 +28,17 @@ drawing pixels.
 
 ## Screenshots
 
+| Motion showcase |
+| --- |
+| ![Animated DoomGeo-AES default ROM showcase with forward walking, turning, and shooting](docs/screenshots/doomgeo-aes-motion.gif) |
+
 | Intro/menu | Current gameplay |
 | --- | --- |
 | ![Block-letter DoomGeo-AES intro menu for the compiled sample map](docs/screenshots/doomgeo-aes-intro-menu.png) | ![Current sample-map wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) |
 
-| Minimap overlay | HUD status bar |
-| --- | --- |
-| ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) | ![Current HUD status bar with Doom face, weapon indicators, key slots, and counters](docs/screenshots/doomgeo-aes-current-hud.png) |
-
-| Keycard test ROM |
+| Minimap overlay |
 | --- |
-| ![Sample-map keycard verification ROM](docs/screenshots/doomgeo-aes-key-test-start.png) |
-
-| Focused key-door test ROM | Missing-key message | Key-door opened | Through doorway |
-| --- | --- | --- | --- |
-| ![Focused sample-map keycard and locked-door verification ROM](docs/screenshots/doomgeo-aes-key-door-test.png) | ![Locked sample-map door showing the compact KEY message](docs/screenshots/doomgeo-aes-key-door-missing-key.png) | ![Sample-map door opened after collecting the keycard](docs/screenshots/doomgeo-aes-key-door-opened.png) | ![Sample-map key-door smoke after walking through the opened doorway](docs/screenshots/doomgeo-aes-key-door-through.png) |
+| ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
 
 | Combat test ROM | Shotgun fire frame |
 | --- | --- |
@@ -52,17 +48,9 @@ drawing pixels.
 | --- |
 | ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
 
-| Sample encounter | Sample encounter fired |
+| Sample encounter | Sample scout route |
 | --- | --- |
-| ![Focused sample-map verification ROM with a visible monster](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Focused sample-map verification ROM after one shot](docs/screenshots/doomgeo-aes-e1m1-encounter-fired.png) |
-
-| Sample scout route | Sample scout fired |
-| --- | --- |
-| ![Sample-map scout ROM with pickups and enemies visible](docs/screenshots/doomgeo-aes-e1m1-scout.png) | ![Sample-map scout ROM after one shot](docs/screenshots/doomgeo-aes-e1m1-scout-fired.png) |
-
-| Hidden-attack regression |
-| --- |
-| ![Hidden-attack regression ROM after a wait with unchanged health and no readable monster](docs/screenshots/doomgeo-aes-hidden-attack.png) |
+| ![Focused sample-map verification ROM with a visible monster](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Sample-map scout ROM with pickups and enemies visible](docs/screenshots/doomgeo-aes-e1m1-scout.png) |
 
 | Melee test ROM | Monster gallery ROM |
 | --- | --- |
@@ -80,12 +68,9 @@ drawing pixels.
 | --- |
 | ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
 
-| Sample-map baseline |
-| --- |
-| ![Current optimized sample-map baseline capture](docs/screenshots/doomgeo-aes-native-comparison.png) |
-
-The checked-in screenshot set is currently captured from the optimized
-hand-authored sample map, not from the experimental converted-WAD renderer.
+The checked-in screenshot and motion-GIF set is currently captured from the
+optimized hand-authored sample map, not from the experimental converted-WAD
+renderer.
 Native Doom comparison tooling remains available through `tools/capture_compare.sh`
 for future converter work.
 
