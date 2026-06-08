@@ -16,7 +16,34 @@ typedef struct NgRipRayHit {
     unsigned char side;
     unsigned char span;
     unsigned char span_height;
+    short z_bottom;
+    short z_top;
+    unsigned char span_flags;
 } NgRipRayHit;
+
+typedef struct NgRipRaySpan {
+    unsigned short seg;
+    unsigned short linedef;
+    short sector;
+    unsigned short flags;
+    unsigned short texture;
+    unsigned short distance_q8;
+    unsigned char texture_kind;
+    unsigned char tex_u;
+    unsigned char side;
+    unsigned char span;
+    unsigned char span_height;
+    short z_bottom;
+    short z_top;
+    unsigned char span_flags;
+} NgRipRaySpan;
+
+typedef struct NgRipRaySpanSet {
+    NgRipRaySpan solid;
+    NgRipRaySpan foreground[2];
+    unsigned char has_solid;
+    unsigned char foreground_count;
+} NgRipRaySpanSet;
 
 int ripdoom_point_side(short x, short y, const NgRipNode *node);
 int ripdoom_point_subsector(short x, short y);
@@ -26,7 +53,9 @@ int ripdoom_blockmap_line_count(int block_x, int block_y);
 int ripdoom_blockmap_lines(int block_x, int block_y, unsigned short *out_lines, int max_lines);
 int ripdoom_collect_local_lines(short x, short y, int block_radius, unsigned short *out_lines, int max_lines);
 int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned short *out_segs, int max_segs);
+int ripdoom_collect_subsector_candidate_segs(short x, short y, unsigned short *out_segs, int max_segs, int *out_exhausted);
 int ripdoom_cast_local_ray(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRayHit *out_hit);
 int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, unsigned short min_distance_q8, NgRipRayHit *out_hit);
+int ripdoom_cast_local_ray_spans(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRaySpanSet *out_spans);
 
 #endif /* RIPDOOM_RUNTIME_H */

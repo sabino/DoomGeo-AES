@@ -26,6 +26,7 @@ MAX_RIP_SUBSECTORS = 512
 MAX_RIP_NODES = 512
 MAX_RIP_THINGS = 384
 MAX_RIP_BLOCKMAP_WORDS = 8192
+SUBSECTOR_CANDIDATE_EXPAND = 192
 
 SEG_ONE_SIDED = 0x0001
 SEG_TWO_SIDED = 0x0002
@@ -36,6 +37,13 @@ SEG_DOOR = 0x0020
 SEG_LOWER = 0x0040
 SEG_UPPER = 0x0080
 SEG_MID = 0x0100
+
+SPAN_SOLID = 0x01
+SPAN_LOWER = 0x02
+SPAN_UPPER = 0x04
+SPAN_MID = 0x08
+SPAN_SKY_GAP = 0x10
+SPAN_OCCLUDES = 0x20
 
 
 def side_index(value: int) -> int:
@@ -123,6 +131,55 @@ def seg_textures(line: dc.LineDef, seg: dc.Seg, sidedefs: list[dc.SideDef], tex_
     )
 
 
+def sector_bounds(sectors: list[dc.Sector], sector_index: int) -> tuple[int, int]:
+    if sector_index < 0 or sector_index >= len(sectors):
+        return 0, 128
+    sector = sectors[sector_index]
+    return sector.floor_height, sector.ceiling_height
+
+
+def sector_is_sky(sectors: list[dc.Sector], sector_index: int) -> bool:
+    if sector_index < 0 or sector_index >= len(sectors):
+        return False
+    return sectors[sector_index].ceiling_pic.upper() == "F_SKY1"
+
+
+def seg_span_metadata(
+    flags: int,
+    upper: int,
+    lower: int,
+    mid: int,
+    front_sector: int,
+    back_sector: int,
+    sectors: list[dc.Sector],
+) -> tuple[int, int, int, int]:
+    front_floor, front_ceil = sector_bounds(sectors, front_sector)
+    back_floor, back_ceil = sector_bounds(sectors, back_sector)
+    z_bottom = front_floor
+    z_top = front_ceil
+    span_flags = 0
+
+    if flags & (SEG_SOLID | SEG_DOOR | SEG_ONE_SIDED):
+        span_flags |= SPAN_SOLID | SPAN_OCCLUDES
+    if (flags & SEG_MID) and mid:
+        span_flags |= SPAN_MID | SPAN_OCCLUDES
+    if (flags & SEG_LOWER) and lower:
+        span_flags |= SPAN_LOWER
+        z_bottom = min(front_floor, back_floor)
+        z_top = max(front_floor, back_floor)
+    if (flags & SEG_UPPER) and upper:
+        span_flags |= SPAN_UPPER
+        if not (span_flags & SPAN_LOWER):
+            z_bottom = min(front_ceil, back_ceil)
+            z_top = max(front_ceil, back_ceil)
+        if sector_is_sky(sectors, front_sector) and sector_is_sky(sectors, back_sector):
+            span_flags |= SPAN_SKY_GAP
+    if span_flags & (SPAN_LOWER | SPAN_UPPER):
+        span_flags |= SPAN_OCCLUDES
+
+    return z_bottom, z_top, span_flags, 1 if (span_flags & SPAN_OCCLUDES) else 0
+
+
 def subsector_sector(index: int, subsector: dc.Subsector, segs: list[dc.Seg], linedefs: list[dc.LineDef], sidedefs: list[dc.SideDef]) -> int:
     del index
     if subsector.numsegs == 0 or subsector.firstseg >= len(segs):
@@ -198,6 +255,35 @@ def write_scalar_array(f, typename: str, name: str, values: list[str], count_mac
     f.write("};\n\n")
 
 
+def bbox_overlap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+    return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
+
+
+def seg_bbox(seg: dc.Seg, vertices: list[dc.Vertex]) -> tuple[int, int, int, int]:
+    v1 = vertices[seg.v1]
+    v2 = vertices[seg.v2]
+    return min(v1.x, v2.x), min(v1.y, v2.y), max(v1.x, v2.x), max(v1.y, v2.y)
+
+
+def expanded_bbox(bbox: tuple[int, int, int, int], amount: int) -> tuple[int, int, int, int]:
+    return bbox[0] - amount, bbox[1] - amount, bbox[2] + amount, bbox[3] + amount
+
+
+def subsector_bbox(subsector: dc.Subsector, segs: list[dc.Seg], vertices: list[dc.Vertex]) -> tuple[int, int, int, int]:
+    boxes = [
+        seg_bbox(segs[i], vertices)
+        for i in range(subsector.firstseg, min(len(segs), subsector.firstseg + subsector.numsegs))
+    ]
+    if not boxes:
+        return 0, 0, 0, 0
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
 def emit(
     header_path: str,
     source_path: str,
@@ -225,6 +311,8 @@ def emit(
 
     seg_rows: list[str] = []
     segs_by_line: list[list[int]] = [[] for _ in linedefs]
+    seg_flags_by_index: list[int] = []
+    seg_bboxes: list[tuple[int, int, int, int]] = []
     seg_flag_counts = {
         "solid": 0,
         "two_sided": 0,
@@ -242,6 +330,9 @@ def emit(
         back_sector = sector_for_side(sidedefs, back_side_index)
         flags = seg_flags(line, seg, sidedefs, sectors)
         upper, lower, mid, upper_kind, lower_kind, mid_kind = seg_textures(line, seg, sidedefs, tex_ids)
+        z_bottom, z_top, span_flags, occludes = seg_span_metadata(flags, upper, lower, mid, front_sector, back_sector, sectors)
+        seg_flags_by_index.append(flags)
+        seg_bboxes.append(seg_bbox(seg, vertices))
         seg_flag_counts["solid"] += 1 if flags & SEG_SOLID else 0
         seg_flag_counts["two_sided"] += 1 if flags & SEG_TWO_SIDED else 0
         seg_flag_counts["passable"] += 1 if flags & SEG_PASSABLE else 0
@@ -253,7 +344,7 @@ def emit(
             "{"
             f"{seg.v1},{seg.v2},{seg.linedef},{side_index(front_sector)},{side_index(back_sector)},"
             f"0x{flags:04x},{upper},{lower},{mid},{seg.offset},{seg.angle},"
-            f"{upper_kind},{lower_kind},{mid_kind}"
+            f"{upper_kind},{lower_kind},{mid_kind},{z_bottom},{z_top},0x{span_flags:02x},{occludes}"
             "}"
         )
     line_seg_indices = [seg_index for line_segs in segs_by_line for seg_index in line_segs]
@@ -262,6 +353,22 @@ def emit(
     for line_segs in segs_by_line:
         line_seg_spans.append(f"{{{first_seg},{len(line_segs)}}}")
         first_seg += len(line_segs)
+
+    subsector_candidate_indices: list[int] = []
+    subsector_candidate_spans: list[str] = []
+    candidate_counts: list[int] = []
+    for subsector in subsectors:
+        query = expanded_bbox(subsector_bbox(subsector, segs, vertices), SUBSECTOR_CANDIDATE_EXPAND)
+        own = set(range(subsector.firstseg, min(len(segs), subsector.firstseg + subsector.numsegs)))
+        candidates: list[int] = []
+        for seg_index, (flags, box) in enumerate(zip(seg_flags_by_index, seg_bboxes)):
+            if not (flags & (SEG_SOLID | SEG_DOOR | SEG_LOWER | SEG_UPPER | SEG_MID)):
+                continue
+            if seg_index in own or bbox_overlap(query, box):
+                candidates.append(seg_index)
+        subsector_candidate_spans.append(f"{{{len(subsector_candidate_indices)},{len(candidates)}}}")
+        subsector_candidate_indices.extend(candidates)
+        candidate_counts.append(len(candidates))
 
     with open(header_path, "w", encoding="ascii") as f:
         f.write("/* Generated by tools/doom_ripdoom_convert.py; do not edit by hand. */\n")
@@ -275,6 +382,7 @@ def emit(
         f.write(f"#define NG_RIP_SECTOR_COUNT {len(sectors)}\n")
         f.write(f"#define NG_RIP_SEG_COUNT {len(segs)}\n")
         f.write(f"#define NG_RIP_LINE_SEG_INDEX_COUNT {len(line_seg_indices)}\n")
+        f.write(f"#define NG_RIP_SUBSECTOR_CANDIDATE_INDEX_COUNT {len(subsector_candidate_indices)}\n")
         f.write(f"#define NG_RIP_SUBSECTOR_COUNT {len(subsectors)}\n")
         f.write(f"#define NG_RIP_NODE_COUNT {len(nodes)}\n")
         f.write(f"#define NG_RIP_THING_COUNT {len(things)}\n")
@@ -303,12 +411,19 @@ def emit(
         f.write(f"#define NG_RIP_SEG_LOWER 0x{SEG_LOWER:04x}\n")
         f.write(f"#define NG_RIP_SEG_UPPER 0x{SEG_UPPER:04x}\n")
         f.write(f"#define NG_RIP_SEG_MID 0x{SEG_MID:04x}\n\n")
+        f.write(f"#define NG_RIP_SPAN_SOLID 0x{SPAN_SOLID:02x}\n")
+        f.write(f"#define NG_RIP_SPAN_LOWER 0x{SPAN_LOWER:02x}\n")
+        f.write(f"#define NG_RIP_SPAN_UPPER 0x{SPAN_UPPER:02x}\n")
+        f.write(f"#define NG_RIP_SPAN_MID 0x{SPAN_MID:02x}\n")
+        f.write(f"#define NG_RIP_SPAN_SKY_GAP 0x{SPAN_SKY_GAP:02x}\n")
+        f.write(f"#define NG_RIP_SPAN_OCCLUDES 0x{SPAN_OCCLUDES:02x}\n\n")
         f.write("typedef struct NgRipVertex { int16_t x; int16_t y; } NgRipVertex;\n")
         f.write("typedef struct NgRipLine { uint16_t v1; uint16_t v2; int16_t front_side; int16_t back_side; uint16_t flags; uint16_t special; uint16_t tag; } NgRipLine;\n")
         f.write("typedef struct NgRipSide { int16_t texture_x; int16_t texture_y; uint16_t top_texture; uint16_t bottom_texture; uint16_t mid_texture; uint16_t sector; } NgRipSide;\n")
         f.write("typedef struct NgRipSector { int16_t floor_height; int16_t ceiling_height; uint16_t floor_flat; uint16_t ceiling_flat; uint8_t light; uint8_t floor_visual; uint8_t damage; uint8_t special; uint16_t tag; } NgRipSector;\n")
-        f.write("typedef struct NgRipSeg { uint16_t v1; uint16_t v2; int16_t linedef; int16_t front_sector; int16_t back_sector; uint16_t flags; uint16_t upper_texture; uint16_t lower_texture; uint16_t mid_texture; int16_t offset; int16_t angle; uint8_t upper_kind; uint8_t lower_kind; uint8_t mid_kind; } NgRipSeg;\n")
+        f.write("typedef struct NgRipSeg { uint16_t v1; uint16_t v2; int16_t linedef; int16_t front_sector; int16_t back_sector; uint16_t flags; uint16_t upper_texture; uint16_t lower_texture; uint16_t mid_texture; int16_t offset; int16_t angle; uint8_t upper_kind; uint8_t lower_kind; uint8_t mid_kind; int16_t z_bottom; int16_t z_top; uint8_t span_flags; uint8_t occludes; } NgRipSeg;\n")
         f.write("typedef struct NgRipLineSegSpan { uint16_t firstseg; uint16_t numsegs; } NgRipLineSegSpan;\n")
+        f.write("typedef struct NgRipSubsectorCandidateSpan { uint16_t firstseg; uint16_t numsegs; } NgRipSubsectorCandidateSpan;\n")
         f.write("typedef struct NgRipSubsector { uint16_t numsegs; uint16_t firstseg; int16_t sector; } NgRipSubsector;\n")
         f.write("typedef struct NgRipNode { int16_t x; int16_t y; int16_t dx; int16_t dy; int16_t bbox[8]; uint16_t child[2]; } NgRipNode;\n")
         f.write("typedef struct NgRipThing { int16_t x; int16_t y; uint16_t angle; uint16_t type; uint16_t flags; uint8_t thing_class; uint8_t info; } NgRipThing;\n\n")
@@ -319,6 +434,8 @@ def emit(
         f.write("extern const NgRipSeg g_rip_segs[NG_RIP_SEG_COUNT];\n")
         f.write("extern const NgRipLineSegSpan g_rip_line_seg_spans[NG_RIP_LINE_COUNT];\n")
         f.write("extern const uint16_t g_rip_line_seg_indices[NG_RIP_LINE_SEG_INDEX_COUNT];\n")
+        f.write("extern const NgRipSubsectorCandidateSpan g_rip_subsector_candidate_spans[NG_RIP_SUBSECTOR_COUNT];\n")
+        f.write("extern const uint16_t g_rip_subsector_candidate_indices[NG_RIP_SUBSECTOR_CANDIDATE_INDEX_COUNT];\n")
         f.write("extern const NgRipSubsector g_rip_subsectors[NG_RIP_SUBSECTOR_COUNT];\n")
         f.write("extern const NgRipNode g_rip_nodes[NG_RIP_NODE_COUNT];\n")
         f.write("extern const NgRipThing g_rip_things[NG_RIP_THING_COUNT];\n")
@@ -375,6 +492,15 @@ def emit(
             "NG_RIP_LINE_SEG_INDEX_COUNT",
             12,
         )
+        write_array(f, "NgRipSubsectorCandidateSpan", "g_rip_subsector_candidate_spans", subsector_candidate_spans, "NG_RIP_SUBSECTOR_COUNT")
+        write_scalar_array(
+            f,
+            "uint16_t",
+            "g_rip_subsector_candidate_indices",
+            [str(seg_index) for seg_index in subsector_candidate_indices],
+            "NG_RIP_SUBSECTOR_CANDIDATE_INDEX_COUNT",
+            12,
+        )
         write_array(
             f,
             "NgRipSubsector",
@@ -418,6 +544,7 @@ def emit(
             f.write(f"sectors={len(sectors)}/{MAX_RIP_SECTORS}\n")
             f.write(f"segs={len(segs)}/{MAX_RIP_SEGS}\n")
             f.write(f"line_seg_indices={len(line_seg_indices)}\n")
+            f.write(f"subsector_candidate_indices={len(subsector_candidate_indices)}\n")
             f.write(f"subsectors={len(subsectors)}/{MAX_RIP_SUBSECTORS}\n")
             f.write(f"nodes={len(nodes)}/{MAX_RIP_NODES}\n")
             f.write(f"things={len(things)}/{MAX_RIP_THINGS}\n")
@@ -426,6 +553,12 @@ def emit(
             f.write(f"blockmap={blockmap[2]}x{blockmap[3]} origin=({blockmap[0]},{blockmap[1]})\n")
             for name, count in seg_flag_counts.items():
                 f.write(f"seg_{name}={count}\n")
+            if candidate_counts:
+                worst_subsector = max(range(len(candidate_counts)), key=lambda i: candidate_counts[i])
+                avg_candidates = sum(candidate_counts) / len(candidate_counts)
+                f.write(f"subsector_candidates_max={candidate_counts[worst_subsector]}\n")
+                f.write(f"subsector_candidates_avg={avg_candidates:.2f}\n")
+                f.write(f"subsector_candidates_worst={worst_subsector}\n")
 
 
 def convert(args: argparse.Namespace) -> None:

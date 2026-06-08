@@ -53,6 +53,7 @@ FLAT_TILES = FLAT_COLS * FLAT_ROWS
 PLANE_PERSPECTIVE_DIRS = 16
 PLANE_FLOOR_FORWARD_PHASES = 1
 PLANE_CEILING_FORWARD_PHASES = 1
+CEILING_PERSPECTIVE_ENABLED = True
 CEILING_PERSPECTIVE_ROWS = BG_HALF_ROWS
 FLOOR_PERSPECTIVE_ROWS = BG_FLOOR_ROWS
 PLANE_PERSPECTIVE_COLS = BG_COLS
@@ -171,6 +172,8 @@ def recompute_layout() -> None:
         * PLANE_CEILING_FORWARD_PHASES
         * CEILING_PERSPECTIVE_ROWS
         * PLANE_PERSPECTIVE_COLS
+        if CEILING_PERSPECTIVE_ENABLED
+        else 0
     )
     FLOOR_PERSPECTIVE_TILES = (
         PLANE_PERSPECTIVE_DIRS
@@ -230,6 +233,13 @@ def apply_plane_forward_phases(floor_phases: int, ceiling_phases: int) -> None:
         raise ValueError("plane forward phase counts must be at least 1")
     PLANE_FLOOR_FORWARD_PHASES = floor_phases
     PLANE_CEILING_FORWARD_PHASES = ceiling_phases
+    recompute_layout()
+
+
+def apply_ceiling_perspective(enabled: bool) -> None:
+    global CEILING_PERSPECTIVE_ENABLED
+
+    CEILING_PERSPECTIVE_ENABLED = enabled
     recompute_layout()
 
 
@@ -693,6 +703,8 @@ def flat_texture_tiles(iwad, zip_member, flat_name, ceiling=False):
 
 
 def perspective_plane_tiles(iwad, zip_member, flat_name, palette, ceiling=False):
+    if ceiling and not CEILING_PERSPECTIVE_ENABLED:
+        return []
     if not iwad:
         count = CEILING_PERSPECTIVE_TILES if ceiling else FLOOR_PERSPECTIVE_TILES
         return [tile_solid() for _ in range(count)]
@@ -1380,6 +1392,8 @@ def main():
     ap.add_argument("--simple-map", action="store_true", help="Bake full-screen NGRayEx-style floor/ceiling plane tiles")
     ap.add_argument("--floor-forward-phases", type=int, help="Forward-motion floor plane cache phases")
     ap.add_argument("--ceiling-forward-phases", type=int, help="Forward-motion ceiling plane cache phases")
+    ap.add_argument("--no-ceiling-perspective", action="store_true", help="Use a flat ceiling fill instead of baking ceiling perspective tiles")
+    ap.add_argument("--crom-file-bytes", type=lambda value: int(value, 0), default=C_PAD, help="Per-file C-ROM byte budget for live encoded tiles before padding")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
     ap.add_argument("--weapon-frames", default=",".join(WEAPON_FRAMES), help="Comma-separated Doom weapon patch frames")
@@ -1438,6 +1452,7 @@ def main():
         args.floor_forward_phases if args.floor_forward_phases is not None else (2 if args.simple_map else 1),
         args.ceiling_forward_phases if args.ceiling_forward_phases is not None else (2 if args.simple_map else 1),
     )
+    apply_ceiling_perspective(not args.no_ceiling_perspective)
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
@@ -1526,10 +1541,16 @@ def main():
         c2 += b
     assert len(c1) == len(tiles) * 64 and len(c2) == len(tiles) * 64
 
-    if len(c1) > C_PAD or len(c2) > C_PAD:
-        raise ValueError(f"C-ROM tile data exceeds configured pad: c1={len(c1):#x} c2={len(c2):#x} pad={C_PAD:#x}")
-    c1 += bytes(C_PAD - len(c1))
-    c2 += bytes(C_PAD - len(c2))
+    if args.crom_file_bytes <= 0:
+        raise ValueError("C-ROM file byte budget must be positive")
+    if len(c1) > args.crom_file_bytes or len(c2) > args.crom_file_bytes:
+        raise ValueError(
+            "C-ROM tile data exceeds visible cart budget: "
+            f"c1={len(c1):#x} c2={len(c2):#x} budget={args.crom_file_bytes:#x} "
+            f"tiles={len(tiles)} max_tiles={args.crom_file_bytes // 64}"
+        )
+    c1 += bytes(args.crom_file_bytes - len(c1))
+    c2 += bytes(args.crom_file_bytes - len(c2))
 
     # Fix (S-ROM) tileset: tile 0 = transparent (all index 0 -> all 0x00),
     # tile 1 = solid (all index 15 -> all 0xFF). The all-0xFF tile reads as

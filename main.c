@@ -161,6 +161,41 @@ static u8 sector_floor_tint(u8 value, u8 kind, u8 component, u8 pulse) {
 }
 
 static void set_sector_flat_palette(u8 kind, u8 light) {
+#if !DOOM_DYNAMIC_SECTOR_FLATS
+    (void)kind;
+    (void)light;
+    for (int i = 0; i < CEILING_PALETTE_COLORS; i++) {
+        u8 r = shade_channel(g_ceiling_palette_rgb[i][0], 112);
+        u8 g = shade_channel(g_ceiling_palette_rgb[i][1], 112);
+        u8 b = clamp31((int)shade_channel(g_ceiling_palette_rgb[i][2], 112) + 3);
+        pal_set(PAL_CEILING, (u16)(i + 1), RGB(r, g, b));
+    }
+    for (int i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+        u8 r = shade_channel(g_floor_palette_rgb[i][0], 104);
+        u8 g = shade_channel(g_floor_palette_rgb[i][1], 96);
+        u8 b = shade_channel(g_floor_palette_rgb[i][2], 82);
+        pal_set(PAL_FLOOR, (u16)(i + 1), RGB(r, g, b));
+    }
+    for (u16 row = 0; row < BG_CEILING_ROWS; row++) {
+        u16 shade = (u16)(76 + row * 16);
+        for (u16 i = 0; i < CEILING_PALETTE_COLORS; i++) {
+            u8 base = (u8)(6 + row * 2);
+            u8 r = clamp31(base + shade_channel(g_ceiling_palette_rgb[i][0], shade) / 4);
+            u8 g = clamp31(base + shade_channel(g_ceiling_palette_rgb[i][1], shade) / 4);
+            u8 b = clamp31(10 + row * 2 + shade_channel(g_ceiling_palette_rgb[i][2], shade) / 3);
+            pal_set((u16)(PAL_CEILING_GRAD_BASE + row), (u16)(i + 1), RGB(r, g, b));
+        }
+    }
+    for (u16 row = 0; row < BG_FLOOR_ROWS; row++) {
+        u16 shade = (u16)(118 + row * 28);
+        for (u16 i = 0; i < FLOOR_PALETTE_COLORS; i++) {
+            u8 r = shade_channel(g_floor_palette_rgb[i][0], shade);
+            u8 g = shade_channel(g_floor_palette_rgb[i][1], (u16)(shade * 7 / 8));
+            u8 b = shade_channel(g_floor_palette_rgb[i][2], (u16)(shade * 3 / 4));
+            pal_set((u16)(PAL_FLOOR_GRAD_BASE + row), (u16)(i + 1), RGB(r, g, b));
+        }
+    }
+#else
     u16 light_scale = sector_light_scale(light);
     u8 pulse = sector_floor_pulse(kind);
     u8 base_kind = (kind <= 3) ? kind : 0;
@@ -202,6 +237,7 @@ static void set_sector_flat_palette(u8 kind, u8 light) {
                         sector_floor_tint(b, row_base_kind, 2, pulse)));
         }
     }
+#endif
 }
 
 static void restore_flat_palettes(void) {
@@ -666,6 +702,9 @@ static void sample_sector_palette_cone(int px_q8, int py_q8, int dir_x_q8, int d
 }
 
 static void update_sector_flat_palette(void) {
+#if !DOOM_DYNAMIC_SECTOR_FLATS
+    return;
+#else
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
     int px_key;
@@ -715,6 +754,7 @@ static void update_sector_flat_palette(void) {
     sector_floor_visual_kind = kind;
     sector_light_band = light;
     if (palette_effect == 0) restore_flat_palettes();
+#endif
 }
 
 static void set_hurt_palettes(void) {
@@ -5702,8 +5742,12 @@ static void write_background_column_tiles(u16 col, u8 scroll_col, u16 ceiling_di
         u16 tile;
         if (row < BG_SPLIT) {
             pal = (u16)(PAL_CEILING_GRAD_BASE + row);
+#if DOOM_CEILING_PERSPECTIVE
             tile = ceiling_tile;
             ceiling_tile = (u16)(ceiling_tile + TILE_PLANE_PERSPECTIVE_COLS);
+#else
+            tile = TILE_SOLID;
+#endif
         } else {
             u16 floor_row = (u16)(row - BG_SPLIT);
             pal = (u16)(PAL_FLOOR_GRAD_BASE + floor_row);
@@ -5762,8 +5806,12 @@ static void update_background_scroll(u8 frame_overrun) {
             bg_pending_progress = 0;
         }
     }
+#if DOOM_CEILING_PERSPECTIVE
     ceiling_direction_tile_offset = (u16)(((u16)direction * DOOM_PLANE_CEILING_FORWARD_PHASES + ceiling_phase)
         * TILE_CEILING_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
+#else
+    ceiling_direction_tile_offset = 0;
+#endif
     floor_direction_tile_offset = (u16)(((u16)direction * DOOM_PLANE_FLOOR_FORWARD_PHASES + floor_phase)
         * TILE_FLOOR_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS);
     ceiling_direction_base = (u16)(TILE_CEILING_PERSPECTIVE_BASE + ceiling_direction_tile_offset);
@@ -5810,12 +5858,12 @@ static void update_background_scroll(u8 frame_overrun) {
 /* ---- wall-slice sprites: fixed X + brick tilemap set once; SCB2/SCB3
  * (and palette when shading flips) are updated every frame in rc_blit. --- */
 static void init_walls(void) {
-    for (u16 c = 0; c < NUM_COLS; c++) {
+    for (u16 c = 0; c < WALL_SPRITE_COUNT; c++) {
         u16 spr = WALL_BASE + c;
         scb1_fill(spr, WALL_WIN, TILE_BRICK, PAL_WALL_LIT);
-        scb4(spr, c * COLW);
+        scb4(spr, (u16)((c % NUM_COLS) * COLW));
         scb2(spr, HSHRINK, 0x00);     
-        scb3(spr, 0, 0, WALL_WIN);
+        scb3(spr, SCRH + 32, 0, 1);
     }
 }
 
@@ -6258,8 +6306,8 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
 }
 
 static int projected_floor_screen_offset(short world_x_q8, short world_y_q8, int h, int player_x_q8, int player_y_q8) {
-    int player_floor = map_cell_floor_height(player_x_q8 >> 8, player_y_q8 >> 8);
-    int thing_floor = map_cell_floor_height(world_x_q8 >> 8, world_y_q8 >> 8);
+    int player_floor = rc_floor_height_q8((short)player_x_q8, (short)player_y_q8);
+    int thing_floor = rc_floor_height_q8(world_x_q8, world_y_q8);
     int delta = thing_floor - player_floor;
     int offset = (delta * h) / 128;
     if (offset < -GAME_H) offset = -GAME_H;

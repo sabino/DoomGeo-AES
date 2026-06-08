@@ -18,6 +18,12 @@ unsigned char g_chunk_lift_open[DOOM_CHUNK_LIFT_COUNT ? DOOM_CHUNK_LIFT_COUNT : 
 #ifndef DOOM_RIPDOOM_RENDER_BLOCK_RADIUS
 #define DOOM_RIPDOOM_RENDER_BLOCK_RADIUS 8
 #endif
+#ifndef DOOM_WALL_LAYERS
+#define DOOM_WALL_LAYERS 1
+#endif
+#ifndef DOOM_MULTIFLOOR_MIN_FAR_SOLID_Q8
+#define DOOM_MULTIFLOOR_MIN_FAR_SOLID_Q8 384
+#endif
 
 static int sample_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_min, unsigned int *out_max, int *out_first);
 static int sample_view_columns(
@@ -607,6 +613,19 @@ static int sample_view(int start_x, int start_y, short view_x, short view_y, uns
 static int last_sample_second_hits = 0;
 
 static int render_probe_cast(short x, short y, short ray_x, short ray_y, NgRipRayHit *hit) {
+#if DOOM_MULTIFLOOR_RENDER
+    NgRipRaySpanSet spans;
+    if (!ripdoom_cast_local_ray_spans(x, y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &spans)) return 0;
+    if (spans.foreground_count) last_sample_second_hits++;
+    if (spans.has_solid) {
+        hit->seg = spans.solid.seg;
+        hit->distance_q8 = spans.solid.distance_q8;
+        return 1;
+    }
+    hit->seg = spans.foreground[0].seg;
+    hit->distance_q8 = spans.foreground[0].distance_q8;
+    return 1;
+#else
     if (!ripdoom_cast_local_ray(x, y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, hit)) return 0;
     if (hit->span && hit->span_height < 96) {
         NgRipRayHit far_hit;
@@ -617,7 +636,52 @@ static int render_probe_cast(short x, short y, short ray_x, short ray_y, NgRipRa
         }
     }
     return 1;
+#endif
 }
+
+#if DOOM_MULTIFLOOR_RENDER
+static int sample_multifloor_span_view(int start_x, int start_y, short view_x, short view_y, unsigned int *out_max_solid) {
+    enum { COLUMNS = 20, PLANE_Q8 = 169 };
+    short plane_x = (short)((-(int)view_y * PLANE_Q8) >> 8);
+    short plane_y = (short)(((int)view_x * PLANE_Q8) >> 8);
+    int layered_columns = 0;
+    unsigned int max_solid = 0;
+    for (int column = 0; column < COLUMNS; column++) {
+        int camera_q8 = ((2 * 256 * column) / (COLUMNS - 1)) - 256;
+        short ray_x = (short)(view_x + (((int)plane_x * camera_q8) >> 8));
+        short ray_y = (short)(view_y + (((int)plane_y * camera_q8) >> 8));
+        NgRipRaySpanSet spans;
+        if (!ripdoom_cast_local_ray_spans((short)start_x, (short)start_y, ray_x, ray_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &spans)) continue;
+        if (spans.has_solid && spans.solid.distance_q8 > max_solid) max_solid = spans.solid.distance_q8;
+        if (spans.has_solid && spans.foreground_count) layered_columns++;
+        else if (spans.foreground_count >= 2) layered_columns++;
+    }
+    if (out_max_solid && max_solid > *out_max_solid) *out_max_solid = max_solid;
+    return layered_columns;
+}
+
+static int find_multifloor_span_view(int start_x, int start_y, unsigned int *out_max_solid) {
+    static const short dirs[8][2] = {
+        {256, 0}, {181, 181}, {0, 256}, {-181, 181},
+        {-256, 0}, {-181, -181}, {0, -256}, {181, -181}
+    };
+    static const short offsets[5][2] = {
+        {0, 0}, {256, 0}, {-256, 0}, {0, 256}, {0, -256}
+    };
+    int best = 0;
+    if (out_max_solid) *out_max_solid = 0;
+    for (int o = 0; o < 5; o++) {
+        int x = start_x + offsets[o][0];
+        int y = start_y + offsets[o][1];
+        if (ripdoom_point_sector((short)x, (short)y) < 0) continue;
+        for (int d = 0; d < 8; d++) {
+            int layered = sample_multifloor_span_view(x, y, dirs[d][0], dirs[d][1], out_max_solid);
+            if (layered > best) best = layered;
+        }
+    }
+    return best;
+}
+#endif
 
 static int sample_view_columns(
     int start_x,
@@ -709,6 +773,10 @@ int main(void) {
     unsigned int min_dist = 0xffff;
     unsigned int max_dist = 0;
     const char *mode = "player";
+#if DOOM_MULTIFLOOR_RENDER
+    int layered_columns = 0;
+    unsigned int multifloor_max_solid = 0;
+#endif
 
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
     {
@@ -781,6 +849,18 @@ int main(void) {
         fprintf(stderr, "RIPDOOM render probe failed: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u\n", start_angle, mode, hits, COLUMNS, first_hit_column, min_dist, max_dist);
         return 1;
     }
+
+#if DOOM_MULTIFLOOR_RENDER
+    layered_columns = find_multifloor_span_view(start_x, start_y, &multifloor_max_solid);
+    if (layered_columns <= 0) {
+        fprintf(stderr, "RIPDOOM render probe failed: multifloor mode found no layered wall-span view near start=(%d,%d)\n", start_x, start_y);
+        return 1;
+    }
+    if (multifloor_max_solid < DOOM_MULTIFLOOR_MIN_FAR_SOLID_Q8) {
+        fprintf(stderr, "RIPDOOM render probe failed: multifloor far solid range too short max=%u threshold=%u\n", multifloor_max_solid, (unsigned)DOOM_MULTIFLOOR_MIN_FAR_SOLID_Q8);
+        return 1;
+    }
+#endif
 
     if (have_forward) {
         unsigned int forward_min = 0xffff;
@@ -992,7 +1072,11 @@ int main(void) {
         }
 #endif
         printf(
-            "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u\n",
+            "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u forward_hits=%d/%d forward_dist=%u..%u"
+#if DOOM_MULTIFLOOR_RENDER
+            " layered_columns=%d far_solid=%u"
+#endif
+            "\n",
             start_angle,
             mode,
             hits,
@@ -1004,10 +1088,29 @@ int main(void) {
             COLUMNS,
             forward_min,
             forward_max
+#if DOOM_MULTIFLOOR_RENDER
+            , layered_columns, multifloor_max_solid
+#endif
         );
         return 0;
     }
 
-    printf("RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u\n", start_angle, mode, hits, COLUMNS, first_hit_column, min_dist, max_dist);
+    printf(
+        "RIPDOOM render probe OK: angle=%d mode=%s hits=%d/%d first=%d dist=%u..%u"
+#if DOOM_MULTIFLOOR_RENDER
+        " layered_columns=%d far_solid=%u"
+#endif
+        "\n",
+        start_angle,
+        mode,
+        hits,
+        COLUMNS,
+        first_hit_column,
+        min_dist,
+        max_dist
+#if DOOM_MULTIFLOOR_RENDER
+        , layered_columns, multifloor_max_solid
+#endif
+    );
     return 0;
 }

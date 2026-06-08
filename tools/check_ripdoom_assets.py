@@ -18,7 +18,7 @@ def macro_value(text: str, name: str) -> int:
 
 def array_body(text: str, typename: str, name: str) -> str:
     match = re.search(
-        rf"const\s+{re.escape(typename)}\s+{re.escape(name)}\[[^\]]+\]\s*=\s*\{{\n(.*?)\n\}};",
+        rf"const\s+{re.escape(typename)}\s+{re.escape(name)}\[[^\]]+\]\s*=\s*\{{\n(.*?)\n?\}};",
         text,
         re.DOTALL,
     )
@@ -102,6 +102,7 @@ def main() -> int:
     sector_count = macro_value(header, "NG_RIP_SECTOR_COUNT")
     seg_count = macro_value(header, "NG_RIP_SEG_COUNT")
     line_seg_index_count = macro_value(header, "NG_RIP_LINE_SEG_INDEX_COUNT")
+    subsector_candidate_index_count = macro_value(header, "NG_RIP_SUBSECTOR_CANDIDATE_INDEX_COUNT")
     subsector_count = macro_value(header, "NG_RIP_SUBSECTOR_COUNT")
     node_count = macro_value(header, "NG_RIP_NODE_COUNT")
     thing_count = macro_value(header, "NG_RIP_THING_COUNT")
@@ -161,6 +162,25 @@ def main() -> int:
             if errors:
                 break
 
+    subsector_candidate_spans = parse_line_seg_spans(array_body(source, "NgRipSubsectorCandidateSpan", "g_rip_subsector_candidate_spans"))
+    if len(subsector_candidate_spans) != subsector_count:
+        errors.append(f"g_rip_subsector_candidate_spans parsed row count {len(subsector_candidate_spans)} != {subsector_count}")
+    subsector_candidate_indices = parse_scalar_values(array_body(source, "uint16_t", "g_rip_subsector_candidate_indices"))
+    if len(subsector_candidate_indices) != subsector_candidate_index_count:
+        errors.append(f"g_rip_subsector_candidate_indices scalar count {len(subsector_candidate_indices)} != {subsector_candidate_index_count}")
+    if not errors:
+        for subsector_index, (firstseg, numsegs) in enumerate(subsector_candidate_spans):
+            if firstseg + numsegs > subsector_candidate_index_count:
+                errors.append(f"subsector {subsector_index} candidate span {firstseg}+{numsegs} exceeds {subsector_candidate_index_count}")
+                break
+            for offset in range(numsegs):
+                seg_index = subsector_candidate_indices[firstseg + offset]
+                if seg_index >= seg_count:
+                    errors.append(f"subsector {subsector_index} candidate references missing seg {seg_index}")
+                    break
+            if errors:
+                break
+
     subsectors = parse_subsector_rows(array_body(source, "NgRipSubsector", "g_rip_subsectors"))
     if len(subsectors) != subsector_count:
         errors.append(f"g_rip_subsectors parsed row count {len(subsectors)} != {subsector_count}")
@@ -211,7 +231,8 @@ def main() -> int:
     print(
         f"RIPDOOM-lite assets OK: vertices={vertex_count} sectors={sector_count} "
         f"segs={seg_count} solid={solid} lower={lower} upper={upper} "
-        f"subsectors={subsector_count} nodes={node_count} things={thing_count} "
+        f"subsectors={subsector_count} candidates={subsector_candidate_index_count} "
+        f"nodes={node_count} things={thing_count} "
         f"blockmap={blockmap_w}x{blockmap_h}"
     )
     return 0

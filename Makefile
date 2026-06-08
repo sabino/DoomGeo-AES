@@ -42,6 +42,15 @@ NEOGEO_BIOS?=$(CURDIR)/.tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip
 DOOM_MAP?=E1M1
 DOOM_SIMPLE_MAP?=1
 DOOM_CHUNKED_SIMPLE_MAP?=0
+DOOM_MULTIFLOOR_RENDER?=0
+ifeq ($(DOOM_MULTIFLOOR_RENDER),1)
+DOOM_SIMPLE_MAP=0
+DOOM_CHUNKED_SIMPLE_MAP=0
+DOOM_WALL_LAYERS?=3
+DOOM_RIPDOOM_RENDER=1
+else
+DOOM_WALL_LAYERS?=1
+endif
 ifeq ($(DOOM_SIMPLE_MAP),1)
 DOOM_MAP_WIDTH?=16
 DOOM_MAP_HEIGHT?=16
@@ -65,11 +74,29 @@ DOOM_WALL_UPLOAD_OVERRUN_COLUMNS?=
 ifeq ($(DOOM_SIMPLE_MAP),1)
 DOOM_PLANE_FLOOR_FORWARD_PHASES?=2
 DOOM_PLANE_CEILING_FORWARD_PHASES?=2
+else ifeq ($(DOOM_MULTIFLOOR_RENDER),1)
+DOOM_PLANE_FLOOR_FORWARD_PHASES?=4
+DOOM_PLANE_CEILING_FORWARD_PHASES?=1
+DOOM_CEILING_PERSPECTIVE?=0
+DOOM_DYNAMIC_SECTOR_FLATS?=0
+DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT?=0
+DOOM_CROM_FILE_BYTES?=1048576
 else
 DOOM_PLANE_FLOOR_FORWARD_PHASES?=1
 DOOM_PLANE_CEILING_FORWARD_PHASES?=1
 endif
+DOOM_CEILING_PERSPECTIVE?=1
+DOOM_DYNAMIC_SECTOR_FLATS?=1
+DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT?=0
+DOOM_RIPDOOM_FOREGROUND_SPANS?=$(DOOM_MULTIFLOOR_RENDER)
+DOOM_FLAT_PLANES?=0
+DOOM_CROM_FILE_BYTES?=4194304
 DOOM_PLANE_PHASE_SHIFT?=15
+DOOM_E1M1_MULTIFLOOR_SPRITES=3004:POSSA1,3004:POSSA2A8,3004:POSSA3A7,3004:POSSA4A6,3004:POSSA5,3004:POSSB1,3004:POSSB2B8,3004:POSSB3B7,3004:POSSB4B6,3004:POSSB5,3001:TROOA1,3001:TROOA2A8,3001:TROOA3A7,3001:TROOA4A6,3001:TROOA5,3001:TROOB1,3001:TROOB2B8,3001:TROOB3B7,3001:TROOB4B6,3001:TROOB5,9010:POSSH0,9015:POSSI0,9020:POSSJ0,9032:POSSK0,9001:POSSL0,9012:TROOI0,9017:TROOJ0,9022:TROOK0,9034:TROOL0,9003:TROOR0,5:BKEYA0,6:YKEYA0,13:RKEYA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2011:STIMA0,2012:MEDIA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2046:BROKA0,2048:AMMOA0,2049:SBOXA0,2035:BAR1A0,9000:BEXPC0,9006:BAL1A0
+ifeq ($(DOOM_MULTIFLOOR_RENDER),1)
+DOOM_MONSTER_SPRITES?=$(DOOM_E1M1_MULTIFLOOR_SPRITES)
+DOOM_SPRITE_SCALES?=1.00,0.75,0.50,0.33,0.25
+endif
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
 EPISODE_MAP?=E1M1
 DOOM_MAP_HEADER=$(BUILDDIR)/doom_map_generated.h
@@ -105,6 +132,10 @@ DOOM_ASSETS_OBJECT=$(BUILDDIR)/doom_assets_generated.o
 DOOM_MAP_CLEANUP_ARGS=$(if $(filter 1 yes true,$(DOOM_MAP_READABILITY_CLEANUP)),--readability-cleanup,)
 GFX_SIMPLE_MAP_ARG=$(if $(filter 1 yes true,$(DOOM_SIMPLE_MAP)),--simple-map,)
 GFX_PLANE_PHASE_ARGS=--floor-forward-phases $(DOOM_PLANE_FLOOR_FORWARD_PHASES) --ceiling-forward-phases $(DOOM_PLANE_CEILING_FORWARD_PHASES)
+GFX_CEILING_ARG=$(if $(filter 0 no false,$(DOOM_CEILING_PERSPECTIVE)),--no-ceiling-perspective,)
+GFX_CROM_BYTES_ARG=--crom-file-bytes $(DOOM_CROM_FILE_BYTES)
+GFX_MONSTER_SPRITES_ARG=$(if $(strip $(DOOM_MONSTER_SPRITES)),--monster-sprites '$(DOOM_MONSTER_SPRITES)',)
+GFX_SPRITE_SCALES_ARG=$(if $(strip $(DOOM_SPRITE_SCALES)),--sprite-scales '$(DOOM_SPRITE_SCALES)',)
 GFX_HEADER=$(BUILDDIR)/doom_gfx_generated.h
 GFX_ROM_DIR?=rom
 GFX_STAMP=$(GFX_ROM_DIR)/.generated-gfx
@@ -136,6 +167,10 @@ override CFLAGS += -DDOOM_CHUNK_MOVEMENT_START_DELAY=$(DOOM_CHUNK_MOVEMENT_START
 endif
 ifeq ($(DOOM_SKIP_INTRO),1)
 override CFLAGS += -DDOOM_SKIP_INTRO=1
+endif
+override CFLAGS += -DDOOM_WALL_LAYERS=$(DOOM_WALL_LAYERS)
+ifeq ($(DOOM_MULTIFLOOR_RENDER),1)
+override CFLAGS += -DDOOM_MULTIFLOOR_RENDER=1
 endif
 ifeq ($(DOOM_SIMPLE_MAP),1)
 override CFLAGS += -DDOOM_SIMPLE_MAP=1
@@ -174,6 +209,21 @@ endif
 ifneq ($(strip $(DOOM_PLANE_CEILING_FORWARD_PHASES)),)
 override CFLAGS += -DDOOM_PLANE_CEILING_FORWARD_PHASES=$(DOOM_PLANE_CEILING_FORWARD_PHASES)
 endif
+ifeq ($(DOOM_CEILING_PERSPECTIVE),0)
+override CFLAGS += -DDOOM_CEILING_PERSPECTIVE=0
+endif
+ifeq ($(DOOM_DYNAMIC_SECTOR_FLATS),0)
+override CFLAGS += -DDOOM_DYNAMIC_SECTOR_FLATS=0
+endif
+ifneq ($(strip $(DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT)),)
+override CFLAGS += -DDOOM_MULTIFLOOR_SOLID_FULL_HEIGHT=$(DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT)
+endif
+ifneq ($(strip $(DOOM_RIPDOOM_FOREGROUND_SPANS)),)
+override CFLAGS += -DDOOM_RIPDOOM_FOREGROUND_SPANS=$(DOOM_RIPDOOM_FOREGROUND_SPANS)
+endif
+ifneq ($(strip $(DOOM_FLAT_PLANES)),)
+override CFLAGS += -DDOOM_FLAT_PLANES=$(DOOM_FLAT_PLANES)
+endif
 ifneq ($(strip $(DOOM_PLANE_PHASE_SHIFT)),)
 override CFLAGS += -DDOOM_PLANE_PHASE_SHIFT=$(DOOM_PLANE_PHASE_SHIFT)
 endif
@@ -207,9 +257,10 @@ include build.mk
 # Some default targets for running your project via emulators
 include emu.mk
 
-# The Doom sprite bank now includes monsters, corpses, weapons, keys and item
-# pickups. That crosses the 2 MiB C-ROM default, so package 4 MiB C-ROMs.
-CROMSIZE=4194304
+# Keep the packaged C-ROM size aligned with the build's visible graphics
+# budget. The puzzledp GnGeo driver maps only the first 1 MiB of each C ROM,
+# so the multifloor slice must not silently place live tiles beyond that.
+CROMSIZE=$(DOOM_CROM_FILE_BYTES)
 
 
 
@@ -519,8 +570,91 @@ asm-rom: $(ASM_CART)
 asm-gngeo: $(ASM_CART)
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
 
+RENDER_EXPERIMENTS=texture_columns ripdoom_flat ripdoom_solid20 ripdoom_spans
+EXPERIMENT?=ripdoom_flat
+EXPERIMENT_ROOT?=build/experiments
+EXPERIMENT_DIR=$(EXPERIMENT_ROOT)/$(EXPERIMENT)
+EXPERIMENT_BUILDDIR=$(EXPERIMENT_DIR)/obj
+EXPERIMENT_ROM=$(EXPERIMENT_DIR)/rom
+EXPERIMENT_GFX_ROM_DIR=$(EXPERIMENT_DIR)/assets
+EXPERIMENT_MANIFEST=$(EXPERIMENT_DIR)/manifest.txt
+RENDER_EXPERIMENT_COMMON=DOOM_MAP=E1M1 DOOM_DETAIL=quality DOOM_SKIP_INTRO=1 DOOM_WALL_TEXTURE=STARTAN3 DOOM_WALL_UPLOAD_COLUMNS=255 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS=255
+RENDER_EXPERIMENT_E1M1_ASSETS=DOOM_MONSTER_SPRITES=$(DOOM_E1M1_MULTIFLOOR_SPRITES) DOOM_SPRITE_SCALES=1.00,0.75,0.50,0.33,0.25 DOOM_CROM_FILE_BYTES=1048576
+
+EXPERIMENT_DESC_texture_columns=Generated STARTAN3 texture columns on the stable simple-map raycaster.
+EXPERIMENT_FLAGS_texture_columns=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=0 DOOM_CEILING_PERSPECTIVE=0 DOOM_FLAT_PLANES=0
+EXPERIMENT_PROBES_texture_columns=simple-enemy-visibility-check
+
+EXPERIMENT_DESC_ripdoom_flat=Actual E1M1 RIPDOOM geometry, one wall layer, flat floor/ceiling backdrop.
+EXPERIMENT_FLAGS_ripdoom_flat=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_WALL_LAYERS=1 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
+EXPERIMENT_PROBES_ripdoom_flat=ripdoom-runtime-check ripdoom-render-check
+
+EXPERIMENT_DESC_ripdoom_solid20=Actual E1M1 RIPDOOM geometry through the 20-column multifloor budget, foreground spans disabled.
+EXPERIMENT_FLAGS_ripdoom_solid20=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_MULTIFLOOR_RENDER=1 DOOM_WALL_LAYERS=3 DOOM_RIPDOOM_FOREGROUND_SPANS=0 DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT=0 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
+EXPERIMENT_PROBES_ripdoom_solid20=ripdoom-runtime-check ripdoom-render-check
+
+EXPERIMENT_DESC_ripdoom_spans=Actual E1M1 RIPDOOM geometry with 3 wall layers and upper/lower foreground spans.
+EXPERIMENT_FLAGS_ripdoom_spans=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_MULTIFLOOR_RENDER=1 DOOM_WALL_LAYERS=3 DOOM_RIPDOOM_FOREGROUND_SPANS=1 DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT=0 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
+EXPERIMENT_PROBES_ripdoom_spans=ripdoom-runtime-check ripdoom-render-check
+
+EXPERIMENT_FLAGS=$(EXPERIMENT_FLAGS_$(EXPERIMENT))
+EXPERIMENT_DESC=$(EXPERIMENT_DESC_$(EXPERIMENT))
+EXPERIMENT_PROBES=$(EXPERIMENT_PROBES_$(EXPERIMENT))
+
+experiment-list:
+	@echo "Renderer experiments:"; \
+	for exp in $(RENDER_EXPERIMENTS); do \
+		case "$$exp" in \
+			texture_columns) desc="$(EXPERIMENT_DESC_texture_columns)" ;; \
+			ripdoom_flat) desc="$(EXPERIMENT_DESC_ripdoom_flat)" ;; \
+			ripdoom_solid20) desc="$(EXPERIMENT_DESC_ripdoom_solid20)" ;; \
+			ripdoom_spans) desc="$(EXPERIMENT_DESC_ripdoom_spans)" ;; \
+			*) desc="" ;; \
+		esac; \
+		printf "  %-18s %s\n" "$$exp" "$$desc"; \
+	done
+
+experiment-check:
+	@if [ -z "$(strip $(EXPERIMENT_FLAGS))" ]; then \
+		echo "Unknown EXPERIMENT=$(EXPERIMENT)"; \
+		echo "Known experiments: $(RENDER_EXPERIMENTS)"; \
+		exit 2; \
+	fi
+
+experiment-manifest: experiment-check
+	@mkdir -p "$(EXPERIMENT_DIR)"
+	@{ \
+		printf "experiment=%s\n" "$(EXPERIMENT)"; \
+		printf "description=%s\n" "$(EXPERIMENT_DESC)"; \
+		printf "flags=%s\n" "$(EXPERIMENT_FLAGS)"; \
+		printf "builddir=%s\n" "$(EXPERIMENT_BUILDDIR)"; \
+		printf "rom=%s\n" "$(EXPERIMENT_ROM)"; \
+		printf "gfx_rom_dir=%s\n" "$(EXPERIMENT_GFX_ROM_DIR)"; \
+		printf "probes=%s\n" "$(EXPERIMENT_PROBES)"; \
+	} > "$(EXPERIMENT_MANIFEST)"
+	@echo "Wrote $(EXPERIMENT_MANIFEST)"
+
+experiment-probes: experiment-check
+	@if [ -z "$(strip $(EXPERIMENT_PROBES))" ]; then \
+		echo "No probes configured for $(EXPERIMENT)"; \
+	else \
+		$(MAKE) $(EXPERIMENT_PROBES) $(EXPERIMENT_FLAGS) BUILDDIR="$(EXPERIMENT_BUILDDIR)" GFX_ROM_DIR="$(EXPERIMENT_GFX_ROM_DIR)"; \
+	fi
+
+experiment-cart: experiment-check
+	$(MAKE) cart $(EXPERIMENT_FLAGS) BUILDDIR="$(EXPERIMENT_BUILDDIR)" ROM="$(EXPERIMENT_ROM)" GFX_ROM_DIR="$(EXPERIMENT_GFX_ROM_DIR)"
+	@if [ ! -e "$(EXPERIMENT_ROM)/neogeo.zip" ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" "$(EXPERIMENT_ROM)/neogeo.zip"; fi
+	$(MAKE) experiment-manifest EXPERIMENT="$(EXPERIMENT)"
+
+experiment-gngeo: experiment-cart
+	@if [ ! -e "$(EXPERIMENT_ROM)/neogeo.zip" ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" "$(EXPERIMENT_ROM)/neogeo.zip"; fi
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i "$(EXPERIMENT_ROM)" $(GAMEROM)
+
 smoke-screenshot:
 	tools/smoke_capture.sh
+
+simple-enemy-visibility-check: $(GFX_HEADER) $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin
+	$(PYTHON) tools/simple_enemy_visibility_probe.py --gfx-header "$(GFX_HEADER)" --crom-file-bytes "$(DOOM_CROM_FILE_BYTES)"
 
 route-check: $(DOOM_MAP_HEADER) $(DOOM_MAP_SOURCE)
 	$(PYTHON) tools/check_e1m1_route.py --header $(DOOM_MAP_HEADER) --source $(DOOM_MAP_SOURCE)
@@ -559,7 +693,7 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo experiment-list experiment-check experiment-manifest experiment-probes experiment-cart experiment-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
@@ -615,7 +749,7 @@ $(GFX_ROM_DIR)/c1.bin $(GFX_ROM_DIR)/c2.bin $(GFX_ROM_DIR)/s1.bin $(GFX_ROM_DIR)
 	@test -f $@
 
 $(GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(BUILDDIR) $(GFX_ROM_DIR)
-	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) $(GFX_SIMPLE_MAP_ARG) $(GFX_PLANE_PHASE_ARGS) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail $(DOOM_DETAIL) $(GFX_SIMPLE_MAP_ARG) $(GFX_PLANE_PHASE_ARGS) $(GFX_CEILING_ARG) $(GFX_CROM_BYTES_ARG) $(GFX_MONSTER_SPRITES_ARG) $(GFX_SPRITE_SCALES_ARG) --palette-header $(GFX_HEADER) --out-dir $(GFX_ROM_DIR)
 	touch $@
 
 $(GFX_ROM_DIR):

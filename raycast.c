@@ -75,18 +75,18 @@ static signed char rayStepXbuf[NUM_COLS];
 static signed char rayStepYbuf[NUM_COLS];
 static u8  rays_dirty = 1;
 
-static u16 scb2buf[NUM_COLS];    /* (HSHRINK<<8)|vshrink                    */
-static u16 scb3buf[NUM_COLS];    /* Y/size word                             */
-static u16 curscb2[NUM_COLS];    /* control words currently in VRAM         */
-static u16 curscb3[NUM_COLS];
-static u8  palbuf[NUM_COLS];     /* desired palette this frame              */
-static u8  curpal[NUM_COLS];     /* palette currently in VRAM (cache)       */
-static u8  texbuf[NUM_COLS];     /* wall texture atlas column this frame    */
-static u8  curtex[NUM_COLS];     /* atlas column currently in VRAM          */
-static u8  kindbuf[NUM_COLS];    /* 0 = wall, 1..N = alt wall, N+1 = door   */
-static u8  curkind[NUM_COLS];
-static u8  closebuf[NUM_COLS];   /* reserved for emergency coarse-wall mips */
-static u8  curclose[NUM_COLS];
+static u16 scb2buf[WALL_SPRITE_COUNT];    /* (HSHRINK<<8)|vshrink              */
+static u16 scb3buf[WALL_SPRITE_COUNT];    /* Y/size word                       */
+static u16 curscb2[WALL_SPRITE_COUNT];    /* control words currently in VRAM   */
+static u16 curscb3[WALL_SPRITE_COUNT];
+static u8  palbuf[WALL_SPRITE_COUNT];     /* desired palette this frame        */
+static u8  curpal[WALL_SPRITE_COUNT];     /* palette currently in VRAM         */
+static u8  texbuf[WALL_SPRITE_COUNT];     /* wall texture atlas column         */
+static u8  curtex[WALL_SPRITE_COUNT];     /* atlas column currently in VRAM    */
+static u8  kindbuf[WALL_SPRITE_COUNT];    /* 0 = wall, 1..N = alt wall, door   */
+static u8  curkind[WALL_SPRITE_COUNT];
+static u8  closebuf[WALL_SPRITE_COUNT];   /* reserved for coarse-wall mips     */
+static u8  curclose[WALL_SPRITE_COUNT];
 static fix distbuf[NUM_COLS];    /* perpendicular wall distance             */
 static u8  wall_full_cover[NUM_COLS]; /* wall column fully hides backdrop    */
 static u16 wall_tiles[TILE_WALL_ATLAS_COLS][WALL_WIN];
@@ -131,6 +131,20 @@ static inline u8 depth_palette(u8 kind, int side, int h) {
         ? PAL_DOOR_DEPTH_BASE
         : (kind ? PAL_WALL_ALT_DEPTH_BASE + (kind - 1) * PAL_WALL_ALT_DEPTH_STRIDE : PAL_DEPTH_BASE))
         + (side ? DEPTH_BANDS : 0) + band);
+}
+
+static inline int wall_slot(int layer, int column) {
+    return layer * NUM_COLS + column;
+}
+
+static void hide_wall_slot(int slot) {
+    if (slot < 0 || slot >= WALL_SPRITE_COUNT) return;
+    scb2buf[slot] = (u16)((HSHRINK << 8) | 0);
+    scb3buf[slot] = scb3_word(SCRH + 32, 0, 1);
+    palbuf[slot] = PAL_WALL_LIT;
+    texbuf[slot] = 0;
+    kindbuf[slot] = 0;
+    closebuf[slot] = 0;
 }
 
 #if DOOM_RIPDOOM_RENDER
@@ -203,14 +217,140 @@ static void ripdoom_visual_pose(short *x, short *y) {
     *y = (short)(ripdoom_view_start_y - dy);
 }
 
+static void ripdoom_coord_from_local_q8(short x_q8, short y_q8, short *x, short *y) {
+#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+    long active_chunk_x = SIMPLE_ACTIVE_CHUNK % DOOM_CHUNK_COLS;
+    long active_chunk_y = SIMPLE_ACTIVE_CHUNK / DOOM_CHUNK_COLS;
+    long global_x_q8 = (long)x_q8 + active_chunk_x * DOOM_CHUNK_SIZE * 256L;
+    long global_y_q8 = (long)y_q8 + active_chunk_y * DOOM_CHUNK_SIZE * 256L;
+    long dx = ((global_x_q8 - ripdoom_start_global_x_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+    long dy = ((global_y_q8 - ripdoom_start_global_y_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+#else
+    long dx = (((long)x_q8 - ripdoom_start_global_x_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+    long dy = (((long)y_q8 - ripdoom_start_global_y_q8) * DOOM_RIPDOOM_RENDER_UNITS_PER_CELL) >> 8;
+#endif
+    *x = (short)(ripdoom_view_start_x + dx);
+    *y = (short)(ripdoom_view_start_y - dy);
+}
+
+static int ripdoom_floor_height_for_local_q8(short x_q8, short y_q8) {
+    short rip_x;
+    short rip_y;
+    int sector;
+    if (!ripdoom_view_ready) return map_cell_floor_height(x_q8 >> 8, y_q8 >> 8);
+    ripdoom_coord_from_local_q8(x_q8, y_q8, &rip_x, &rip_y);
+    sector = ripdoom_point_sector(rip_x, rip_y);
+    if (sector < 0 || sector >= NG_RIP_SECTOR_COUNT) return map_cell_floor_height(x_q8 >> 8, y_q8 >> 8);
+    return g_rip_sectors[sector].floor_height;
+}
+
+static int rc_ripdoom_floor_height_q8(short x_q8, short y_q8) {
+#if DOOM_MULTIFLOOR_RENDER
+    return ripdoom_floor_height_for_local_q8(x_q8, y_q8);
+#else
+    return map_cell_floor_height(x_q8 >> 8, y_q8 >> 8);
+#endif
+}
+
+static u8 ripdoom_can_move_to_local_q8(short from_x_q8, short from_y_q8, short to_x_q8, short to_y_q8) {
+#if DOOM_MULTIFLOOR_RENDER
+    short from_rip_x;
+    short from_rip_y;
+    short to_rip_x;
+    short to_rip_y;
+    int from_sector;
+    int to_sector;
+    int from_floor;
+    int to_floor;
+    int to_ceil;
+    if (!ripdoom_view_ready) return 1;
+    ripdoom_coord_from_local_q8(from_x_q8, from_y_q8, &from_rip_x, &from_rip_y);
+    ripdoom_coord_from_local_q8(to_x_q8, to_y_q8, &to_rip_x, &to_rip_y);
+    from_sector = ripdoom_point_sector(from_rip_x, from_rip_y);
+    to_sector = ripdoom_point_sector(to_rip_x, to_rip_y);
+    if (from_sector < 0 || to_sector < 0 || from_sector >= NG_RIP_SECTOR_COUNT || to_sector >= NG_RIP_SECTOR_COUNT) return 0;
+    from_floor = g_rip_sectors[from_sector].floor_height;
+    to_floor = g_rip_sectors[to_sector].floor_height;
+    to_ceil = g_rip_sectors[to_sector].ceiling_height;
+    if (to_floor - from_floor > DOOM_PLAYER_STEP_HEIGHT) return 0;
+    if (from_floor - to_floor > DOOM_PLAYER_DROP_HEIGHT) return 0;
+    if (to_ceil - to_floor < DOOM_PLAYER_HEIGHT) return 0;
+#else
+    (void)from_x_q8;
+    (void)from_y_q8;
+    (void)to_x_q8;
+    (void)to_y_q8;
+#endif
+    return 1;
+}
+
 static u8 ripdoom_kind_for_hit(const NgRipRayHit *hit) {
     if (hit->flags & NG_RIP_SEG_DOOR) return (u8)(TILE_WALL_ALT_COUNT + 1);
     if (hit->texture_kind >= 1 && hit->texture_kind <= TILE_WALL_ALT_COUNT) return hit->texture_kind;
     return 0;
 }
 
+static u8 ripdoom_kind_for_span(const NgRipRaySpan *span) {
+    if (span->flags & NG_RIP_SEG_DOOR) return (u8)(TILE_WALL_ALT_COUNT + 1);
+    if (span->texture_kind >= 1 && span->texture_kind <= TILE_WALL_ALT_COUNT) return span->texture_kind;
+    return 0;
+}
+
+#if DOOM_MULTIFLOOR_RENDER
+static u8 rc_project_ripdoom_span_to_slot(int slot, const NgRipRaySpan *span, int eye_z, u8 full_cover_candidate, fix *out_perp) {
+    fix perp;
+    int full_h;
+    int top;
+    int bottom;
+    int h;
+    int palette_h;
+    int vsh;
+    int view_h = GAME_H;
+    u8 kind;
+    if (!span) return 0;
+    perp = (fix)((((long)span->distance_q8) << FBITS) / DOOM_RIPDOOM_RENDER_UNITS_PER_CELL);
+    if (perp < FMIN) perp = FMIN;
+    if (out_perp) *out_perp = perp;
+    full_h = projected_height(perp);
+    top = HORIZON - (((int)span->z_top - eye_z) * full_h) / 128;
+    bottom = HORIZON - (((int)span->z_bottom - eye_z) * full_h) / 128;
+    if (bottom <= 0 || top >= view_h) return 0;
+    if (top < 0) top = 0;
+    if (bottom > view_h) bottom = view_h;
+#if DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT
+    if (full_cover_candidate) {
+        top = 0;
+        bottom = view_h;
+    }
+#endif
+    h = bottom - top;
+    if (h < PORTAL_SPAN_DRAW_MIN_H && !full_cover_candidate) return 0;
+    if (h < 1) h = 1;
+    if (h > MAX_H) h = MAX_H;
+    palette_h = full_h;
+    if (palette_h < 1) palette_h = 1;
+    if (palette_h > MAX_H) palette_h = MAX_H;
+    vsh = h - 1;
+    if (vsh < 0) vsh = 0;
+    if (vsh > 255) vsh = 255;
+    kind = ripdoom_kind_for_span(span);
+    kindbuf[slot] = kind;
+    texbuf[slot] = (u8)(((int)span->tex_u * TILE_WALL_ATLAS_COLS) >> 8);
+    texbuf[slot] &= (TILE_WALL_ATLAS_COLS - 1);
+    closebuf[slot] = 0;
+    scb2buf[slot] = (u16)((HSHRINK << 8) | (vsh & 0xFF));
+    scb3buf[slot] = scb3_word(top, 0, WALL_WIN);
+    palbuf[slot] = depth_palette(kind, span->side, palette_h);
+    return (u8)(full_cover_candidate && top <= 0 && bottom >= view_h);
+}
+#endif
+
 static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
+#if DOOM_MULTIFLOOR_RENDER
+    NgRipRaySpanSet spans;
+#else
     NgRipRayHit hit;
+#endif
     short rip_x;
     short rip_y;
     short rip_dir_x;
@@ -226,6 +366,27 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     ripdoom_visual_pose(&rip_x, &rip_y);
     rip_dir_x = (short)(ray_x >> (FBITS - 8));
     rip_dir_y = (short)((-ray_y) >> (FBITS - 8));
+#if DOOM_MULTIFLOOR_RENDER
+    for (int layer = 0; layer < DOOM_WALL_LAYERS; layer++) hide_wall_slot(wall_slot(layer, column));
+    distbuf[column] = FBIG;
+    wall_full_cover[column] = 0;
+    if (!ripdoom_cast_local_ray_spans(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &spans)) return 0;
+    {
+        int sector = ripdoom_point_sector(rip_x, rip_y);
+        int eye_z = DOOM_PLAYER_EYE_HEIGHT;
+        if (sector >= 0 && sector < NG_RIP_SECTOR_COUNT) eye_z += g_rip_sectors[sector].floor_height;
+        if (spans.has_solid) {
+            wall_full_cover[column] = rc_project_ripdoom_span_to_slot(wall_slot(0, column), &spans.solid, eye_z, 1, &perp);
+            distbuf[column] = perp;
+        }
+#if DOOM_RIPDOOM_FOREGROUND_SPANS
+        for (int i = 0; i < spans.foreground_count && i + 1 < DOOM_WALL_LAYERS; i++) {
+            (void)rc_project_ripdoom_span_to_slot(wall_slot(i + 1, column), &spans.foreground[i], eye_z, 0, 0);
+        }
+#endif
+    }
+    return 1;
+#else
     if (!ripdoom_cast_local_ray(rip_x, rip_y, rip_dir_x, rip_dir_y, DOOM_RIPDOOM_RENDER_BLOCK_RADIUS, &hit)) return 0;
     if (hit.span && hit.span_height < 96) {
         NgRipRayHit far_hit;
@@ -272,8 +433,17 @@ static u8 rc_render_ripdoom_column(int column, fix ray_x, fix ray_y) {
     wall_full_cover[column] = (u8)(!hit.span && top <= 0 && h >= view_h);
     palbuf[column] = depth_palette(kindbuf[column], hit.side, h);
     return 1;
+#endif
 }
 #endif
+
+int rc_floor_height_q8(short x_q8, short y_q8) {
+#if DOOM_RIPDOOM_RENDER && DOOM_MULTIFLOOR_RENDER
+    return rc_ripdoom_floor_height_q8(x_q8, y_q8);
+#else
+    return map_cell_floor_height(x_q8 >> 8, y_q8 >> 8);
+#endif
+}
 
 static void update_projection_cache(void) {
     fix det = fmul(planeX, dirY) - fmul(dirX, planeY);
@@ -323,14 +493,18 @@ void rc_init(void) {
     planeX = FIX(DOOM_PLANE_X);
     planeY = FIX(DOOM_PLANE_Y);
     update_projection_cache();
-    for (int c = 0; c < NUM_COLS; c++) {
+    for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
         curpal[c] = 0xFF; /* force first write */
         curtex[c] = 0xFF;
         curkind[c] = 0xFF;
         curclose[c] = 0xFF;
         curscb2[c] = 0xFFFF;
         curscb3[c] = 0xFFFF;
+        hide_wall_slot(c);
+    }
+    for (int c = 0; c < NUM_COLS; c++) {
         wall_full_cover[c] = 0;
+        distbuf[c] = FBIG;
     }
     rc_invalidate_view();
 }
@@ -378,6 +552,13 @@ static u8 player_can_occupy(fix x, fix y) {
     if (map_at(cx, (y - PLAYER_RADIUS) >> FBITS)) return 0;
     if (map_at(cx, (y + PLAYER_RADIUS) >> FBITS)) return 0;
     if (rc_dynamic_blocked_q8((short)(x >> (FBITS - 8)), (short)(y >> (FBITS - 8)))) return 0;
+#if DOOM_RIPDOOM_RENDER && DOOM_MULTIFLOOR_RENDER
+    if (!ripdoom_can_move_to_local_q8(
+            (short)(posX >> (FBITS - 8)),
+            (short)(posY >> (FBITS - 8)),
+            (short)(x >> (FBITS - 8)),
+            (short)(y >> (FBITS - 8)))) return 0;
+#endif
     return 1;
 }
 
@@ -859,35 +1040,35 @@ void rc_blit(void) {
     int scb3_changes = 0;
     if (!wall_upload_dirty) return;
 
-    for (int c = 0; c < NUM_COLS; c++) {
+    for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
         if (scb2buf[c] != curscb2[c]) scb2_changes++;
         if (scb3buf[c] != curscb3[c]) scb3_changes++;
     }
 
-    if (scb2_changes > NUM_COLS / 2) {
+    if (scb2_changes > WALL_SPRITE_COUNT / 2) {
         vram_addr(VRAM_SCB2 + WALL_BASE);
         vram_mod(1);
-        for (int c = 0; c < NUM_COLS; c++) {
+        for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
             vram_w(scb2buf[c]);
             curscb2[c] = scb2buf[c];
         }
     } else {
-        for (int c = 0; c < NUM_COLS; c++) {
+        for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
             if (scb2buf[c] == curscb2[c]) continue;
             vram_poke((u16)(VRAM_SCB2 + WALL_BASE + c), scb2buf[c]);
             curscb2[c] = scb2buf[c];
         }
     }
 
-    if (scb3_changes > NUM_COLS / 2) {
+    if (scb3_changes > WALL_SPRITE_COUNT / 2) {
         vram_addr(VRAM_SCB3 + WALL_BASE);
         vram_mod(1);
-        for (int c = 0; c < NUM_COLS; c++) {
+        for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
             vram_w(scb3buf[c]);
             curscb3[c] = scb3buf[c];
         }
     } else {
-        for (int c = 0; c < NUM_COLS; c++) {
+        for (int c = 0; c < WALL_SPRITE_COUNT; c++) {
             if (scb3buf[c] == curscb3[c]) continue;
             vram_poke((u16)(VRAM_SCB3 + WALL_BASE + c), scb3buf[c]);
             curscb3[c] = scb3buf[c];
@@ -898,17 +1079,17 @@ void rc_blit(void) {
      * geometry. Spread them across frames so input response is not held
      * hostage by rewriting every 15-tile wall column while turning. */
     {
-        u8 budget = wall_first_upload ? NUM_COLS : WALL_TILE_UPLOAD_COLUMNS_PER_FRAME;
+        u8 budget = wall_first_upload ? WALL_SPRITE_COUNT : WALL_TILE_UPLOAD_COLUMNS_PER_FRAME;
         u8 remaining = 0;
         u8 start = wall_upload_scan;
         if (wall_frame_overrun && !wall_first_upload && budget > WALL_TILE_UPLOAD_COLUMNS_OVERRUN) {
             budget = WALL_TILE_UPLOAD_COLUMNS_OVERRUN;
         }
-        for (int i = 0; i < NUM_COLS; i++) {
+        for (int i = 0; i < WALL_SPRITE_COUNT; i++) {
             int c = start + i;
             u8 texture_changed;
             u16 spr;
-            if (c >= NUM_COLS) c -= NUM_COLS;
+            if (c >= WALL_SPRITE_COUNT) c -= WALL_SPRITE_COUNT;
             spr = WALL_BASE + c;
             texture_changed = (u8)(texbuf[c] != curtex[c] || kindbuf[c] != curkind[c] || closebuf[c] != curclose[c]);
             if (!texture_changed && palbuf[c] == curpal[c]) continue;
@@ -918,7 +1099,7 @@ void rc_blit(void) {
             }
             budget--;
             wall_upload_scan = (u8)(c + 1);
-            if (wall_upload_scan >= NUM_COLS) wall_upload_scan = 0;
+            if (wall_upload_scan >= WALL_SPRITE_COUNT) wall_upload_scan = 0;
             if (texture_changed) {
                 u16 *tiles = (kindbuf[c] > TILE_WALL_ALT_COUNT) ? door_tiles[texbuf[c]] : (kindbuf[c] ? wall_alt_tiles[kindbuf[c] - 1][texbuf[c]] : wall_tiles[texbuf[c]]);
                 if (palbuf[c] != curpal[c]) {

@@ -15,6 +15,7 @@ void rc_player_cell(int *cx, int *cy);
 void rc_player_q8(int *x_q8, int *y_q8);
 void rc_dir_q8(int *dir_x, int *dir_y);
 void rc_view_q8(int *dir_x, int *dir_y, int *plane_x, int *plane_y);
+int rc_floor_height_q8(short x_q8, short y_q8);
 void rc_set_pose_q8(short x_q8, short y_q8, short dir_x_q8, short dir_y_q8);
 void rc_shift_player_q8(short dx_q8, short dy_q8);
 int rc_project_point(int world_x_q8, int world_y_q8, int *screen_x, int *height, int *dist_q8);

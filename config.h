@@ -30,7 +30,27 @@
 #error "Select exactly one Doom detail tier"
 #endif
 
-#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#ifndef DOOM_MULTIFLOOR_RENDER
+#define DOOM_MULTIFLOOR_RENDER 0
+#endif
+#ifndef DOOM_WALL_LAYERS
+#define DOOM_WALL_LAYERS 1
+#endif
+#if DOOM_MULTIFLOOR_RENDER && !DOOM_RIPDOOM_RENDER
+#error "DOOM_MULTIFLOOR_RENDER requires DOOM_RIPDOOM_RENDER"
+#endif
+#if DOOM_MULTIFLOOR_RENDER && DOOM_SIMPLE_MAP
+#error "DOOM_MULTIFLOOR_RENDER is only for full WAD/RIPDOOM builds"
+#endif
+#if DOOM_WALL_LAYERS < 1 || DOOM_WALL_LAYERS > 3
+#error "DOOM_WALL_LAYERS must be 1, 2, or 3"
+#endif
+
+#if DOOM_MULTIFLOOR_RENDER && DOOM_WALL_LAYERS == 3
+#define NUM_COLS 20                 /* 3x20 sprite strips: v1 multifloor budget */
+#elif DOOM_MULTIFLOOR_RENDER && DOOM_WALL_LAYERS == 2
+#define NUM_COLS 32                 /* optional 2-layer fallback budget */
+#elif DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 #ifndef DOOM_CHUNK_WALL_COLS
 #define DOOM_CHUNK_WALL_COLS 80     /* original NGRayEx 4px strips */
 #endif
@@ -53,6 +73,7 @@
 
 #define COLW     (SCRW / NUM_COLS)
 #define HSHRINK  (COLW - 1)        
+#define WALL_SPRITE_COUNT (NUM_COLS * DOOM_WALL_LAYERS)
  
 #if DOOM_SIMPLE_MAP
 #define BG_CEILING_ROWS 6
@@ -150,11 +171,25 @@
 #endif
 #endif
 #ifndef DOOM_MOVING_RENDER_COLUMNS
-#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#if DOOM_MULTIFLOOR_RENDER
+#define DOOM_MOVING_RENDER_COLUMNS NUM_COLS
+#elif DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 #define DOOM_MOVING_RENDER_COLUMNS 10
 #else
 #define DOOM_MOVING_RENDER_COLUMNS NUM_COLS
 #endif
+#endif
+#ifndef DOOM_PLAYER_EYE_HEIGHT
+#define DOOM_PLAYER_EYE_HEIGHT 41
+#endif
+#ifndef DOOM_PLAYER_HEIGHT
+#define DOOM_PLAYER_HEIGHT 56
+#endif
+#ifndef DOOM_PLAYER_STEP_HEIGHT
+#define DOOM_PLAYER_STEP_HEIGHT 24
+#endif
+#ifndef DOOM_PLAYER_DROP_HEIGHT
+#define DOOM_PLAYER_DROP_HEIGHT 64
 #endif
 
 /* Floor/ceiling tiles are whole-row Neo Geo backdrop sprites, not Doom's
@@ -212,7 +247,11 @@
  * + 7 weapon strips = 95. Neo Geo evaluates 96 sprites per scanline, so every
  * tier keeps the weapon in front while staying inside the practical budget.
  */
-#if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
+#if DOOM_MULTIFLOOR_RENDER && DOOM_WALL_LAYERS == 3
+#define ENEMY_VISIBLE_COUNT 2       /* 20 backdrop + 60 walls + 8 things + 7 weapon = 95 */
+#elif DOOM_MULTIFLOOR_RENDER
+#define ENEMY_VISIBLE_COUNT 1       /* 20 backdrop + 64 walls + 4 things + 7 weapon = 91 */
+#elif DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
 #define ENEMY_VISIBLE_COUNT 4       /* 20 backdrop + 80 walls + 16 things + 7 weapon = 123 */
 #elif DOOM_SIMPLE_MAP
 #define ENEMY_VISIBLE_COUNT 8       /* 3 monsters + barrel + 4 pickups before HUD palettes */
@@ -227,7 +266,7 @@
 #endif
 
 #define ENEMY_STRIPS 4
-#define ENEMY_BASE   (WALL_BASE + NUM_COLS)
+#define ENEMY_BASE   (WALL_BASE + WALL_SPRITE_COUNT)
 #define ENEMY_COUNT  (ENEMY_VISIBLE_COUNT * ENEMY_STRIPS)
 #define ENEMY_WIN    5
 #define ENEMY_GROUND_LIFT 2         /* keeps prescaled Doom sprites seated on the raycast floor */
@@ -235,7 +274,7 @@
 #define WEAPON_COUNT 7
 #define WEAPON_WIN   8
 #define WEAPON_Y_OFFSET 0
-#define DOOM_PLAYFIELD_SPRITE_COUNT (BG_COUNT + NUM_COLS + ENEMY_COUNT + WEAPON_COUNT)
+#define DOOM_PLAYFIELD_SPRITE_COUNT (BG_COUNT + WALL_SPRITE_COUNT + ENEMY_COUNT + WEAPON_COUNT)
 #define DOOM_PLAYFIELD_SCANLINE_LIMIT 95
 #if !DOOM_SIMPLE_MAP && DOOM_PLAYFIELD_SPRITE_COUNT > DOOM_PLAYFIELD_SCANLINE_LIMIT
 #error "Active playfield sprites exceed the Neo Geo scanline budget"
@@ -303,6 +342,22 @@
 #define DOOM_PLANE_CEILING_FORWARD_PHASES 1
 #endif
 #endif
+#ifndef DOOM_CEILING_PERSPECTIVE
+#define DOOM_CEILING_PERSPECTIVE 1
+#endif
+#ifndef DOOM_DYNAMIC_SECTOR_FLATS
+#if DOOM_MULTIFLOOR_RENDER
+#define DOOM_DYNAMIC_SECTOR_FLATS 0
+#else
+#define DOOM_DYNAMIC_SECTOR_FLATS 1
+#endif
+#endif
+#ifndef DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT
+#define DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT 0
+#endif
+#ifndef DOOM_RIPDOOM_FOREGROUND_SPANS
+#define DOOM_RIPDOOM_FOREGROUND_SPANS DOOM_MULTIFLOOR_RENDER
+#endif
 #ifndef DOOM_PLANE_PHASE_SHIFT
 #define DOOM_PLANE_PHASE_SHIFT 15
 #endif
@@ -312,7 +367,11 @@
 #define TILE_PLANE_PERSPECTIVE_COLS BG_COUNT
 #define TILE_CEILING_PERSPECTIVE_ROWS BG_CEILING_ROWS
 #define TILE_FLOOR_PERSPECTIVE_ROWS BG_FLOOR_ROWS
+#if DOOM_CEILING_PERSPECTIVE
 #define TILE_CEILING_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * DOOM_PLANE_CEILING_FORWARD_PHASES * TILE_CEILING_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
+#else
+#define TILE_CEILING_PERSPECTIVE_TILES 0
+#endif
 #define TILE_FLOOR_PERSPECTIVE_TILES (TILE_PLANE_PERSPECTIVE_DIRS * DOOM_PLANE_FLOOR_FORWARD_PHASES * TILE_FLOOR_PERSPECTIVE_ROWS * TILE_PLANE_PERSPECTIVE_COLS)
 #ifndef BG_SCROLL_COLUMNS_PER_FRAME
 #define BG_SCROLL_COLUMNS_PER_FRAME 10

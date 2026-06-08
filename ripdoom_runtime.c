@@ -226,6 +226,18 @@ static int ripdoom_chunk_lift_seg_open(const NgRipSeg *seg, const NgRipVertex *v
 }
 #endif
 
+static int ripdoom_intersect_seg_ray(
+    unsigned short seg_index,
+    short x,
+    short y,
+    short dir_x_q8,
+    short dir_y_q8,
+    int min_t_q8,
+    int *out_t_q8,
+    int *out_u_q8,
+    int *out_side
+);
+
 static void ripdoom_consider_seg_ray(
     unsigned short seg_index,
     short x,
@@ -237,6 +249,39 @@ static void ripdoom_consider_seg_ray(
     int *best_t_q8,
     int *best_u_q8,
     int *best_side
+) {
+    int t_q8;
+    int u_q8;
+    int side;
+
+    if (!ripdoom_intersect_seg_ray(seg_index, x, y, dir_x_q8, dir_y_q8, min_t_q8, &t_q8, &u_q8, &side)) return;
+    if (t_q8 >= *best_t_q8) return;
+    *best_seg = seg_index;
+    *best_t_q8 = t_q8;
+    *best_u_q8 = u_q8;
+    *best_side = side;
+}
+
+static int ripdoom_seg_render_relevant(const NgRipSeg *seg) {
+    return seg && (seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID));
+}
+
+static int ripdoom_seg_solid_backdrop(const NgRipSeg *seg) {
+    if (!seg) return 0;
+    if (seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_ONE_SIDED)) return 1;
+    return (seg->span_flags & NG_RIP_SPAN_MID) && seg->mid_texture;
+}
+
+static int ripdoom_intersect_seg_ray(
+    unsigned short seg_index,
+    short x,
+    short y,
+    short dir_x_q8,
+    short dir_y_q8,
+    int min_t_q8,
+    int *out_t_q8,
+    int *out_u_q8,
+    int *out_side
 ) {
     const NgRipSeg *seg;
     const NgRipVertex *v1;
@@ -251,20 +296,20 @@ static void ripdoom_consider_seg_ray(
     int t_q8;
     int u_q8;
 
-    if (seg_index >= NG_RIP_SEG_COUNT) return;
+    if (seg_index >= NG_RIP_SEG_COUNT) return 0;
     seg = &g_rip_segs[seg_index];
-    if (!(seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_LOWER | NG_RIP_SEG_UPPER | NG_RIP_SEG_MID))) return;
-    if (seg->v1 >= NG_RIP_VERTEX_COUNT || seg->v2 >= NG_RIP_VERTEX_COUNT) return;
+    if (!ripdoom_seg_render_relevant(seg)) return 0;
+    if (seg->v1 >= NG_RIP_VERTEX_COUNT || seg->v2 >= NG_RIP_VERTEX_COUNT) return 0;
     v1 = &g_rip_vertices[seg->v1];
     v2 = &g_rip_vertices[seg->v2];
 #if DOOM_SIMPLE_MAP && DOOM_CHUNKED_SIMPLE_MAP
-    if (ripdoom_chunk_door_seg_open(seg, v1, v2)) return;
-    if (ripdoom_chunk_lift_seg_open(seg, v1, v2)) return;
+    if (ripdoom_chunk_door_seg_open(seg, v1, v2)) return 0;
+    if (ripdoom_chunk_lift_seg_open(seg, v1, v2)) return 0;
 #endif
     seg_x = (long)v2->x - v1->x;
     seg_y = (long)v2->y - v1->y;
     denom = (long)dir_x_q8 * seg_y - (long)dir_y_q8 * seg_x;
-    if (denom == 0) return;
+    if (denom == 0) return 0;
     rel_x = (long)v1->x - x;
     rel_y = (long)v1->y - y;
     num_t = rel_x * seg_y - rel_y * seg_x;
@@ -274,14 +319,14 @@ static void ripdoom_consider_seg_ray(
         num_t = -num_t;
         num_u = -num_u;
     }
-    if (num_t <= 0 || num_u < 0 || num_u > denom) return;
+    if (num_t <= 0 || num_u < 0 || num_u > denom) return 0;
     t_q8 = ripdoom_div_q8(num_t, denom);
-    if (t_q8 < min_t_q8 || t_q8 >= *best_t_q8) return;
+    if (t_q8 < min_t_q8) return 0;
     u_q8 = ripdoom_div_q8(num_u, denom);
-    *best_seg = seg_index;
-    *best_t_q8 = t_q8;
-    *best_u_q8 = u_q8;
-    *best_side = ((seg_x < 0 ? -seg_x : seg_x) > (seg_y < 0 ? -seg_y : seg_y)) ? 1 : 0;
+    *out_t_q8 = t_q8;
+    *out_u_q8 = u_q8;
+    *out_side = ((seg_x < 0 ? -seg_x : seg_x) > (seg_y < 0 ? -seg_y : seg_y)) ? 1 : 0;
+    return 1;
 }
 
 static void ripdoom_cast_sampled_blocks(
@@ -331,6 +376,70 @@ static void ripdoom_cast_sampled_blocks(
                 for (span_index = 0; span_index < span->numsegs; span_index++) {
                     unsigned short seg = g_rip_line_seg_indices[span->firstseg + span_index];
                     ripdoom_consider_seg_ray(seg, x, y, dir_x_q8, dir_y_q8, min_t_q8, best_seg, best_t_q8, best_u_q8, best_side);
+                }
+            }
+        }
+    }
+}
+
+static void ripdoom_cast_sampled_solid_blocks(
+    short x,
+    short y,
+    short dir_x_q8,
+    short dir_y_q8,
+    int block_radius,
+    int min_t_q8,
+    int *best_seg,
+    int *best_t_q8,
+    int *best_u_q8,
+    int *best_side
+) {
+    enum { SAMPLE_STEP = 64, MAX_SAMPLE_STEPS = 128 };
+    int max_steps = block_radius * 8;
+    int last_bx = -1;
+    int last_by = -1;
+    int step;
+    if (max_steps < 24) max_steps = 24;
+    if (max_steps > MAX_SAMPLE_STEPS) max_steps = MAX_SAMPLE_STEPS;
+
+    for (step = 0; step <= max_steps; step++) {
+        int dist = step * SAMPLE_STEP;
+        short sx = (short)(x + (((long)dir_x_q8 * dist) >> 8));
+        short sy = (short)(y + (((long)dir_y_q8 * dist) >> 8));
+        int bx;
+        int by;
+        int cell;
+        int offset;
+        if (*best_seg >= 0 && dist > ((*best_t_q8 >> 8) + (1 << RIPDOOM_BLOCKMAP_SHIFT))) break;
+        if (!ripdoom_blockmap_cell(sx, sy, &bx, &by)) continue;
+        if (bx == last_bx && by == last_by) continue;
+        last_bx = bx;
+        last_by = by;
+        cell = by * NG_RIP_BLOCKMAP_W + bx;
+        offset = g_rip_blockmap_words[4 + cell];
+        if (offset < 0 || offset >= NG_RIP_BLOCKMAP_WORD_COUNT) continue;
+        if (g_rip_blockmap_words[offset] == 0) offset++;
+        while (offset < NG_RIP_BLOCKMAP_WORD_COUNT && g_rip_blockmap_words[offset] != -1) {
+            int line = g_rip_blockmap_words[offset++];
+            if (line >= 0 && line < NG_RIP_LINE_COUNT) {
+                const NgRipLineSegSpan *span = &g_rip_line_seg_spans[line];
+                int span_index;
+                if ((int)span->firstseg + (int)span->numsegs > NG_RIP_LINE_SEG_INDEX_COUNT) continue;
+                for (span_index = 0; span_index < span->numsegs; span_index++) {
+                    unsigned short seg_index = g_rip_line_seg_indices[span->firstseg + span_index];
+                    const NgRipSeg *seg;
+                    int t_q8;
+                    int u_q8;
+                    int side;
+                    if (seg_index >= NG_RIP_SEG_COUNT) continue;
+                    seg = &g_rip_segs[seg_index];
+                    if (!ripdoom_seg_solid_backdrop(seg)) continue;
+                    if (!ripdoom_intersect_seg_ray(seg_index, x, y, dir_x_q8, dir_y_q8, min_t_q8, &t_q8, &u_q8, &side)) continue;
+                    if (t_q8 >= *best_t_q8) continue;
+                    *best_seg = seg_index;
+                    *best_t_q8 = t_q8;
+                    *best_u_q8 = u_q8;
+                    *best_side = side;
                 }
             }
         }
@@ -411,6 +520,243 @@ int ripdoom_collect_local_segs(short x, short y, int block_radius, unsigned shor
     return seg_count > max_segs ? max_segs : seg_count;
 }
 
+int ripdoom_collect_subsector_candidate_segs(short x, short y, unsigned short *out_segs, int max_segs, int *out_exhausted) {
+    int subsector;
+    const NgRipSubsectorCandidateSpan *span;
+    int count;
+    int i;
+    if (out_exhausted) *out_exhausted = 0;
+    if (!out_segs || max_segs <= 0) return 0;
+    subsector = ripdoom_point_subsector(x, y);
+    if (subsector < 0 || subsector >= NG_RIP_SUBSECTOR_COUNT) return 0;
+    span = &g_rip_subsector_candidate_spans[subsector];
+    count = span->numsegs;
+    if ((int)span->firstseg + count > NG_RIP_SUBSECTOR_CANDIDATE_INDEX_COUNT) return 0;
+    if (count > max_segs) {
+        count = max_segs;
+        if (out_exhausted) *out_exhausted = 1;
+    }
+    for (i = 0; i < count; i++) out_segs[i] = g_rip_subsector_candidate_indices[span->firstseg + i];
+    return count;
+}
+
+static void ripdoom_fill_ray_hit_from_seg(
+    int best_seg,
+    int best_t_q8,
+    int best_u_q8,
+    int best_side,
+    NgRipRayHit *out_hit
+) {
+    const NgRipSeg *seg = &g_rip_segs[best_seg];
+    unsigned short texture = seg->mid_texture;
+    unsigned char texture_kind = seg->mid_kind;
+    unsigned char span = 0;
+    unsigned char span_height = 0;
+    if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture = seg->lower_texture;
+    if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture_kind = seg->lower_kind;
+    else if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) {
+        texture = seg->upper_texture;
+        texture_kind = seg->upper_kind;
+    }
+    ripdoom_seg_span(seg, &span, &span_height);
+    out_hit->seg = (unsigned short)best_seg;
+    out_hit->linedef = (unsigned short)seg->linedef;
+    out_hit->sector = seg->front_sector;
+    out_hit->flags = seg->flags;
+    out_hit->texture = texture;
+    out_hit->distance_q8 = best_t_q8 > 0xffff ? 0xffff : (unsigned short)best_t_q8;
+    out_hit->texture_kind = texture_kind;
+    out_hit->tex_u = (unsigned char)(best_u_q8 > 255 ? 255 : best_u_q8);
+    out_hit->side = (unsigned char)best_side;
+    out_hit->span = span;
+    out_hit->span_height = span_height;
+    out_hit->z_bottom = seg->z_bottom;
+    out_hit->z_top = seg->z_top;
+    out_hit->span_flags = seg->span_flags;
+}
+
+typedef struct NgRipSpanCandidate {
+    NgRipRaySpan span;
+    unsigned char solid;
+} NgRipSpanCandidate;
+
+static unsigned char ripdoom_span_height_from_z(short z_bottom, short z_top) {
+    int delta = (int)z_top - (int)z_bottom;
+    if (delta < 0) delta = -delta;
+    return ripdoom_span_height_from_delta(delta);
+}
+
+static int ripdoom_sector_z(int sector_index, int ceiling) {
+    if (sector_index < 0 || sector_index >= NG_RIP_SECTOR_COUNT) return ceiling ? 128 : 0;
+    return ceiling ? g_rip_sectors[sector_index].ceiling_height : g_rip_sectors[sector_index].floor_height;
+}
+
+static void ripdoom_insert_span_candidate(NgRipSpanCandidate *candidates, int *count, const NgRipSpanCandidate *candidate) {
+    enum { MAX_CANDIDATES = 16 };
+    int pos;
+    if (!candidate->span.texture && !candidate->solid) return;
+    pos = *count;
+    if (pos > MAX_CANDIDATES) pos = MAX_CANDIDATES;
+    while (pos > 0 && candidates[pos - 1].span.distance_q8 > candidate->span.distance_q8) {
+        if (pos < MAX_CANDIDATES) candidates[pos] = candidates[pos - 1];
+        pos--;
+    }
+    if (pos < MAX_CANDIDATES) candidates[pos] = *candidate;
+    if (*count < MAX_CANDIDATES) (*count)++;
+}
+
+static void ripdoom_make_span_candidate(
+    const NgRipSeg *seg,
+    int seg_index,
+    int t_q8,
+    int u_q8,
+    int side,
+    unsigned char span_type,
+    unsigned short texture,
+    unsigned char texture_kind,
+    short z_bottom,
+    short z_top,
+    unsigned char span_flags,
+    unsigned char solid,
+    NgRipSpanCandidate *out_candidate
+) {
+    out_candidate->span.seg = (unsigned short)seg_index;
+    out_candidate->span.linedef = (unsigned short)seg->linedef;
+    out_candidate->span.sector = seg->front_sector;
+    out_candidate->span.flags = seg->flags;
+    out_candidate->span.texture = texture;
+    out_candidate->span.distance_q8 = t_q8 > 0xffff ? 0xffff : (unsigned short)t_q8;
+    out_candidate->span.texture_kind = texture_kind;
+    out_candidate->span.tex_u = (unsigned char)(u_q8 > 255 ? 255 : u_q8);
+    out_candidate->span.side = (unsigned char)side;
+    out_candidate->span.span = span_type;
+    out_candidate->span.span_height = ripdoom_span_height_from_z(z_bottom, z_top);
+    out_candidate->span.z_bottom = z_bottom;
+    out_candidate->span.z_top = z_top;
+    out_candidate->span.span_flags = span_flags;
+    out_candidate->solid = solid;
+}
+
+static void ripdoom_add_seg_span_candidates(
+    unsigned short seg_index,
+    int t_q8,
+    int u_q8,
+    int side,
+    NgRipSpanCandidate *candidates,
+    int *candidate_count
+) {
+    const NgRipSeg *seg;
+    int front_floor;
+    int front_ceil;
+    int back_floor;
+    int back_ceil;
+    NgRipSpanCandidate candidate;
+    if (seg_index >= NG_RIP_SEG_COUNT) return;
+    seg = &g_rip_segs[seg_index];
+    front_floor = ripdoom_sector_z(seg->front_sector, 0);
+    front_ceil = ripdoom_sector_z(seg->front_sector, 1);
+    back_floor = ripdoom_sector_z(seg->back_sector, 0);
+    back_ceil = ripdoom_sector_z(seg->back_sector, 1);
+
+    if ((seg->flags & (NG_RIP_SEG_SOLID | NG_RIP_SEG_DOOR | NG_RIP_SEG_ONE_SIDED)) || ((seg->span_flags & NG_RIP_SPAN_MID) && seg->mid_texture)) {
+        unsigned short texture = seg->mid_texture ? seg->mid_texture : (seg->upper_texture ? seg->upper_texture : seg->lower_texture);
+        unsigned char texture_kind = seg->mid_texture ? seg->mid_kind : (seg->upper_texture ? seg->upper_kind : seg->lower_kind);
+        ripdoom_make_span_candidate(seg, seg_index, t_q8, u_q8, side, 0, texture, texture_kind, front_floor, front_ceil, NG_RIP_SPAN_SOLID, 1, &candidate);
+        ripdoom_insert_span_candidate(candidates, candidate_count, &candidate);
+        return;
+    }
+
+    if ((seg->span_flags & NG_RIP_SPAN_LOWER) && seg->lower_texture) {
+        short z_bottom = (short)(front_floor < back_floor ? front_floor : back_floor);
+        short z_top = (short)(front_floor > back_floor ? front_floor : back_floor);
+        if (z_top > z_bottom) {
+            ripdoom_make_span_candidate(seg, seg_index, t_q8, u_q8, side, 1, seg->lower_texture, seg->lower_kind, z_bottom, z_top, NG_RIP_SPAN_LOWER, 0, &candidate);
+            ripdoom_insert_span_candidate(candidates, candidate_count, &candidate);
+        }
+    }
+    if ((seg->span_flags & NG_RIP_SPAN_UPPER) && seg->upper_texture && !(seg->span_flags & NG_RIP_SPAN_SKY_GAP)) {
+        short z_bottom = (short)(front_ceil < back_ceil ? front_ceil : back_ceil);
+        short z_top = (short)(front_ceil > back_ceil ? front_ceil : back_ceil);
+        if (z_top > z_bottom) {
+            ripdoom_make_span_candidate(seg, seg_index, t_q8, u_q8, side, 2, seg->upper_texture, seg->upper_kind, z_bottom, z_top, NG_RIP_SPAN_UPPER, 0, &candidate);
+            ripdoom_insert_span_candidate(candidates, candidate_count, &candidate);
+        }
+    }
+}
+
+int ripdoom_cast_local_ray_spans(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, NgRipRaySpanSet *out_spans) {
+    enum { LOCAL_SEG_LIMIT = 160, MAX_CANDIDATES = 16 };
+    unsigned short local_segs[LOCAL_SEG_LIMIT];
+    NgRipSpanCandidate candidates[MAX_CANDIDATES];
+    int local_count;
+    int candidate_count = 0;
+    int exhausted = 0;
+    int i;
+    if (!out_spans || (dir_x_q8 == 0 && dir_y_q8 == 0)) return 0;
+    out_spans->has_solid = 0;
+    out_spans->foreground_count = 0;
+    local_count = ripdoom_collect_subsector_candidate_segs(x, y, local_segs, LOCAL_SEG_LIMIT, &exhausted);
+    if (local_count <= 0 || exhausted) {
+        local_count = ripdoom_collect_local_segs(x, y, block_radius, local_segs, LOCAL_SEG_LIMIT);
+    }
+
+    for (i = 0; i < local_count; i++) {
+        int t_q8;
+        int u_q8;
+        int side;
+        if (!ripdoom_intersect_seg_ray(local_segs[i], x, y, dir_x_q8, dir_y_q8, 24, &t_q8, &u_q8, &side)) continue;
+        ripdoom_add_seg_span_candidates(local_segs[i], t_q8, u_q8, side, candidates, &candidate_count);
+    }
+
+    if (candidate_count <= 0) {
+        int best_seg = -1;
+        int best_t_q8 = 0x7fffffff;
+        int best_u_q8 = 0;
+        int best_side = 0;
+        ripdoom_cast_sampled_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, 24, &best_seg, &best_t_q8, &best_u_q8, &best_side);
+        if (best_seg >= 0) ripdoom_add_seg_span_candidates((unsigned short)best_seg, best_t_q8, best_u_q8, best_side, candidates, &candidate_count);
+    }
+
+    {
+        int has_local_solid = 0;
+        for (i = 0; i < candidate_count; i++) {
+            if (candidates[i].solid) {
+                has_local_solid = 1;
+                break;
+            }
+        }
+        if (!has_local_solid) {
+            int best_seg = -1;
+            int best_t_q8 = 0x7fffffff;
+            int best_u_q8 = 0;
+            int best_side = 0;
+            ripdoom_cast_sampled_solid_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, 24, &best_seg, &best_t_q8, &best_u_q8, &best_side);
+            if (best_seg >= 0) {
+                if (candidate_count >= MAX_CANDIDATES) candidate_count = MAX_CANDIDATES - 1;
+                ripdoom_add_seg_span_candidates((unsigned short)best_seg, best_t_q8, best_u_q8, best_side, candidates, &candidate_count);
+            }
+        }
+    }
+
+    for (i = 0; i < candidate_count; i++) {
+        if (candidates[i].solid) {
+            out_spans->solid = candidates[i].span;
+            out_spans->has_solid = 1;
+            break;
+        }
+        if (out_spans->foreground_count < 2) {
+            out_spans->foreground[out_spans->foreground_count++] = candidates[i].span;
+        }
+    }
+
+    if (!out_spans->has_solid) {
+        for (; i < candidate_count && out_spans->foreground_count < 2; i++) {
+            if (!candidates[i].solid) out_spans->foreground[out_spans->foreground_count++] = candidates[i].span;
+        }
+    }
+    return out_spans->has_solid || out_spans->foreground_count;
+}
+
 int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q8, int block_radius, unsigned short min_distance_q8, NgRipRayHit *out_hit) {
     enum { LOCAL_SEG_LIMIT = 128 };
     unsigned short local_segs[LOCAL_SEG_LIMIT];
@@ -420,9 +766,13 @@ int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q
     int best_u_q8 = 0;
     int best_side = 0;
     int i;
+    int exhausted = 0;
     int min_t_q8 = min_distance_q8 < 24 ? 24 : min_distance_q8;
     if (!out_hit || (dir_x_q8 == 0 && dir_y_q8 == 0)) return 0;
-    local_count = ripdoom_collect_local_segs(x, y, block_radius, local_segs, LOCAL_SEG_LIMIT);
+    local_count = ripdoom_collect_subsector_candidate_segs(x, y, local_segs, LOCAL_SEG_LIMIT, &exhausted);
+    if (local_count <= 0 || exhausted) {
+        local_count = ripdoom_collect_local_segs(x, y, block_radius, local_segs, LOCAL_SEG_LIMIT);
+    }
 
     for (i = 0; i < local_count; i++) {
         unsigned short seg_index = local_segs[i];
@@ -433,31 +783,7 @@ int ripdoom_cast_local_ray_after(short x, short y, short dir_x_q8, short dir_y_q
         ripdoom_cast_sampled_blocks(x, y, dir_x_q8, dir_y_q8, block_radius, min_t_q8, &best_seg, &best_t_q8, &best_u_q8, &best_side);
     }
     if (best_seg < 0) return 0;
-    {
-        const NgRipSeg *seg = &g_rip_segs[best_seg];
-        unsigned short texture = seg->mid_texture;
-        unsigned char texture_kind = seg->mid_kind;
-        unsigned char span = 0;
-        unsigned char span_height = 0;
-        if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture = seg->lower_texture;
-        if ((seg->flags & NG_RIP_SEG_LOWER) && seg->lower_texture) texture_kind = seg->lower_kind;
-        else if ((seg->flags & NG_RIP_SEG_UPPER) && seg->upper_texture) {
-            texture = seg->upper_texture;
-            texture_kind = seg->upper_kind;
-        }
-        ripdoom_seg_span(seg, &span, &span_height);
-        out_hit->seg = (unsigned short)best_seg;
-        out_hit->linedef = (unsigned short)seg->linedef;
-        out_hit->sector = seg->front_sector;
-        out_hit->flags = seg->flags;
-        out_hit->texture = texture;
-        out_hit->distance_q8 = best_t_q8 > 0xffff ? 0xffff : (unsigned short)best_t_q8;
-        out_hit->texture_kind = texture_kind;
-        out_hit->tex_u = (unsigned char)(best_u_q8 > 255 ? 255 : best_u_q8);
-        out_hit->side = (unsigned char)best_side;
-        out_hit->span = span;
-        out_hit->span_height = span_height;
-    }
+    ripdoom_fill_ray_hit_from_seg(best_seg, best_t_q8, best_u_q8, best_side, out_hit);
     return 1;
 }
 
