@@ -50,8 +50,8 @@ real hardware/performance tradeoff.
 `texture_columns`
 
 Generated STARTAN3 texture columns on the stable simple-map raycaster. Use this
-as the baseline for texture readability, column density, and classic floor
-motion before adding real WAD geometry.
+as the baseline for texture readability, column density, matched ceiling/floor
+plane motion, and full-frame backdrop refresh before adding real WAD geometry.
 
 `ripdoom_flat`
 

@@ -223,6 +223,9 @@ def main() -> int:
 
     try:
         defs, scales = parse_generated_sprites(args.gfx_header)
+        assert_sprite_fits("live former human walk frames", defs, scales, 3004, {1, 2, 3, 4, 5, 6, 7, 8}, args.crom_file_bytes)
+        assert_sprite_fits("former human corpse frame", defs, scales, 9001, {0}, args.crom_file_bytes)
+        assert_sprite_fits("former human death frames", defs, scales, 9010, {0}, args.crom_file_bytes)
         assert_sprite_fits("live imp walk frames", defs, scales, 3001, {1, 2, 3, 4, 5, 6, 7, 8}, args.crom_file_bytes)
         assert_sprite_fits("imp corpse frame", defs, scales, 9003, {0}, args.crom_file_bytes)
         assert_sprite_fits("imp death frames", defs, scales, 9012, {0}, args.crom_file_bytes)
