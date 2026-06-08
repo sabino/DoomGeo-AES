@@ -243,6 +243,19 @@ def apply_ceiling_perspective(enabled: bool) -> None:
     recompute_layout()
 
 
+def apply_titlepic(enabled: bool) -> None:
+    global TITLEPIC_COLS, TITLEPIC_ROWS, TITLEPIC_TILES
+
+    if enabled:
+        TITLEPIC_COLS = 20
+        TITLEPIC_ROWS = 13
+    else:
+        TITLEPIC_COLS = 0
+        TITLEPIC_ROWS = 0
+    TITLEPIC_TILES = TITLEPIC_COLS * TITLEPIC_ROWS
+    recompute_layout()
+
+
 def encode_tile(px):
     """px: 16x16 list-of-lists of palette indices (0..15) -> (c1, c2) bytes."""
     c1, c2 = bytearray(), bytearray()
@@ -830,6 +843,8 @@ def patch_grid_tiles(iwad, zip_member, patch_name, cols, rows):
 
 
 def titlepic_tiles(iwad, zip_member):
+    if TITLEPIC_TILES == 0:
+        return [], "disabled-title", [], 0, 0
     if not iwad:
         palette = [(6, 6, 8), (54, 40, 26), (118, 26, 18), (170, 146, 74), (210, 198, 150)] * 3
         return [tile_solid() for _ in range(TITLEPIC_TILES)], "fallback-title", palette, TITLEPIC_COLS * 16, 200
@@ -1393,6 +1408,7 @@ def main():
     ap.add_argument("--floor-forward-phases", type=int, help="Forward-motion floor plane cache phases")
     ap.add_argument("--ceiling-forward-phases", type=int, help="Forward-motion ceiling plane cache phases")
     ap.add_argument("--no-ceiling-perspective", action="store_true", help="Use a flat ceiling fill instead of baking ceiling perspective tiles")
+    ap.add_argument("--no-titlepic", action="store_true", help="Omit title picture C-ROM tiles for skip-intro experiment builds")
     ap.add_argument("--crom-file-bytes", type=lambda value: int(value, 0), default=C_PAD, help="Per-file C-ROM byte budget for live encoded tiles before padding")
     ap.add_argument("--map", default="E1M1", help="Doom map used to select player-start floor and ceiling flats")
     ap.add_argument("--palette-header", help="Generated wall palette header")
@@ -1453,6 +1469,7 @@ def main():
         args.ceiling_forward_phases if args.ceiling_forward_phases is not None else (2 if args.simple_map else 1),
     )
     apply_ceiling_perspective(not args.no_ceiling_perspective)
+    apply_titlepic(not args.no_titlepic)
 
     here = os.path.dirname(os.path.abspath(__file__))
     out = args.out_dir if args.out_dir else os.path.join(here, "..", "rom")
