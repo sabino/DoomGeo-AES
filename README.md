@@ -178,7 +178,6 @@ make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
 make DOOM_MAP=E1M1 DOOM_SKILL_MASK=2
-python3 tools/doomgeo_build.py build --target asm-rom
 python3 tools/doomgeo_build.py pages --out dist/pages
 make smoke-screenshot
 DOOM_MAP=E1M1 tools/capture_compare.sh

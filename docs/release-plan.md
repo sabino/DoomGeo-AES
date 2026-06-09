@@ -11,7 +11,6 @@ the other only accompanies and tracks the plan.
 - [x] Package both CLIs as standalone Linux and Windows binaries in GitHub Actions.
 - [x] Build the Neo Geo ROM in GitHub Actions on Ubuntu 24.04.
 - [x] Add a GitHub Pages bundle that plays the ROM through a WebAssembly/asm.js browser emulator frontend.
-- [x] Add a separate 68000 ASM ROM build and expose it from GitHub Pages.
 - [x] Add a fully native Windows/MSYS2 ROM build job after validating ngdevkit UCRT64 in CI.
 - [ ] Add signed release uploads for tagged builds.
 - [x] Add a smoke-run screenshot capture helper for the Linux ROM build.
@@ -22,16 +21,13 @@ the other only accompanies and tracks the plan.
 
 - Linux ROM builds are expected to produce `build/rom/magdrop2.zip` internally,
   then package it as `dist/rom/doomgeo.zip`.
-- ASM ROM builds are expected to produce `build/asm-rom/magdrop2.zip` from
-  `asm/doomgeo_asm.S`, then package it as `dist/asm-rom/doomgeo-asm.zip`.
 - Windows/MSYS2 ROM builds are expected to produce the same packaged
   `doomgeo.zip` through the UCRT64 ngdevkit packages.
 - Standalone helper builds are expected to produce `doomgeo-build` and
   `doomgeo-plan` artifacts for Linux, plus `.exe` variants for Windows.
-- The Pages bundle is expected to publish `index.html`, `asm.html`,
-  `rom/web-<hash>/magdrop2.zip`, `rom/web-<hash>/doomgeo.zip`,
-  `rom/web-<hash>/neogeo.zip`, `rom/asm/web-<hash>/magdrop2.zip`, and
-  `rom/asm/web-<hash>/doomgeo-asm.zip`.
+- The Pages bundle is expected to publish `index.html`,
+  `rom/web-<hash>/magdrop2.zip`, `rom/web-<hash>/doomgeo.zip`, and
+  `rom/web-<hash>/neogeo.zip`.
 - The Pages ROM zips are expected to be FBNeo-compatible launch packages with
   `magdrop2` driver chip filenames, sizes, and CRCs internally while preserving
   the generated homebrew data outside the final padding correction bytes.

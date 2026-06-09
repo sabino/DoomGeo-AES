@@ -59,34 +59,6 @@ jobs:
           path: dist/rom/*
           if-no-files-found: error
 
-  asm-rom:
-    name: 68000 ASM ROM
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install ngdevkit
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y software-properties-common zip
-          sudo add-apt-repository -y ppa:dciabrin/ngdevkit
-          sudo apt-get update
-          sudo apt-get install -y ngdevkit ngdevkit-gngeo
-
-      - name: Build ASM ROM
-        run: python3 tools/doomgeo_build.py build --tools-prefix /usr --target asm-rom
-
-      - name: Collect ASM ROM artifacts
-        run: python3 tools/doomgeo_build.py package --variant asm --out dist/asm-rom
-
-      - name: Upload ASM ROM
-        uses: actions/upload-artifact@v4
-        with:
-          name: doomgeo-asm-rom
-          path: dist/asm-rom/*
-          if-no-files-found: error
-
   pages-rom:
     name: GitHub Pages Freedoom ROM
     runs-on: ubuntu-24.04
@@ -226,7 +198,6 @@ jobs:
     needs:
       - rom
       - pages-rom
-      - asm-rom
     if: github.event_name != 'pull_request'
     environment:
       name: github-pages
@@ -241,14 +212,8 @@ jobs:
           name: doomgeo-pages-rom
           path: dist/pages-rom
 
-      - name: Download ASM ROM artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: doomgeo-asm-rom
-          path: dist/asm-rom
-
       - name: Build Pages bundle
-        run: python3 tools/doomgeo_build.py pages --rom dist/pages-rom/doomgeo.zip --bios dist/pages-rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-asm.zip --out dist/pages
+        run: python3 tools/doomgeo_build.py pages --rom dist/pages-rom/doomgeo.zip --bios dist/pages-rom/neogeo.zip --out dist/pages
 
       - name: Verify FBNeo web package CRCs
         run: |
@@ -283,21 +248,15 @@ jobs:
           main_rom = glob.glob("dist/pages/rom/web-*/doomgeo.zip")
           main_launch_rom = glob.glob("dist/pages/rom/web-*/magdrop2.zip")
           main_bios = glob.glob("dist/pages/rom/web-*/neogeo.zip")
-          asm_rom = glob.glob("dist/pages/rom/asm/web-*/doomgeo-asm.zip")
-          asm_launch_rom = glob.glob("dist/pages/rom/asm/web-*/magdrop2.zip")
-          if len(main_rom) != 1 or len(main_launch_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1 or len(asm_launch_rom) != 1:
+          if len(main_rom) != 1 or len(main_launch_rom) != 1 or len(main_bios) != 1:
               raise SystemExit(
                   "unexpected web package layout: "
-                  f"{main_rom=} {main_launch_rom=} {main_bios=} {asm_rom=} {asm_launch_rom=}"
+                  f"{main_rom=} {main_launch_rom=} {main_bios=}"
               )
           check(main_rom[0], expected_rom)
           check(main_rom[0], expected_bios)
           check(main_launch_rom[0], expected_rom)
           check(main_launch_rom[0], expected_bios)
-          check(asm_rom[0], expected_rom)
-          check(asm_rom[0], expected_bios)
-          check(asm_launch_rom[0], expected_rom)
-          check(asm_launch_rom[0], expected_bios)
           check(main_bios[0], expected_bios)
           PY
 
