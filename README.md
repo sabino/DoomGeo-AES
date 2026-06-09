@@ -1,6 +1,6 @@
-# DoomGeo-AES
+# DoomGeo
 
-DoomGeo-AES is a Neo Geo AES research prototype that pushes Doom-like gameplay
+DoomGeo is a Neo Geo AES research prototype that pushes Doom-like gameplay
 through the hardware the way the machine wants to draw: sprite strips, pre-baked
 graphics, fix-layer UI, and very small runtime data.
 
@@ -9,7 +9,7 @@ data offline, convert the map and assets into Neo Geo-friendly structures, and
 the 68000 runtime drives the scene by updating sprite control blocks rather than
 drawing pixels.
 
-![Current DoomGeo-AES gameplay](docs/screenshots/doomgeo-aes-current-gameplay.png)
+![Current DoomGeo gameplay](docs/screenshots/doomgeo-current-gameplay.png)
 
 ## Current State
 
@@ -30,43 +30,43 @@ drawing pixels.
 
 | Motion showcase |
 | --- |
-| ![Animated DoomGeo-AES default ROM showcase with forward walking, turning, and shooting](docs/screenshots/doomgeo-aes-motion.gif) |
+| ![Animated DoomGeo default ROM showcase with forward walking, turning, and shooting](docs/screenshots/doomgeo-motion.gif) |
 
 | Intro/menu | Current gameplay |
 | --- | --- |
-| ![Block-letter DoomGeo-AES intro menu for the compiled sample map](docs/screenshots/doomgeo-aes-intro-menu.png) | ![Current sample-map wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-aes-current-gameplay.png) |
+| ![Block-letter DoomGeo intro menu for the compiled sample map](docs/screenshots/doomgeo-intro-menu.png) | ![Current sample-map wall, floor, weapon, and HUD state](docs/screenshots/doomgeo-current-gameplay.png) |
 
 | Minimap overlay |
 | --- |
-| ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-aes-current-minimap.png) |
+| ![Fix-layer minimap overlay with map markers](docs/screenshots/doomgeo-current-minimap.png) |
 
 | Combat test ROM | Shotgun fire frame |
 | --- | --- |
-| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-aes-combat-test.png) | ![Combat interaction smoke with restrained weapon muzzle flash preserving shotgun detail](docs/screenshots/doomgeo-aes-combat-fired.png) |
+| ![Combat verification ROM with a visible imp and shotgun HUD state](docs/screenshots/doomgeo-combat-test.png) | ![Combat interaction smoke with restrained weapon muzzle flash preserving shotgun detail](docs/screenshots/doomgeo-combat-fired.png) |
 
 | Combat kill smoke |
 | --- |
-| ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-aes-combat-kill.png) |
+| ![Combat interaction smoke after killing the visible imp](docs/screenshots/doomgeo-combat-kill.png) |
 
 | Sample encounter | Sample scout route |
 | --- | --- |
-| ![Focused sample-map verification ROM with a visible monster](docs/screenshots/doomgeo-aes-e1m1-encounter.png) | ![Sample-map scout ROM with pickups and enemies visible](docs/screenshots/doomgeo-aes-e1m1-scout.png) |
+| ![Focused sample-map verification ROM with a visible monster](docs/screenshots/doomgeo-e1m1-encounter.png) | ![Sample-map scout ROM with pickups and enemies visible](docs/screenshots/doomgeo-e1m1-scout.png) |
 
 | Melee test ROM | Monster gallery ROM |
 | --- | --- |
-| ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-aes-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-aes-monster-gallery.png) |
+| ![Close-combat verification ROM with chainsaw equipped and a nearby imp](docs/screenshots/doomgeo-melee-test.png) | ![Living monster gallery ROM with multiple shareware Doom enemy sprites and a barrel](docs/screenshots/doomgeo-monster-gallery.png) |
 
 | Arsenal test ROM | Held-C weapon shortcut |
 | --- | --- |
-| ![Arsenal verification ROM with available WAD-backed weapons, keycards, ammo, and armor](docs/screenshots/doomgeo-aes-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-aes-weapon-shortcut-held.png) |
+| ![Arsenal verification ROM with available WAD-backed weapons, keycards, ammo, and armor](docs/screenshots/doomgeo-arsenal-test.png) | ![Held-C weapon shortcut smoke after pressing Right to select the chaingun](docs/screenshots/doomgeo-weapon-shortcut-held.png) |
 
 | Death/drop test ROM |
 | --- |
-| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-aes-death-test.png) |
+| ![Death/drop verification ROM with Doom corpses and a dropped shotgun rendered in the playfield](docs/screenshots/doomgeo-death-test.png) |
 
 | Powerup test ROM |
 | --- |
-| ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-aes-powerup-test.png) |
+| ![Powerup verification ROM with Doom powerup pickups and a visible imp](docs/screenshots/doomgeo-powerup-test.png) |
 
 The checked-in screenshot and motion-GIF set is currently captured from the
 optimized hand-authored sample map, not from the experimental converted-WAD
@@ -178,7 +178,6 @@ make DOOM_MAP=E1M2
 make DOOM_IWAD=/path/to/DOOM.WAD DOOM_MAP=E1M1
 make DOOM_MAP=E1M1 DOOM_MAP_WIDTH=38 DOOM_MAP_HEIGHT=27
 make DOOM_MAP=E1M1 DOOM_SKILL_MASK=2
-python3 tools/doomgeo_build.py build --target asm-rom
 python3 tools/doomgeo_build.py pages --out dist/pages
 make smoke-screenshot
 DOOM_MAP=E1M1 tools/capture_compare.sh
@@ -188,10 +187,9 @@ python3 tools/inspect_map_specials.py --map E1M2
 ```
 
 You must provide your own Neo Geo BIOS for local emulation. The browser package
-uses a separate Freedoom-based ROM and an FBNeo-compatible packaging path, but
-that does not rename the project: `DoomGeo-AES` is the game name. The browser
-player launches a `magdrop2` romset package internally so the arcade core
-accepts the generated homebrew ROM zip.
+uses a separate Freedoom-based ROM and an FBNeo-compatible packaging path. The
+browser player launches a `magdrop2` romset package internally so the arcade
+core accepts the generated DoomGeo homebrew ROM zip.
 
 ## Documentation
 
@@ -227,7 +225,7 @@ license-compatible. Current work adapts ideas and terminology only.
 
 ## License And Assets
 
-DoomGeo-AES is research/homebrew work derived from this repo's Neo Geo raycaster
+DoomGeo is research/homebrew work derived from this repo's Neo Geo raycaster
 code plus original conversion/runtime code written here. It does not include a
 commercial Doom IWAD, a Neo Geo BIOS, or proprietary id Software game data. The
 default build downloads shareware/Freedoom-compatible WAD data under `.tools/`

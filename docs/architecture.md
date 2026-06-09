@@ -1,6 +1,6 @@
 # Architecture Notes
 
-DoomGeo-AES uses the original Neo Geo raycaster idea from the video reference:
+DoomGeo uses the original Neo Geo raycaster idea from the video reference:
 do not draw pixels at runtime. Instead, prepare graphics in C-ROM format and let
 the video chip scale vertical sprite strips.
 

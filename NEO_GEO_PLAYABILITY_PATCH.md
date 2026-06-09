@@ -1,7 +1,7 @@
 # Neo Geo Playability Patch
 
 This branch adopts the useful parts of the external playability patch while
-preserving DoomGeo-AES' Neo Geo renderer model: WAD data is converted offline,
+preserving DoomGeo's Neo Geo renderer model: WAD data is converted offline,
 graphics are pre-baked into Neo Geo-friendly tiles, and the 68000 runtime
 updates sprite/fix-layer state instead of drawing a framebuffer.
 

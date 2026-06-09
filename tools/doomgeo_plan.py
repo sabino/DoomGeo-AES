@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan-only tracker for DoomGeo-AES.
+"""Plan-only tracker for DoomGeo.
 
 This helper deliberately does not build, install, or modify generated assets.
 It only edits the markdown plan file committed under docs/.
@@ -108,7 +108,7 @@ def add_item(path: Path, text: str) -> int:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Track the DoomGeo-AES release plan only.")
+    parser = argparse.ArgumentParser(description="Track the DoomGeo release plan only.")
     parser.add_argument("--repo", type=Path, default=None)
     parser.add_argument("--plan", type=Path, default=None)
     sub = parser.add_subparsers(dest="command", required=True)

@@ -269,7 +269,7 @@ GNGEO_BASE_DATAFILE:=$(GNGEO_DATAFILE)
 GNGEO_RUN_DATAFILE=$(ROM)/gngeo_data.zip
 
 %/gngeo_data.zip: %/202-p1.p1 %/202-m1.m1 %/202-v1.v1 %/202-s1.s1 %/202-c1.c1 %/202-c2.c2
-	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES --year 2026 --publisher Unpublished --prom $(@D)/202-p1.p1 --mrom $(@D)/202-m1.m1 --vrom $(@D)/202-v1.v1 --srom $(@D)/202-s1.s1 --crom $(@D)/202-c1.c1 $(@D)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo --year 2026 --publisher Unpublished --prom $(@D)/202-p1.p1 --mrom $(@D)/202-m1.m1 --vrom $(@D)/202-v1.v1 --srom $(@D)/202-s1.s1 --crom $(@D)/202-c1.c1 $(@D)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
 
 gngeo gngeo-fullscreen: GNGEO_DATAFILE=$(GNGEO_RUN_DATAFILE)
 gngeo gngeo-fullscreen: $(GNGEO_RUN_DATAFILE)
@@ -397,7 +397,7 @@ $(SPRITE_BANK_TEST_CART): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c
 	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
 
 $(SPRITE_BANK_TEST_GNGEO_DATAFILE): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 $(SPRITE_BANK_TEST_ROM)/202-s1.s1 $(SPRITE_BANK_TEST_ROM)/202-m1.m1 $(SPRITE_BANK_TEST_ROM)/202-v1.v1 | $(SPRITE_BANK_TEST_ROM)
-	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES-Sprite-Bank-Test --year 2026 --publisher Unpublished --prom $(SPRITE_BANK_TEST_PROM) --mrom $(SPRITE_BANK_TEST_ROM)/202-m1.m1 --vrom $(SPRITE_BANK_TEST_ROM)/202-v1.v1 --srom $(SPRITE_BANK_TEST_ROM)/202-s1.s1 --crom $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-Sprite-Bank-Test --year 2026 --publisher Unpublished --prom $(SPRITE_BANK_TEST_PROM) --mrom $(SPRITE_BANK_TEST_ROM)/202-m1.m1 --vrom $(SPRITE_BANK_TEST_ROM)/202-v1.v1 --srom $(SPRITE_BANK_TEST_ROM)/202-s1.s1 --crom $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
 
 sprite-bank-test-rom: $(SPRITE_BANK_TEST_CART)
 
@@ -611,57 +611,6 @@ chunk-powerup-test-gngeo:
 	$(MAKE) build/chunk-powerup-test-rom/gngeo_data.zip
 	$(GNGEO) --datafile="build/chunk-powerup-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-powerup-test-rom $(GAMEROM)
 
-ASM_ROM=$(BUILDDIR)/asm-rom
-ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
-ASM_GFX_STAMP=$(ASM_ASSET_ROM)/.generated-gfx
-ASM_ELF=$(BUILDDIR)/asm/doomgeo_asm.elf
-ASM_PROM=$(ASM_ROM)/202-p1.p1
-ASM_CART=$(ASM_ROM)/$(GAMEROM).zip
-ASM_SOUND_DRIVER=$(NGSHAREDIR)/nullsound_driver.ihx
-
-$(BUILDDIR)/%.o: %.S | $(BUILDDIR)
-	mkdir -p $(dir $@)
-	$(M68KGCC) $(NGCFLAGS) $(CFLAGS) -c $< -o $@
-
-$(ASM_ELF): $(BUILDDIR)/asm/doomgeo_asm.o
-	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
-
-$(ASM_ROM):
-	mkdir -p $@
-
-$(ASM_ASSET_ROM):
-	mkdir -p $@
-
-$(ASM_GFX_STAMP): tools/gen_asm_gfx.py | $(ASM_ASSET_ROM)
-	$(PYTHON) tools/gen_asm_gfx.py --out-dir $(ASM_ASSET_ROM)
-	touch $@
-
-$(ASM_PROM): $(ASM_ELF) | $(ASM_ROM)
-	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
-
-$(ASM_ROM)/202-c1.c1: $(ASM_GFX_STAMP) | $(ASM_ROM)
-	cp $(ASM_ASSET_ROM)/c1.bin $@
-$(ASM_ROM)/202-c2.c2: $(ASM_GFX_STAMP) | $(ASM_ROM)
-	cp $(ASM_ASSET_ROM)/c2.bin $@
-$(ASM_ROM)/202-s1.s1: $(ASM_GFX_STAMP) | $(ASM_ROM)
-	cp $(ASM_ASSET_ROM)/s1.bin $@
-$(ASM_ROM)/202-m1.m1: $(ASM_SOUND_DRIVER) | $(ASM_ROM)
-	$(Z80SDOBJCOPY) -I ihex -O binary $< $@ --pad-to $(MROMSIZE)
-$(ASM_ROM)/202-v1.v1: $(ASM_GFX_STAMP) | $(ASM_ROM)
-	cp $(ASM_ASSET_ROM)/v1.bin $@
-
-$(ASM_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(ASM_ROM)
-	cp $< $@
-
-$(ASM_CART): $(ASM_PROM) $(ASM_ROM)/202-c1.c1 $(ASM_ROM)/202-c2.c2 $(ASM_ROM)/202-s1.s1 $(ASM_ROM)/202-m1.m1 $(ASM_ROM)/202-v1.v1 $(ASM_ROM)/neogeo.zip
-	cd $(ASM_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
-	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
-
-asm-rom: $(ASM_CART)
-
-asm-gngeo: $(ASM_CART)
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
-
 smoke-screenshot:
 	tools/smoke_capture.sh
 
@@ -705,7 +654,7 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo sprite-bank-test-rom sprite-bank-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo sprite-bank-test-rom sprite-bank-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)

@@ -1,6 +1,6 @@
 # Reference Port Notes
 
-These repositories are useful research material for DoomGeo-AES, but they are
+These repositories are useful research material for DoomGeo, but they are
 not drop-in solutions for Neo Geo hardware. The current branch does not copy
 their code.
 
@@ -25,7 +25,7 @@ Useful ideas:
 
 Why it cannot be copied directly:
 
-- SNES Super FX rendering is framebuffer-oriented; DoomGeo-AES must stay on Neo
+- SNES Super FX rendering is framebuffer-oriented; DoomGeo must stay on Neo
   Geo sprite strips, fix-layer UI, and offline graphics conversion.
 - The assembly/runtime layout is tuned for SNES memory, cartridge mapping, and
   Super FX behavior, not the Neo Geo 68000/video-chip path.
@@ -53,7 +53,7 @@ Useful ideas:
 Why it cannot be copied directly:
 
 - The model assumes a normal `DG_ScreenBuffer` that the platform displays.
-- DoomGeo-AES has no framebuffer and cannot upload arbitrary per-frame pixels.
+- DoomGeo has no framebuffer and cannot upload arbitrary per-frame pixels.
 - The Neo Geo path must pre-bake graphics and update sprite control blocks
   instead.
 
@@ -87,7 +87,7 @@ Why it cannot be copied directly:
 
 - It still exposes Doom's framebuffer/audio model.
 - It is designed for devices that can receive a framebuffer and output it.
-- DoomGeo-AES must avoid runtime patch composition and pixel drawing.
+- DoomGeo must avoid runtime patch composition and pixel drawing.
 
 Potential adaptation:
 
@@ -116,7 +116,7 @@ Useful ideas:
 
 Neo Geo adaptation:
 
-- DoomGeo-AES keeps its generated-data, sprite/fix-layer model. It now uses a
+- DoomGeo keeps its generated-data, sprite/fix-layer model. It now uses a
   small Neo Geo-specific equivalent of the timing idea: the main loop detects a
   missed vblank window and gives the following active gameplay frame one capped
   extra player movement tick. This keeps walking and turning closer to real time
@@ -162,7 +162,7 @@ Useful ideas:
 - The Super FX source is useful as a constrained-console Doom renderer, not as
   source to paste into the Neo Geo runtime.
 - Its default configuration keeps true floor/ceiling texture mapping disabled
-  and uses cheaper solid/dithered floor drawing, which matches DoomGeo-AES's
+  and uses cheaper solid/dithered floor drawing, which matches DoomGeo's
   pre-baked floor/palette cue strategy.
 - Its view build is split into A/B/C screen ranges and gates high/low detail
   work before tracing, which is a good model for keeping movement responsive
@@ -179,7 +179,7 @@ Why it cannot be copied directly:
 
 - The code is Super FX assembly with GSU bank/cache/plot instructions, not 68000
   Neo Geo code.
-- Its drawing path writes pixels; DoomGeo-AES must preserve the offline
+- Its drawing path writes pixels; DoomGeo must preserve the offline
   conversion, C-ROM tile, sprite-strip, and fix-layer architecture.
 - Exact floor span rendering would spend runtime work in the wrong place for
   this hardware. Wall visibility and input response should keep priority.

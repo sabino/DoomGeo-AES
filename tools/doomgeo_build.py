@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DoomGeo-AES build helper.
+"""DoomGeo build helper.
 
 This script is intentionally dependency-light so GitHub Actions can package it
 as a single standalone binary with PyInstaller for Linux and Windows.
@@ -21,17 +21,13 @@ from typing import TypeAlias
 
 REPO_MARKERS = ("Makefile", "config.mk", "rom.mk")
 DEFAULT_LOCAL_PREFIX = Path(".tools") / "ngdevkit-local" / "usr"
-PROJECT_NAME = "DoomGeo-AES"
-PACKAGE_ROM_ZIP = "doomgeo-aes.zip"
-PACKAGE_ASM_ROM_ZIP = "doomgeo-aes-asm.zip"
+PROJECT_NAME = "DoomGeo"
+PACKAGE_ROM_ZIP = "doomgeo.zip"
 FBNEO_COMPAT_ROM_ZIP = "magdrop2.zip"
 FBNEO_DRIVER_NAME = "magdrop2"
 ROM_ZIP = Path("build") / "rom" / FBNEO_COMPAT_ROM_ZIP
 ROM_ELF = Path("build") / "rom.elf"
 BIOS_ZIP = Path("build") / "rom" / "neogeo.zip"
-ASM_ROM_ZIP = Path("build") / "asm-rom" / FBNEO_COMPAT_ROM_ZIP
-ASM_ROM_ELF = Path("build") / "asm" / "doomgeo_asm.elf"
-ASM_BIOS_ZIP = Path("build") / "asm-rom" / "neogeo.zip"
 FBNEO_ROM_ENTRIES = {
     "221-p1.p1": ("202-p1.p1", 0x80000, 0x7BE82353),
     "221-s1.s1": ("202-s1.s1", 0x20000, 0x2A4063A3),
@@ -266,20 +262,13 @@ def build(root: Path, prefix_arg: str | None, target: str, run_emulator: bool) -
         run(["make", "gngeo"], cwd=root, env=env)
 
 
-def package_artifacts(root: Path, out_dir: Path, variant: str) -> None:
+def package_artifacts(root: Path, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    if variant == "asm":
-        artifacts = (
-            (ASM_ROM_ZIP, PACKAGE_ASM_ROM_ZIP),
-            (ASM_ROM_ELF, ASM_ROM_ELF.name),
-            (ASM_BIOS_ZIP, ASM_BIOS_ZIP.name),
-        )
-    else:
-        artifacts = (
-            (ROM_ZIP, PACKAGE_ROM_ZIP),
-            (ROM_ELF, ROM_ELF.name),
-            (BIOS_ZIP, BIOS_ZIP.name),
-        )
+    artifacts = (
+        (ROM_ZIP, PACKAGE_ROM_ZIP),
+        (ROM_ELF, ROM_ELF.name),
+        (BIOS_ZIP, BIOS_ZIP.name),
+    )
     copied = 0
     for artifact, packaged_name in artifacts:
         source = root / artifact
@@ -443,9 +432,7 @@ def html_page(
     game_url: str,
     download_url: str,
     bios_url: str,
-    extra_link: str | None = None,
 ) -> str:
-    extra_action = f'\n      <a class="button" href="{extra_link}">Open ASM Build</a>' if extra_link else ""
     template = """<!doctype html>
 <html lang="en">
 <head>
@@ -532,7 +519,6 @@ def html_page(
     <div class="actions">
       <a class="button" href="__DOWNLOAD_URL__">Download ROM</a>
       <a class="button" href="__BIOS_URL__">Download web BIOS</a>
-      __EXTRA_ACTION__
     </div>
   </main>
   <script>
@@ -555,7 +541,6 @@ def html_page(
         .replace("__GAME_URL__", game_url)
         .replace("__DOWNLOAD_URL__", download_url)
         .replace("__BIOS_URL__", bios_url)
-        .replace("__EXTRA_ACTION__", extra_action)
     )
 
 
@@ -564,7 +549,6 @@ def build_pages(
     out_dir: Path,
     rom_source: Path | None,
     bios_source: Path | None,
-    asm_rom_source: Path | None,
 ) -> None:
     rom = (root / rom_source).resolve() if rom_source else root / ROM_ZIP
     bios = (root / bios_source).resolve() if bios_source else root / BIOS_ZIP
@@ -572,10 +556,7 @@ def build_pages(
         raise BuildError(f"ROM not found: {rom}")
     if not bios.exists():
         raise BuildError(f"BIOS not found: {bios}")
-    version_inputs = [rom, bios]
-    if asm_rom_source:
-        version_inputs.append((root / asm_rom_source).resolve())
-    version = web_asset_version(version_inputs)
+    version = web_asset_version([rom, bios])
     rom_out = out_dir / "rom" / f"web-{version}"
     rom_out.mkdir(parents=True, exist_ok=True)
     main_rom_url = f"rom/web-{version}/{PACKAGE_ROM_ZIP}"
@@ -594,31 +575,9 @@ def build_pages(
             main_launch_rom_url,
             main_rom_url,
             bios_url,
-            "asm.html" if asm_rom_source else None,
         ),
         encoding="utf-8",
     )
-    if asm_rom_source:
-        asm_rom = (root / asm_rom_source).resolve()
-        if not asm_rom.exists():
-            raise BuildError(f"ASM ROM not found: {asm_rom}")
-        asm_out = out_dir / "rom" / "asm" / f"web-{version}"
-        asm_out.mkdir(parents=True, exist_ok=True)
-        asm_rom_url = f"rom/asm/web-{version}/{PACKAGE_ASM_ROM_ZIP}"
-        asm_launch_rom_url = f"rom/asm/web-{version}/{FBNEO_COMPAT_ROM_ZIP}"
-        build_fbneo_rom_zip(asm_rom, asm_out / FBNEO_COMPAT_ROM_ZIP, bios)
-        shutil.copy2(asm_out / FBNEO_COMPAT_ROM_ZIP, asm_out / PACKAGE_ASM_ROM_ZIP)
-        (out_dir / "asm.html").write_text(
-            html_page(
-                f"{PROJECT_NAME} ASM",
-                "A separate 68000 assembly cartridge build with a controller-driven Neo Geo sprite scene.",
-                FBNEO_DRIVER_NAME,
-                asm_launch_rom_url,
-                asm_rom_url,
-                bios_url,
-            ),
-            encoding="utf-8",
-        )
     print_step(f"wrote GitHub Pages site to {out_dir}")
 
 
@@ -692,13 +651,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     package = sub.add_parser("package", help="copy build artifacts into an output directory")
     package.add_argument("--out", type=Path, default=Path("dist") / "rom")
-    package.add_argument("--variant", choices=("c", "asm"), default="c")
 
     pages = sub.add_parser("pages", help="build a GitHub Pages playable web bundle")
     pages.add_argument("--out", type=Path, default=Path("dist") / "pages")
     pages.add_argument("--rom", type=Path, default=None)
     pages.add_argument("--bios", type=Path, default=None)
-    pages.add_argument("--asm-rom", type=Path, default=None, help="optional ASM ROM zip to expose at asm.html")
 
     remove = sub.add_parser("uninstall", help="remove repo-local installed tools")
     remove.add_argument("--all", action="store_true", help="also remove cached WADs/downloaded packages")
@@ -728,10 +685,10 @@ def main(argv: list[str] | None = None) -> int:
             build(root, args.tools_prefix, args.target, args.run)
             return 0
         if args.command == "package":
-            package_artifacts(root, (root / args.out).resolve(), args.variant)
+            package_artifacts(root, (root / args.out).resolve())
             return 0
         if args.command == "pages":
-            build_pages(root, (root / args.out).resolve(), args.rom, args.bios, args.asm_rom)
+            build_pages(root, (root / args.out).resolve(), args.rom, args.bios)
             return 0
         if args.command == "uninstall":
             uninstall(root, args.all, args.dry_run)

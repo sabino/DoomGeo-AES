@@ -14,7 +14,7 @@ GIF_FRAME_DIR="$OUT_DIR/gif-frames"
 DOC_SCREEN_DIR="docs/screenshots"
 LOG_DIR=".tools/logs"
 LOG="$LOG_DIR/docs-media-gngeo.log"
-GIF_OUT="$DOC_SCREEN_DIR/doomgeo-aes-motion.gif"
+GIF_OUT="$DOC_SCREEN_DIR/doomgeo-motion.gif"
 CAPTURE_P1CONTROL="${SMOKE_P1CONTROL:-A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79}"
 
 require_cmd() {
@@ -174,18 +174,18 @@ capture_default_rom_media() {
 }
 
 copy_curated_media() {
-    cp "$STATIC_DIR/intro-menu.png" "$DOC_SCREEN_DIR/doomgeo-aes-intro-menu.png"
-    cp "$STATIC_DIR/current-gameplay.png" "$DOC_SCREEN_DIR/doomgeo-aes-current-gameplay.png"
-    cp "$STATIC_DIR/current-minimap.png" "$DOC_SCREEN_DIR/doomgeo-aes-current-minimap.png"
-    cp "$STATIC_DIR/combat-initial.png" "$DOC_SCREEN_DIR/doomgeo-aes-combat-test.png"
-    cp "$STATIC_DIR/combat-fired.png" "$DOC_SCREEN_DIR/doomgeo-aes-combat-fired.png"
-    cp "$STATIC_DIR/combat-death.png" "$DOC_SCREEN_DIR/doomgeo-aes-combat-kill.png"
-    cp "$STATIC_DIR/e1m1-encounter-initial.png" "$DOC_SCREEN_DIR/doomgeo-aes-e1m1-encounter.png"
-    cp "$STATIC_DIR/e1m1-scout-initial.png" "$DOC_SCREEN_DIR/doomgeo-aes-e1m1-scout.png"
-    cp "$STATIC_DIR/monster-gallery.png" "$DOC_SCREEN_DIR/doomgeo-aes-monster-gallery.png"
-    cp "$STATIC_DIR/weapon-shortcut-before.png" "$DOC_SCREEN_DIR/doomgeo-aes-arsenal-test.png"
-    cp "$STATIC_DIR/weapon-shortcut-held-c-right.png" "$DOC_SCREEN_DIR/doomgeo-aes-weapon-shortcut-held.png"
-    cp "$STATIC_DIR/death-drop.png" "$DOC_SCREEN_DIR/doomgeo-aes-death-test.png"
+    cp "$STATIC_DIR/intro-menu.png" "$DOC_SCREEN_DIR/doomgeo-intro-menu.png"
+    cp "$STATIC_DIR/current-gameplay.png" "$DOC_SCREEN_DIR/doomgeo-current-gameplay.png"
+    cp "$STATIC_DIR/current-minimap.png" "$DOC_SCREEN_DIR/doomgeo-current-minimap.png"
+    cp "$STATIC_DIR/combat-initial.png" "$DOC_SCREEN_DIR/doomgeo-combat-test.png"
+    cp "$STATIC_DIR/combat-fired.png" "$DOC_SCREEN_DIR/doomgeo-combat-fired.png"
+    cp "$STATIC_DIR/combat-death.png" "$DOC_SCREEN_DIR/doomgeo-combat-kill.png"
+    cp "$STATIC_DIR/e1m1-encounter-initial.png" "$DOC_SCREEN_DIR/doomgeo-e1m1-encounter.png"
+    cp "$STATIC_DIR/e1m1-scout-initial.png" "$DOC_SCREEN_DIR/doomgeo-e1m1-scout.png"
+    cp "$STATIC_DIR/monster-gallery.png" "$DOC_SCREEN_DIR/doomgeo-monster-gallery.png"
+    cp "$STATIC_DIR/weapon-shortcut-before.png" "$DOC_SCREEN_DIR/doomgeo-arsenal-test.png"
+    cp "$STATIC_DIR/weapon-shortcut-held-c-right.png" "$DOC_SCREEN_DIR/doomgeo-weapon-shortcut-held.png"
+    cp "$STATIC_DIR/death-drop.png" "$DOC_SCREEN_DIR/doomgeo-death-test.png"
 }
 
 encode_motion_gif() {
@@ -199,18 +199,18 @@ encode_motion_gif() {
 remove_duplicate_docs_media() {
     rm -f \
         "$DOC_SCREEN_DIR/doom-neogeo-current.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-bfg-fallback.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-current-hud.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-e1m1-encounter-fired.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-e1m1-exit-complete.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-e1m1-scout-fired.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-hidden-attack.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-key-door-missing-key.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-key-door-opened.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-key-door-test.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-key-door-through.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-key-test-start.png" \
-        "$DOC_SCREEN_DIR/doomgeo-aes-native-comparison.png" \
+        "$DOC_SCREEN_DIR/doomgeo-bfg-fallback.png" \
+        "$DOC_SCREEN_DIR/doomgeo-current-hud.png" \
+        "$DOC_SCREEN_DIR/doomgeo-e1m1-encounter-fired.png" \
+        "$DOC_SCREEN_DIR/doomgeo-e1m1-exit-complete.png" \
+        "$DOC_SCREEN_DIR/doomgeo-e1m1-scout-fired.png" \
+        "$DOC_SCREEN_DIR/doomgeo-hidden-attack.png" \
+        "$DOC_SCREEN_DIR/doomgeo-key-door-missing-key.png" \
+        "$DOC_SCREEN_DIR/doomgeo-key-door-opened.png" \
+        "$DOC_SCREEN_DIR/doomgeo-key-door-test.png" \
+        "$DOC_SCREEN_DIR/doomgeo-key-door-through.png" \
+        "$DOC_SCREEN_DIR/doomgeo-key-test-start.png" \
+        "$DOC_SCREEN_DIR/doomgeo-native-comparison.png" \
         "$DOC_SCREEN_DIR/item-ground-after-bias.png" \
         "$DOC_SCREEN_DIR/item-ground-after.png" \
         "$DOC_SCREEN_DIR/item-ground-before-after.png" \
