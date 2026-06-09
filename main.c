@@ -6376,7 +6376,7 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
 
     if (thing_is_corpse(thing_type)) return origin_y + 2;
     if (thing_is_pickup(thing_type)) {
-        if (origin_y > GAME_H - 10) origin_y = GAME_H - 10;
+        if (origin_y > GAME_H - 8) origin_y = GAME_H - 8;
         return origin_y + 1;
     }
     if (thing_is_barrel(thing_type)) return origin_y + 1;
@@ -6458,6 +6458,47 @@ static int thing_adjusted_screen_height(u16 thing_type, int h) {
     return h;
 }
 
+static u16 sprite_zoom_q8_for_projected_height(const DoomSpriteScale *meta, int h, u8 hardware_scale) {
+    long zoom;
+    if (!hardware_scale || meta->height == 0) return 256;
+    zoom = ((long)h * 256L) / meta->height;
+    if (zoom < 48) zoom = 48;
+    if (zoom > 256) zoom = 256;
+    return (u16)zoom;
+}
+
+static u16 pickup_zoom_q8_for_distance(int dist_q8) {
+    enum {
+        PICKUP_FULL_DIST_Q8 = WORLD_Q8(256),
+        PICKUP_FAR_DIST_Q8 = WORLD_Q8(1280),
+        PICKUP_FAR_ZOOM_Q8 = 48
+    };
+    long span;
+    long t;
+    long zoom;
+    if (dist_q8 <= PICKUP_FULL_DIST_Q8) return 256;
+    if (dist_q8 >= PICKUP_FAR_DIST_Q8) return PICKUP_FAR_ZOOM_Q8;
+    span = (long)PICKUP_FAR_DIST_Q8 - PICKUP_FULL_DIST_Q8;
+    t = (long)dist_q8 - PICKUP_FULL_DIST_Q8;
+    zoom = 256L - (t * (256L - PICKUP_FAR_ZOOM_Q8)) / span;
+    if (zoom < PICKUP_FAR_ZOOM_Q8) zoom = PICKUP_FAR_ZOOM_Q8;
+    if (zoom > 256) zoom = 256;
+    return (u16)zoom;
+}
+
+static u16 sprite_hshrink_for_zoom(u16 zoom_q8) {
+    int width = (int)((16L * zoom_q8 + 255L) >> 8);
+    if (width < 1) width = 1;
+    if (width > 16) width = 16;
+    return (u16)(width - 1);
+}
+
+static u16 sprite_vshrink_for_zoom(u16 zoom_q8) {
+    if (zoom_q8 >= 256) return 0xFF;
+    if (zoom_q8 < 1) return 0;
+    return (u16)(zoom_q8 - 1);
+}
+
 static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short world_x_q8, short world_y_q8,
                            int sx, int h, int dist_q8,
                            u8 flash, u8 fallback_projection, int view_px, int view_py) {
@@ -6467,6 +6508,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     u8 is_pickup = thing_is_pickup(thing_type);
     u8 is_projectile = thing_is_projectile(thing_type);
     u8 is_explosion = thing_is_explosion(thing_type);
+    u8 hardware_scale = is_pickup;
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index, view_px, view_py);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
@@ -6506,7 +6548,9 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     else if (h > 24) idx = 3;
     else idx = 4;
     if (is_monster && idx > 1) idx = 1;
-#if !DOOM_SIMPLE_MAP
+#if DOOM_SIMPLE_MAP
+    if (is_pickup) idx = 0;
+#else
     if (is_pickup && idx > 1) idx = 1;
 #endif
     if (is_projectile && idx > 3) idx = 3;
@@ -6522,30 +6566,40 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     }
     {
         u8 rendered = 0;
-        int sprite_x = sx - meta->origin_x;
+        u16 zoom_q8 = is_pickup
+            ? pickup_zoom_q8_for_distance(dist_q8)
+            : sprite_zoom_q8_for_projected_height(meta, h, hardware_scale);
+        u16 hshrink = sprite_hshrink_for_zoom(zoom_q8);
+        u16 vshrink = sprite_vshrink_for_zoom(zoom_q8);
+        int strip_step = hardware_scale ? (int)hshrink + 1 : 16;
+        int scaled_origin_x = hardware_scale ? (int)(((long)meta->origin_x * zoom_q8 + 128L) >> 8) : meta->origin_x;
+        int scaled_origin_y = hardware_scale ? (int)(((long)meta->origin_y * zoom_q8 + 128L) >> 8) : meta->origin_y;
+        int scaled_width = hardware_scale ? (int)(((long)meta->width * zoom_q8 + 128L) >> 8) : meta->width;
+        int scaled_height = hardware_scale ? (int)(((long)meta->height * zoom_q8 + 128L) >> 8) : meta->height;
+        int sprite_x = sx - scaled_origin_x;
         int visible_left = SCRW;
         int visible_right = 0;
         int top;
         enemies[slot].screen_x = sprite_x;
-        enemies[slot].screen_w = meta->width;
+        enemies[slot].screen_w = scaled_width;
+        if (hardware_scale) enemies[slot].screen_h = scaled_height;
         if ((is_explosion && thing_index < 0) || is_projectile) {
-            top = (GAME_H - meta->height) / 2;
+            top = (GAME_H - scaled_height) / 2;
         } else {
             top = world_sprite_origin_y(thing_type, h)
                 - projected_floor_screen_offset(world_x_q8, world_y_q8, h, view_px, view_py)
-                - meta->origin_y + ENEMY_GROUND_LIFT;
-            if (is_pickup) top += pickup_floor_distance_bias(dist_q8);
+                - scaled_origin_y + ENEMY_GROUND_LIFT;
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
             u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
-            int strip_x = sprite_x + j * 16;
+            int strip_x = sprite_x + j * strip_step;
             if (j < meta->strips && strip_x > -16 && strip_x < SCRW
-                && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + 15, dist_q8))) {
+                && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + strip_step - 1, dist_q8))) {
                 int strip_left = strip_x < 0 ? 0 : strip_x;
-                int strip_right = strip_x + 16;
+                int strip_right = strip_x + strip_step;
                 if (strip_right > SCRW) strip_right = SCRW;
-                scb2(spr, 0x0F, 0xFF);
+                scb2(spr, hshrink, vshrink);
                 scb3(spr, top, 0, meta->rows);
                 scb4(spr, (u16)strip_x);
                 if (strip_left < visible_left) visible_left = strip_left;

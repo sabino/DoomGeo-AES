@@ -81,7 +81,6 @@ DOOM_PLANE_CEILING_FORWARD_PHASES?=1
 DOOM_CEILING_PERSPECTIVE?=0
 DOOM_DYNAMIC_SECTOR_FLATS?=0
 DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT?=0
-DOOM_CROM_FILE_BYTES?=1048576
 else
 DOOM_PLANE_FLOOR_FORWARD_PHASES?=1
 DOOM_PLANE_CEILING_FORWARD_PHASES?=1
@@ -93,17 +92,12 @@ DOOM_RIPDOOM_FOREGROUND_SPANS?=$(DOOM_MULTIFLOOR_RENDER)
 DOOM_FLAT_PLANES?=0
 DOOM_CROM_FILE_BYTES?=4194304
 DOOM_PLANE_PHASE_SHIFT?=15
-DOOM_E1M1_MULTIFLOOR_SPRITES=3004:POSSA1,3004:POSSA2A8,3004:POSSA3A7,3004:POSSA4A6,3004:POSSA5,3004:POSSB1,3004:POSSB2B8,3004:POSSB3B7,3004:POSSB4B6,3004:POSSB5,3001:TROOA1,3001:TROOA2A8,3001:TROOA3A7,3001:TROOA4A6,3001:TROOA5,3001:TROOB1,3001:TROOB2B8,3001:TROOB3B7,3001:TROOB4B6,3001:TROOB5,9010:POSSH0,9015:POSSI0,9020:POSSJ0,9032:POSSK0,9001:POSSL0,9012:TROOI0,9017:TROOJ0,9022:TROOK0,9034:TROOL0,9003:TROOR0,5:BKEYA0,6:YKEYA0,13:RKEYA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2007:CLIPA0,2008:SHELA0,2011:STIMA0,2012:MEDIA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2046:BROKA0,2048:AMMOA0,2049:SBOXA0,2035:BAR1A0,9000:BEXPC0,9006:BAL1A0
-DOOM_SIMPLE_PLAYABLE_SPRITES=3004:POSSA1,3004:POSSA3A7,3004:POSSA5,3004:POSSB1,3004:POSSB3B7,3004:POSSB5,3001:TROOA1,3001:TROOA3A7,3001:TROOA5,3001:TROOB1,3001:TROOB3B7,3001:TROOB5,9010:POSSH0,9015:POSSI0,9020:POSSJ0,9032:POSSK0,9001:POSSL0,9012:TROOI0,9017:TROOJ0,9022:TROOK0,9034:TROOL0,9003:TROOR0,5:BKEYA0,6:YKEYA0,8:BPAKA0,13:RKEYA0,2001:SHOTA0,2002:MGUNA0,2003:LAUNA0,2005:CSAWA0,2007:CLIPA0,2008:SHELA0,2010:ROCKA0,2011:STIMA0,2012:MEDIA0,2013:SOULA0,2014:BON1A0,2015:BON2A0,2018:ARM1A0,2019:ARM2A0,2024:PINVA0,2025:SUITA0,2026:PMAPA0,2035:BAR1A0,2045:PVISA0,2046:BROKA0,2048:AMMOA0,2049:SBOXA0,9000:BEXPC0,9006:BAL1A0
-DOOM_SIMPLE_EXPERIMENT_SPRITES=$(DOOM_SIMPLE_PLAYABLE_SPRITES)
 ifeq ($(DOOM_SIMPLE_MAP),1)
 ifeq ($(DOOM_CHUNKED_SIMPLE_MAP),0)
-DOOM_MONSTER_SPRITES?=$(DOOM_SIMPLE_PLAYABLE_SPRITES)
 DOOM_SPRITE_SCALES?=1.00,0.75,0.50,0.33
 endif
 endif
 ifeq ($(DOOM_MULTIFLOOR_RENDER),1)
-DOOM_MONSTER_SPRITES?=$(DOOM_E1M1_MULTIFLOOR_SPRITES)
 DOOM_SPRITE_SCALES?=1.00,0.75,0.50,0.33,0.25
 endif
 EPISODE_MAPS?=E1M1 E1M2 E1M3 E1M4 E1M5 E1M6 E1M7 E1M8 E1M9
@@ -270,9 +264,19 @@ include build.mk
 # Some default targets for running your project via emulators
 include emu.mk
 
-# Keep the packaged C-ROM size aligned with the build's visible graphics
-# budget. The puzzledp GnGeo driver maps only the first 1 MiB of each C ROM,
-# so the multifloor slice must not silently place live tiles beyond that.
+ROMTOOL?=$(TOOL_BINDIR)/romtool.py
+GNGEO_BASE_DATAFILE:=$(GNGEO_DATAFILE)
+GNGEO_RUN_DATAFILE=$(ROM)/gngeo_data.zip
+
+%/gngeo_data.zip: %/202-p1.p1 %/202-m1.m1 %/202-v1.v1 %/202-s1.s1 %/202-c1.c1 %/202-c2.c2
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES --year 2026 --publisher Unpublished --prom $(@D)/202-p1.p1 --mrom $(@D)/202-m1.m1 --vrom $(@D)/202-v1.v1 --srom $(@D)/202-s1.s1 --crom $(@D)/202-c1.c1 $(@D)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+
+gngeo gngeo-fullscreen: GNGEO_DATAFILE=$(GNGEO_RUN_DATAFILE)
+gngeo gngeo-fullscreen: $(GNGEO_RUN_DATAFILE)
+
+# Keep the packaged C-ROM size explicit. Local GnGeo launches generate a
+# matching datafile because the stock puzzledp metadata only maps 1 MiB per
+# C-ROM and corrupts/omits larger generated sprite banks.
 CROMSIZE=$(DOOM_CROM_FILE_BYTES)
 
 
@@ -343,8 +347,63 @@ $(FACE_TEST_CART): $(FACE_TEST_PROM) $(FACE_TEST_ROM)/202-c1.c1 $(FACE_TEST_ROM)
 
 face-test-rom: $(FACE_TEST_CART)
 
-face-test-gngeo: $(FACE_TEST_CART)
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(FACE_TEST_ROM) $(GAMEROM)
+face-test-gngeo: $(FACE_TEST_CART) $(FACE_TEST_ROM)/gngeo_data.zip
+	$(GNGEO) --datafile="$(FACE_TEST_ROM)/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(FACE_TEST_ROM) $(GAMEROM)
+
+SPRITE_BANK_TEST_BUILDDIR=build/sprite-bank-test
+SPRITE_BANK_TEST_ROM=build/sprite-bank-test-rom
+SPRITE_BANK_TEST_ASSETS=build/sprite-bank-test-assets
+SPRITE_BANK_TEST_GFX_HEADER=$(SPRITE_BANK_TEST_BUILDDIR)/doom_gfx_generated.h
+SPRITE_BANK_TEST_GFX_STAMP=$(SPRITE_BANK_TEST_ASSETS)/.generated-gfx
+SPRITE_BANK_TEST_ELF=$(SPRITE_BANK_TEST_BUILDDIR)/sprite_bank_test.elf
+SPRITE_BANK_TEST_PROM=$(SPRITE_BANK_TEST_ROM)/202-p1.p1
+SPRITE_BANK_TEST_CART=$(SPRITE_BANK_TEST_ROM)/$(GAMEROM).zip
+SPRITE_BANK_TEST_GNGEO_DATAFILE=$(SPRITE_BANK_TEST_ROM)/gngeo_data.zip
+
+$(SPRITE_BANK_TEST_BUILDDIR) $(SPRITE_BANK_TEST_ROM) $(SPRITE_BANK_TEST_ASSETS):
+	mkdir -p $@
+
+$(SPRITE_BANK_TEST_GFX_STAMP): tools/gen_gfx.py tools/doom_convert.py config.h $(DOOM_MAP_HEADER) $(DOOM_IWAD) | $(SPRITE_BANK_TEST_BUILDDIR) $(SPRITE_BANK_TEST_ASSETS)
+	$(PYTHON) tools/gen_gfx.py --iwad $(DOOM_IWAD) --map $(DOOM_MAP) --wall-texture $(DOOM_WALL_TEXTURE) --detail quality --simple-map $(GFX_PLANE_PHASE_ARGS) $(GFX_CEILING_ARG) $(GFX_TITLEPIC_ARG) --crom-file-bytes $(DOOM_CROM_FILE_BYTES) --palette-header $(SPRITE_BANK_TEST_GFX_HEADER) --out-dir $(SPRITE_BANK_TEST_ASSETS)
+	touch $@
+
+$(SPRITE_BANK_TEST_GFX_HEADER): $(SPRITE_BANK_TEST_GFX_STAMP)
+	@test -f $@
+
+$(SPRITE_BANK_TEST_BUILDDIR)/sprite_bank_test.o: sprite_bank_test.c hw.h config.h $(SPRITE_BANK_TEST_GFX_HEADER) | $(SPRITE_BANK_TEST_BUILDDIR)
+	$(M68KGCC) $(NGCFLAGS) -I$(SPRITE_BANK_TEST_BUILDDIR) -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DETAIL_QUALITY=1 -DDOOM_SIMPLE_MAP=1 -DDOOM_CHUNKED_SIMPLE_MAP=0 -c sprite_bank_test.c -o $@
+
+$(SPRITE_BANK_TEST_ELF): $(SPRITE_BANK_TEST_BUILDDIR)/sprite_bank_test.o
+	$(M68KGCC) -o $@ $^ $(NGLDFLAGS) $(LDFLAGS)
+
+$(SPRITE_BANK_TEST_PROM): $(SPRITE_BANK_TEST_ELF) | $(SPRITE_BANK_TEST_ROM)
+	$(M68KOBJCOPY) -O binary -S -R .text2 --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab status=none
+
+$(SPRITE_BANK_TEST_ROM)/202-c1.c1: $(SPRITE_BANK_TEST_GFX_STAMP) | $(SPRITE_BANK_TEST_ROM)
+	cp $(SPRITE_BANK_TEST_ASSETS)/c1.bin $@
+$(SPRITE_BANK_TEST_ROM)/202-c2.c2: $(SPRITE_BANK_TEST_GFX_STAMP) | $(SPRITE_BANK_TEST_ROM)
+	cp $(SPRITE_BANK_TEST_ASSETS)/c2.bin $@
+$(SPRITE_BANK_TEST_ROM)/202-s1.s1: $(SPRITE_BANK_TEST_GFX_STAMP) | $(SPRITE_BANK_TEST_ROM)
+	cp $(SPRITE_BANK_TEST_ASSETS)/s1.bin $@
+$(SPRITE_BANK_TEST_ROM)/202-m1.m1: $(SPRITE_BANK_TEST_GFX_STAMP) | $(SPRITE_BANK_TEST_ROM)
+	cp $(SPRITE_BANK_TEST_ASSETS)/m1.bin $@
+$(SPRITE_BANK_TEST_ROM)/202-v1.v1: $(SPRITE_BANK_TEST_GFX_STAMP) | $(SPRITE_BANK_TEST_ROM)
+	cp $(SPRITE_BANK_TEST_ASSETS)/v1.bin $@
+$(SPRITE_BANK_TEST_ROM)/neogeo.zip: $(ROM)/neogeo.zip | $(SPRITE_BANK_TEST_ROM)
+	cp $< $@
+
+$(SPRITE_BANK_TEST_CART): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 $(SPRITE_BANK_TEST_ROM)/202-s1.s1 $(SPRITE_BANK_TEST_ROM)/202-m1.m1 $(SPRITE_BANK_TEST_ROM)/202-v1.v1 $(SPRITE_BANK_TEST_ROM)/neogeo.zip
+	cd $(SPRITE_BANK_TEST_ROM) && for i in `ls -1 | grep -v -e \.bin -e \.zip`; do ln -nsf $$i $${i%.*}.bin; done; \
+	printf "===\nhttps://github.com/dciabrin/ngdevkit\n===" | zip -qz $(GAMEROM).zip `ls -1 | grep -v -e \.zip`
+
+$(SPRITE_BANK_TEST_GNGEO_DATAFILE): $(SPRITE_BANK_TEST_PROM) $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 $(SPRITE_BANK_TEST_ROM)/202-s1.s1 $(SPRITE_BANK_TEST_ROM)/202-m1.m1 $(SPRITE_BANK_TEST_ROM)/202-v1.v1 | $(SPRITE_BANK_TEST_ROM)
+	$(ROMTOOL) --build hash --format gngeo --name $(GAMEROM) --long-name DoomGeo-AES-Sprite-Bank-Test --year 2026 --publisher Unpublished --prom $(SPRITE_BANK_TEST_PROM) --mrom $(SPRITE_BANK_TEST_ROM)/202-m1.m1 --vrom $(SPRITE_BANK_TEST_ROM)/202-v1.v1 --srom $(SPRITE_BANK_TEST_ROM)/202-s1.s1 --crom $(SPRITE_BANK_TEST_ROM)/202-c1.c1 $(SPRITE_BANK_TEST_ROM)/202-c2.c2 --output $@ --extra gngeo.data="$(GNGEO_BASE_DATAFILE)"
+
+sprite-bank-test-rom: $(SPRITE_BANK_TEST_CART)
+
+sprite-bank-test-gngeo: GNGEO_DATAFILE=$(SPRITE_BANK_TEST_GNGEO_DATAFILE)
+sprite-bank-test-gngeo: $(SPRITE_BANK_TEST_CART) $(SPRITE_BANK_TEST_GNGEO_DATAFILE)
+	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(SPRITE_BANK_TEST_ROM) $(GAMEROM)
 
 HUD_TEST_ROM=$(BUILDDIR)/hud-test-rom
 HUD_TEST_ELF=$(BUILDDIR)/hud_test.elf
@@ -381,36 +440,40 @@ $(HUD_TEST_CART): $(HUD_TEST_PROM) $(HUD_TEST_ROM)/202-c1.c1 $(HUD_TEST_ROM)/202
 
 hud-test-rom: $(HUD_TEST_CART)
 
-hud-test-gngeo: $(HUD_TEST_CART)
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(HUD_TEST_ROM) $(GAMEROM)
+hud-test-gngeo: $(HUD_TEST_CART) $(HUD_TEST_ROM)/gngeo_data.zip
+	$(GNGEO) --datafile="$(HUD_TEST_ROM)/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(HUD_TEST_ROM) $(GAMEROM)
 
 key-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-test ROM=build/key-test-rom GFX_ROM_DIR=build/key-test-assets
 
 key-test-gngeo:
 	$(MAKE) key-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-test-rom $(GAMEROM)
+	$(MAKE) build/key-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/key-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-test-rom $(GAMEROM)
 
 key-door-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 BUILDDIR=build/key-door-test ROM=build/key-door-test-rom GFX_ROM_DIR=build/key-door-test-assets CFLAGS="-Ibuild/key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
 
 key-door-test-gngeo:
 	$(MAKE) key-door-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-door-test-rom $(GAMEROM)
+	$(MAKE) build/key-door-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/key-door-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/key-door-test-rom $(GAMEROM)
 
 chunk-key-door-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M2 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-key-door-test ROM=build/chunk-key-door-test-rom GFX_ROM_DIR=build/chunk-key-door-test-assets CFLAGS="-Ibuild/chunk-key-door-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_KEY_DOOR_TEST"
 
 chunk-key-door-test-gngeo:
 	$(MAKE) chunk-key-door-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
+	$(MAKE) build/chunk-key-door-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-key-door-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-key-door-test-rom $(GAMEROM)
 
 chunk-movement-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_CHUNK_MOVEMENT_TEST=1 DOOM_CHUNK_MOVEMENT_START_DELAY=300 BUILDDIR=build/chunk-movement-test ROM=build/chunk-movement-test-rom GFX_ROM_DIR=build/chunk-movement-test-assets
 
 chunk-movement-test-gngeo:
 	$(MAKE) chunk-movement-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-movement-test-rom $(GAMEROM)
+	$(MAKE) build/chunk-movement-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-movement-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-movement-test-rom $(GAMEROM)
 
 chunk-playable-rom:
 	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-playable ROM=build/chunk-playable-rom GFX_ROM_DIR=build/chunk-playable-assets
@@ -418,49 +481,56 @@ chunk-playable-rom:
 chunk-playable-gngeo:
 	$(MAKE) chunk-playable-rom
 	@if [ ! -e build/chunk-playable-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/chunk-playable-rom/neogeo.zip; fi
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-rom $(GAMEROM)
+	$(MAKE) build/chunk-playable-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-playable-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-rom $(GAMEROM)
 
 chunk-playable-debug-rom:
 	$(MAKE) cart DOOM_MAP=E1M1 DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_CHUNK_CELL_UNITS=256 DOOM_RIPDOOM_RENDER=1 DOOM_SKIP_INTRO=1 DOOM_INPUT_DEBUG=1 DOOM_FRAME_STATS=1 BUILDDIR=build/chunk-playable-debug ROM=build/chunk-playable-debug-rom GFX_ROM_DIR=build/chunk-playable-debug-assets
 
 chunk-playable-debug-gngeo:
 	$(MAKE) chunk-playable-debug-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-debug-rom $(GAMEROM)
+	$(MAKE) build/chunk-playable-debug-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-playable-debug-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-playable-debug-rom $(GAMEROM)
 
 combat-test-rom:
 	$(MAKE) cart BUILDDIR=build/combat-test ROM=build/combat-test-rom GFX_ROM_DIR=build/combat-test-assets CFLAGS="-Ibuild/combat-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_COMBAT_TEST"
 
 combat-test-gngeo:
 	$(MAKE) combat-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/combat-test-rom $(GAMEROM)
+	$(MAKE) build/combat-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/combat-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/combat-test-rom $(GAMEROM)
 
 encounter-test-rom:
 	$(MAKE) cart BUILDDIR=build/encounter-test ROM=build/encounter-test-rom GFX_ROM_DIR=build/encounter-test-assets CFLAGS="-Ibuild/encounter-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_ENCOUNTER_TEST"
 
 encounter-test-gngeo:
 	$(MAKE) encounter-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/encounter-test-rom $(GAMEROM)
+	$(MAKE) build/encounter-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/encounter-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/encounter-test-rom $(GAMEROM)
 
 scout-test-rom:
 	$(MAKE) cart BUILDDIR=build/scout-test ROM=build/scout-test-rom GFX_ROM_DIR=build/scout-test-assets CFLAGS="-Ibuild/scout-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_SCOUT_TEST"
 
 scout-test-gngeo:
 	$(MAKE) scout-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/scout-test-rom $(GAMEROM)
+	$(MAKE) build/scout-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/scout-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/scout-test-rom $(GAMEROM)
 
 exit-test-rom:
 	$(MAKE) cart BUILDDIR=build/exit-test ROM=build/exit-test-rom GFX_ROM_DIR=build/exit-test-assets CFLAGS="-Ibuild/exit-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M1_EXIT_TEST"
 
 exit-test-gngeo:
 	$(MAKE) exit-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/exit-test-rom $(GAMEROM)
+	$(MAKE) build/exit-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/exit-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/exit-test-rom $(GAMEROM)
 
 e1m8-boss-test-rom:
 	$(MAKE) cart DOOM_MAP=E1M8 DOOM_DETAIL=quality BUILDDIR=build/e1m8-boss-test ROM=build/e1m8-boss-test-rom GFX_ROM_DIR=build/e1m8-boss-test-assets CFLAGS="-Ibuild/e1m8-boss-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_E1M8_BOSS_TEST"
 
 e1m8-boss-test-gngeo:
 	$(MAKE) e1m8-boss-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/e1m8-boss-test-rom $(GAMEROM)
+	$(MAKE) build/e1m8-boss-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/e1m8-boss-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/e1m8-boss-test-rom $(GAMEROM)
 
 episode-map-rom:
 	$(MAKE) cart DOOM_MAP=$(EPISODE_MAP) BUILDDIR=build/episode-roms/$(EPISODE_MAP) ROM=build/episode-roms/$(EPISODE_MAP)-rom GFX_ROM_DIR=build/episode-roms/$(EPISODE_MAP)-assets
@@ -468,7 +538,8 @@ episode-map-rom:
 episode-map-gngeo:
 	$(MAKE) episode-map-rom
 	@if [ ! -e build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" build/episode-roms/$(EPISODE_MAP)-rom/neogeo.zip; fi
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/episode-roms/$(EPISODE_MAP)-rom $(GAMEROM)
+	$(MAKE) build/episode-roms/$(EPISODE_MAP)-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/episode-roms/$(EPISODE_MAP)-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/episode-roms/$(EPISODE_MAP)-rom $(GAMEROM)
 
 episode-roms:
 	@for map in $(EPISODE_MAPS); do \
@@ -481,56 +552,64 @@ hidden-attack-test-rom:
 
 hidden-attack-test-gngeo:
 	$(MAKE) hidden-attack-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/hidden-attack-test-rom $(GAMEROM)
+	$(MAKE) build/hidden-attack-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/hidden-attack-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/hidden-attack-test-rom $(GAMEROM)
 
 melee-test-rom:
 	$(MAKE) cart BUILDDIR=build/melee-test ROM=build/melee-test-rom GFX_ROM_DIR=build/melee-test-assets CFLAGS="-Ibuild/melee-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MELEE_TEST"
 
 melee-test-gngeo:
 	$(MAKE) melee-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/melee-test-rom $(GAMEROM)
+	$(MAKE) build/melee-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/melee-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/melee-test-rom $(GAMEROM)
 
 monster-gallery-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/monster-gallery ROM=build/monster-gallery-rom GFX_ROM_DIR=build/monster-gallery-assets CFLAGS="-Ibuild/monster-gallery -std=c99 -fomit-frame-pointer -Os -g -DDOOM_MONSTER_GALLERY_TEST"
 
 monster-gallery-gngeo:
 	$(MAKE) monster-gallery-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/monster-gallery-rom $(GAMEROM)
+	$(MAKE) build/monster-gallery-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/monster-gallery-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/monster-gallery-rom $(GAMEROM)
 
 arsenal-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/arsenal-test ROM=build/arsenal-test-rom GFX_ROM_DIR=build/arsenal-test-assets CFLAGS="-Ibuild/arsenal-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_ARSENAL_TEST"
 
 arsenal-test-gngeo:
 	$(MAKE) arsenal-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
+	$(MAKE) build/arsenal-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/arsenal-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/arsenal-test-rom $(GAMEROM)
 
 death-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/death-test ROM=build/death-test-rom GFX_ROM_DIR=build/death-test-assets CFLAGS="-Ibuild/death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
 
 death-test-gngeo:
 	$(MAKE) death-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
+	$(MAKE) build/death-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/death-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/death-test-rom $(GAMEROM)
 
 chunk-death-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-death-test ROM=build/chunk-death-test-rom GFX_ROM_DIR=build/chunk-death-test-assets CFLAGS="-Ibuild/chunk-death-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_DEATH_TEST"
 
 chunk-death-test-gngeo:
 	$(MAKE) chunk-death-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-death-test-rom $(GAMEROM)
+	$(MAKE) build/chunk-death-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-death-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-death-test-rom $(GAMEROM)
 
 powerup-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality BUILDDIR=build/powerup-test ROM=build/powerup-test-rom GFX_ROM_DIR=build/powerup-test-assets CFLAGS="-Ibuild/powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 
 powerup-test-gngeo:
 	$(MAKE) powerup-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/powerup-test-rom $(GAMEROM)
+	$(MAKE) build/powerup-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/powerup-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/powerup-test-rom $(GAMEROM)
 
 chunk-powerup-test-rom:
 	$(MAKE) cart DOOM_DETAIL=quality DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=1 DOOM_SKIP_INTRO=1 BUILDDIR=build/chunk-powerup-test ROM=build/chunk-powerup-test-rom GFX_ROM_DIR=build/chunk-powerup-test-assets CFLAGS="-Ibuild/chunk-powerup-test -std=c99 -fomit-frame-pointer -Os -g -DDOOM_POWERUP_TEST"
 
 chunk-powerup-test-gngeo:
 	$(MAKE) chunk-powerup-test-rom
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-powerup-test-rom $(GAMEROM)
+	$(MAKE) build/chunk-powerup-test-rom/gngeo_data.zip
+	$(GNGEO) --datafile="build/chunk-powerup-test-rom/gngeo_data.zip" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i build/chunk-powerup-test-rom $(GAMEROM)
 
 ASM_ROM=$(BUILDDIR)/asm-rom
 ASM_ASSET_ROM=$(BUILDDIR)/asm-assets
@@ -583,87 +662,6 @@ asm-rom: $(ASM_CART)
 asm-gngeo: $(ASM_CART)
 	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i $(ASM_ROM) $(GAMEROM)
 
-RENDER_EXPERIMENTS=texture_columns ripdoom_flat ripdoom_solid20 ripdoom_spans
-EXPERIMENT?=ripdoom_flat
-EXPERIMENT_ROOT?=build/experiments
-EXPERIMENT_DIR=$(EXPERIMENT_ROOT)/$(EXPERIMENT)
-EXPERIMENT_BUILDDIR=$(EXPERIMENT_DIR)/obj
-EXPERIMENT_ROM=$(EXPERIMENT_DIR)/rom
-EXPERIMENT_GFX_ROM_DIR=$(EXPERIMENT_DIR)/assets
-EXPERIMENT_MANIFEST=$(EXPERIMENT_DIR)/manifest.txt
-RENDER_EXPERIMENT_COMMON=DOOM_MAP=E1M1 DOOM_DETAIL=quality DOOM_SKIP_INTRO=1 DOOM_WALL_TEXTURE=STARTAN3 DOOM_WALL_UPLOAD_COLUMNS=255 DOOM_WALL_UPLOAD_OVERRUN_COLUMNS=255
-RENDER_EXPERIMENT_E1M1_ASSETS=DOOM_MONSTER_SPRITES=$(DOOM_E1M1_MULTIFLOOR_SPRITES) DOOM_SPRITE_SCALES=1.00,0.75,0.50,0.33,0.25 DOOM_CROM_FILE_BYTES=1048576
-RENDER_EXPERIMENT_SIMPLE_ASSETS=DOOM_MONSTER_SPRITES=$(DOOM_SIMPLE_EXPERIMENT_SPRITES) DOOM_SPRITE_SCALES=1.00,0.75,0.50,0.33 DOOM_CROM_FILE_BYTES=1048576
-
-EXPERIMENT_DESC_texture_columns=Generated STARTAN3 texture columns on the stable simple-map raycaster.
-EXPERIMENT_FLAGS_texture_columns=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_SIMPLE_ASSETS) DOOM_SIMPLE_MAP=1 DOOM_CHUNKED_SIMPLE_MAP=0 DOOM_TITLEPIC=0 DOOM_CEILING_PERSPECTIVE=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=2 DOOM_PLANE_CEILING_FORWARD_PHASES=2 DOOM_BG_SCROLL_COLUMNS=20 DOOM_BG_SCROLL_OVERRUN_COLUMNS=20 DOOM_FLAT_PLANES=0
-EXPERIMENT_PROBES_texture_columns=simple-enemy-visibility-check
-
-EXPERIMENT_DESC_ripdoom_flat=Actual E1M1 RIPDOOM geometry, one wall layer, flat floor/ceiling backdrop.
-EXPERIMENT_FLAGS_ripdoom_flat=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_WALL_LAYERS=1 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
-EXPERIMENT_PROBES_ripdoom_flat=ripdoom-runtime-check ripdoom-render-check
-
-EXPERIMENT_DESC_ripdoom_solid20=Actual E1M1 RIPDOOM geometry through the 20-column multifloor budget, foreground spans disabled.
-EXPERIMENT_FLAGS_ripdoom_solid20=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_MULTIFLOOR_RENDER=1 DOOM_WALL_LAYERS=3 DOOM_RIPDOOM_FOREGROUND_SPANS=0 DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT=0 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
-EXPERIMENT_PROBES_ripdoom_solid20=ripdoom-runtime-check ripdoom-render-check
-
-EXPERIMENT_DESC_ripdoom_spans=Actual E1M1 RIPDOOM geometry with 3 wall layers and upper/lower foreground spans.
-EXPERIMENT_FLAGS_ripdoom_spans=$(RENDER_EXPERIMENT_COMMON) $(RENDER_EXPERIMENT_E1M1_ASSETS) DOOM_SIMPLE_MAP=0 DOOM_RIPDOOM_RENDER=1 DOOM_MULTIFLOOR_RENDER=1 DOOM_WALL_LAYERS=3 DOOM_RIPDOOM_FOREGROUND_SPANS=1 DOOM_MULTIFLOOR_SOLID_FULL_HEIGHT=0 DOOM_CEILING_PERSPECTIVE=0 DOOM_DYNAMIC_SECTOR_FLATS=0 DOOM_FLAT_PLANES=1 DOOM_PLANE_FLOOR_FORWARD_PHASES=1 DOOM_PLANE_CEILING_FORWARD_PHASES=1
-EXPERIMENT_PROBES_ripdoom_spans=ripdoom-runtime-check ripdoom-render-check
-
-EXPERIMENT_FLAGS=$(EXPERIMENT_FLAGS_$(EXPERIMENT))
-EXPERIMENT_DESC=$(EXPERIMENT_DESC_$(EXPERIMENT))
-EXPERIMENT_PROBES=$(EXPERIMENT_PROBES_$(EXPERIMENT))
-
-experiment-list:
-	@echo "Renderer experiments:"; \
-	for exp in $(RENDER_EXPERIMENTS); do \
-		case "$$exp" in \
-			texture_columns) desc="$(EXPERIMENT_DESC_texture_columns)" ;; \
-			ripdoom_flat) desc="$(EXPERIMENT_DESC_ripdoom_flat)" ;; \
-			ripdoom_solid20) desc="$(EXPERIMENT_DESC_ripdoom_solid20)" ;; \
-			ripdoom_spans) desc="$(EXPERIMENT_DESC_ripdoom_spans)" ;; \
-			*) desc="" ;; \
-		esac; \
-		printf "  %-18s %s\n" "$$exp" "$$desc"; \
-	done
-
-experiment-check:
-	@if [ -z "$(strip $(EXPERIMENT_FLAGS))" ]; then \
-		echo "Unknown EXPERIMENT=$(EXPERIMENT)"; \
-		echo "Known experiments: $(RENDER_EXPERIMENTS)"; \
-		exit 2; \
-	fi
-
-experiment-manifest: experiment-check
-	@mkdir -p "$(EXPERIMENT_DIR)"
-	@{ \
-		printf "experiment=%s\n" "$(EXPERIMENT)"; \
-		printf "description=%s\n" "$(EXPERIMENT_DESC)"; \
-		printf "flags=%s\n" "$(EXPERIMENT_FLAGS)"; \
-		printf "builddir=%s\n" "$(EXPERIMENT_BUILDDIR)"; \
-		printf "rom=%s\n" "$(EXPERIMENT_ROM)"; \
-		printf "gfx_rom_dir=%s\n" "$(EXPERIMENT_GFX_ROM_DIR)"; \
-		printf "probes=%s\n" "$(EXPERIMENT_PROBES)"; \
-	} > "$(EXPERIMENT_MANIFEST)"
-	@echo "Wrote $(EXPERIMENT_MANIFEST)"
-
-experiment-probes: experiment-check
-	@if [ -z "$(strip $(EXPERIMENT_PROBES))" ]; then \
-		echo "No probes configured for $(EXPERIMENT)"; \
-	else \
-		$(MAKE) $(EXPERIMENT_PROBES) $(EXPERIMENT_FLAGS) BUILDDIR="$(EXPERIMENT_BUILDDIR)" GFX_ROM_DIR="$(EXPERIMENT_GFX_ROM_DIR)"; \
-	fi
-
-experiment-cart: experiment-check
-	$(MAKE) cart $(EXPERIMENT_FLAGS) BUILDDIR="$(EXPERIMENT_BUILDDIR)" ROM="$(EXPERIMENT_ROM)" GFX_ROM_DIR="$(EXPERIMENT_GFX_ROM_DIR)"
-	@if [ ! -e "$(EXPERIMENT_ROM)/neogeo.zip" ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" "$(EXPERIMENT_ROM)/neogeo.zip"; fi
-	$(MAKE) experiment-manifest EXPERIMENT="$(EXPERIMENT)"
-
-experiment-gngeo: experiment-cart
-	@if [ ! -e "$(EXPERIMENT_ROM)/neogeo.zip" ] && [ -e "$(NEOGEO_BIOS)" ]; then ln -nsf "$(NEOGEO_BIOS)" "$(EXPERIMENT_ROM)/neogeo.zip"; fi
-	$(GNGEO) --datafile="$(GNGEO_DATAFILE)" --p1control="$(GNGEO_P1CONTROL)" $(SHADEROPTS) $(EXTRAOPTS) --screen320 --scale $(SCALE_WIN) --no-resize -i "$(EXPERIMENT_ROM)" $(GAMEROM)
-
 smoke-screenshot:
 	tools/smoke_capture.sh
 
@@ -707,7 +705,7 @@ ripdoom-render-check: $(DOOM_RIPDOOM_HEADER) $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK
 	$(HOSTCC) -std=c99 -I. -I$(BUILDDIR) $(filter -D%,$(CFLAGS)) ripdoom_runtime.c $(DOOM_RIPDOOM_SOURCE) $(DOOM_CHUNK_RENDER_SOURCE) tools/ripdoom_render_probe.c -o $(BUILDDIR)/ripdoom_render_probe
 	$(BUILDDIR)/ripdoom_render_probe
 
-.PHONY: face-test-rom face-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo experiment-list experiment-check experiment-manifest experiment-probes experiment-cart experiment-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
+.PHONY: face-test-rom face-test-gngeo sprite-bank-test-rom sprite-bank-test-gngeo hud-test-rom hud-test-gngeo key-test-rom key-test-gngeo key-door-test-rom key-door-test-gngeo chunk-key-door-test-rom chunk-key-door-test-gngeo chunk-movement-test-rom chunk-movement-test-gngeo chunk-playable-rom chunk-playable-gngeo chunk-playable-debug-rom chunk-playable-debug-gngeo combat-test-rom combat-test-gngeo encounter-test-rom encounter-test-gngeo scout-test-rom scout-test-gngeo exit-test-rom exit-test-gngeo e1m8-boss-test-rom e1m8-boss-test-gngeo episode-map-rom episode-map-gngeo episode-roms hidden-attack-test-rom hidden-attack-test-gngeo melee-test-rom melee-test-gngeo arsenal-test-rom arsenal-test-gngeo death-test-rom death-test-gngeo chunk-death-test-rom chunk-death-test-gngeo powerup-test-rom powerup-test-gngeo chunk-powerup-test-rom chunk-powerup-test-gngeo asm-rom asm-gngeo smoke-screenshot simple-enemy-visibility-check route-check episode-route-report episode-route-check bsp-asset-check chunk-map chunk-route-check chunk-visibility-check chunk-stream-check chunk-movement-check ripdoom-map ripdoom-check ripdoom-runtime-check ripdoom-render-check
 
 $(FREEDOOM_ZIP):
 	mkdir -p $(dir $@)
