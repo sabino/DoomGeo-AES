@@ -15,6 +15,8 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PAGES_DOOM_IWAD: .tools/assets/freedoom-0.13.0.zip
+  PAGES_DOOM_CROM_FILE_BYTES: "2097152"
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -83,6 +85,42 @@ jobs:
         with:
           name: doomgeo-aes-asm-rom
           path: dist/asm-rom/*
+          if-no-files-found: error
+
+  pages-rom:
+    name: GitHub Pages Freedoom ROM
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ngdevkit
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common curl zip imagemagick sox libsox-fmt-mp3 python3-pil python3-ruamel.yaml
+          sudo add-apt-repository -y ppa:dciabrin/ngdevkit
+          sudo apt-get update
+          sudo apt-get install -y ngdevkit ngdevkit-gngeo
+
+      - name: Download Freedoom IWAD
+        run: make "${PAGES_DOOM_IWAD}"
+
+      - name: Build web-safe Freedoom ROM
+        run: |
+          make cart bios \
+            TOOLS_PREFIX=/usr \
+            DOOM_IWAD="${PAGES_DOOM_IWAD}" \
+            DOOM_CROM_FILE_BYTES="${PAGES_DOOM_CROM_FILE_BYTES}"
+
+      - name: Collect Pages ROM artifacts
+        run: python3 tools/doomgeo_build.py package --out dist/pages-rom
+
+      - name: Upload Pages ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: doomgeo-aes-pages-rom
+          path: dist/pages-rom/*
           if-no-files-found: error
 
   helpers:
@@ -187,6 +225,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - rom
+      - pages-rom
       - asm-rom
     if: github.event_name != 'pull_request'
     environment:
@@ -196,11 +235,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download ROM artifact
+      - name: Download Pages ROM artifact
         uses: actions/download-artifact@v4
         with:
-          name: doomgeo-aes-rom
-          path: dist/rom
+          name: doomgeo-aes-pages-rom
+          path: dist/pages-rom
 
       - name: Download ASM ROM artifact
         uses: actions/download-artifact@v4
@@ -209,7 +248,7 @@ jobs:
           path: dist/asm-rom
 
       - name: Build Pages bundle
-        run: python3 tools/doomgeo_build.py pages --rom dist/rom/doomgeo-aes.zip --bios dist/rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-aes-asm.zip --out dist/pages
+        run: python3 tools/doomgeo_build.py pages --rom dist/pages-rom/doomgeo-aes.zip --bios dist/pages-rom/neogeo.zip --asm-rom dist/asm-rom/doomgeo-aes-asm.zip --out dist/pages
 
       - name: Verify FBNeo web package CRCs
         run: |

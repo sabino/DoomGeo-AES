@@ -34,6 +34,8 @@ the other only accompanies and tracks the plan.
 - The Pages ROM zips are expected to be FBNeo-compatible launch packages with
   `puzzledp` driver chip filenames, sizes, and CRCs internally while preserving
   the generated homebrew data outside the final padding correction bytes.
+- The Pages main ROM is expected to come from a separate Freedoom-based build
+  with 2 MiB C-ROM chips, not from the normal native/local ROM artifact.
 - Repo-local installs are removable with `doomgeo-build uninstall`; `--all`
   also removes cached WAD/package downloads under `.tools`.
 - The installer decision is MSYS2 UCRT64 for native Windows builds, with WSL

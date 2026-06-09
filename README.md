@@ -188,9 +188,10 @@ python3 tools/inspect_map_specials.py --map E1M2
 ```
 
 You must provide your own Neo Geo BIOS for local emulation. The browser package
-uses an FBNeo-compatible packaging path, but that does not rename the project:
-`DoomGeo-AES` is the game name; `puzzledp` is only the private FBNeo driver/chip
-identity used so the arcade core accepts the generated homebrew ROM zip.
+uses a separate Freedoom-based ROM and an FBNeo-compatible packaging path, but
+that does not rename the project: `DoomGeo-AES` is the game name; `puzzledp` is
+only the private FBNeo driver/chip identity used so the arcade core accepts the
+generated homebrew ROM zip.
 
 ## Documentation
 
