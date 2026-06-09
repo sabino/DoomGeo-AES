@@ -39,6 +39,14 @@ FBNEO_PUZZLEDP_CRC = {
     "202-m1.m1": 0x9C0291EA,
     "202-v1.v1": 0xDEBEB8FB,
 }
+FBNEO_PUZZLEDP_SIZE = {
+    "202-p1.p1": 0x80000,
+    "202-s1.s1": 0x20000,
+    "202-c1.c1": 0x200000,
+    "202-c2.c2": 0x200000,
+    "202-m1.m1": 0x20000,
+    "202-v1.v1": 0x80000,
+}
 FBNEO_NEOGEO_CRC = {
     "sp-s3.sp1": 0x91B64BE3,
     "sm1.sm1": 0x94416D67,
@@ -385,6 +393,13 @@ def build_fbneo_rom_zip(source_zip: Path, out_zip: Path) -> None:
                 data = archive.read(name)
             except KeyError as exc:
                 raise BuildError(f"ROM entry missing for FBNeo package: {name}") from exc
+            expected_size = FBNEO_PUZZLEDP_SIZE[name]
+            if len(data) != expected_size:
+                raise BuildError(
+                    f"ROM entry {name} is {len(data)} bytes, but the FBNeo puzzledp "
+                    f"web driver expects {expected_size} bytes; rebuild the Pages ROM "
+                    "with DOOM_CROM_FILE_BYTES=2097152"
+                )
             entries[name] = force_crc32(data, desired_crc)
     write_zip_entries(out_zip, entries)
     print_step(f"wrote FBNeo-compatible ROM package to {out_zip}")
