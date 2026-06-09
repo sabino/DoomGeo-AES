@@ -275,8 +275,8 @@ gngeo gngeo-fullscreen: GNGEO_DATAFILE=$(GNGEO_RUN_DATAFILE)
 gngeo gngeo-fullscreen: $(GNGEO_RUN_DATAFILE)
 
 # Keep the packaged C-ROM size explicit. Local GnGeo launches generate a
-# matching datafile because the stock puzzledp metadata only maps 1 MiB per
-# C-ROM and corrupts/omits larger generated sprite banks.
+# matching datafile because stock arcade metadata can map smaller C-ROM windows
+# than the generated sprite bank.
 CROMSIZE=$(DOOM_CROM_FILE_BYTES)
 
 

@@ -20,9 +20,9 @@ the other only accompanies and tracks the plan.
 
 ## Evidence
 
-- Linux ROM builds are expected to produce `build/rom/puzzledp.zip` internally,
+- Linux ROM builds are expected to produce `build/rom/magdrop2.zip` internally,
   then package it as `dist/rom/doomgeo-aes.zip`.
-- ASM ROM builds are expected to produce `build/asm-rom/puzzledp.zip` from
+- ASM ROM builds are expected to produce `build/asm-rom/magdrop2.zip` from
   `asm/doomgeo_asm.S`, then package it as `dist/asm-rom/doomgeo-aes-asm.zip`.
 - Windows/MSYS2 ROM builds are expected to produce the same packaged
   `doomgeo-aes.zip` through the UCRT64 ngdevkit packages.

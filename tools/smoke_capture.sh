@@ -15,6 +15,7 @@ WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
 EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
 DIRECT_ROM="${SMOKE_DIRECT_ROM:-}"
+DIRECT_ROMSET="${SMOKE_DIRECT_ROMSET:-magdrop2}"
 CAPTURE_P1CONTROL="${SMOKE_P1CONTROL:-A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
@@ -184,7 +185,7 @@ if [ -n "$DIRECT_ROM" ]; then
         "$ROOT/.tools/ngdevkit-local/usr/bin/ngdevkit-gngeo" \
         --datafile="$ROOT/.tools/ngdevkit-local/usr/share/ngdevkit-gngeo/gngeo_data.zip" \
         --p1control="$CAPTURE_P1CONTROL" \
-        $EXTRAOPTS_VALUE --screen320 --scale 3 --no-resize -i "$DIRECT_ROM" puzzledp >"$LOG" 2>&1 < /dev/null &
+        $EXTRAOPTS_VALUE --screen320 --scale 3 --no-resize -i "$DIRECT_ROM" "$DIRECT_ROMSET" >"$LOG" 2>&1 < /dev/null &
     RUN_PID="$!"
 else
     run_args=("$RUN_TARGET")

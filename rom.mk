@@ -6,7 +6,7 @@ BUILDDIR?=build
 ROM?=$(BUILDDIR)/rom
 
 # ROM name
-GAMEROM=puzzledp
+GAMEROM=magdrop2
 
 # program ROM
 PROMSIZE=524288

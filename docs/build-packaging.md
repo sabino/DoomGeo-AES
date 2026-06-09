@@ -19,7 +19,7 @@ For the Pages bundle only, `doomgeo-build pages` writes FBNeo-compatible launch
 zips against the `magdrop2` driver by adjusting unused padding bytes in the
 generated ROM chips and null BIOS aliases. `magdrop2` is used because its FBNeo
 driver has 4 MiB C1/C2 graphics ROM windows, matching the generated web sprite
-bank without cutting assets back to the smaller `puzzledp` shape. The browser
+bank without cutting assets back to a smaller romset shape. The browser
 player launches `magdrop2.zip` and sets `EJS_gameName = "magdrop2"` because
 FBNeo identifies arcade games by driver/romset name. The bundle also writes
 project-named copies

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Probe the authored simple-map live enemy visibility path.
 
-The texture-column experiment uses generated Doom sprites inside GnGeo's
-puzzledp C-ROM window. A full sprite bank can push live monster tiles past the
-visible C-ROM range while the earlier corpse frames still fit, producing an
-invisible live monster and a briefly visible death frame.
+The texture-column experiment uses generated Doom sprites inside the configured
+Neo Geo C-ROM window. A mismatched romset/datafile can push live monster tiles
+past the visible C-ROM range while the earlier corpse frames still fit,
+producing an invisible live monster and a briefly visible death frame.
 """
 
 from __future__ import annotations
