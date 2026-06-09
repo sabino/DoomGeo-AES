@@ -890,5 +890,6 @@ readable.
 - Windows builds are supported through MSYS2 UCRT64.
 - GitHub Actions builds Linux ROM, Windows ROM, standalone helper binaries, a
   Pages-playable FBNeo package, and a separate 68000 ASM ROM.
-- Browser packages are public `doomgeo-aes.zip` / `doomgeo-aes-asm.zip` files,
-  while the internal FBNeo chip names/CRCs match the `puzzledp` driver.
+- Browser packages launch `magdrop2.zip` with internal FBNeo chip names/CRCs
+  matching the `magdrop2` driver, with project-named copies available as
+  download links.

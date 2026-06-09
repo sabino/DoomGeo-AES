@@ -16,17 +16,22 @@ expose the standalone 68000 assembly ROM at `asm.html`.
 
 FBNeo is an arcade core and validates known romsets by filename, size, and CRC.
 For the Pages bundle only, `doomgeo-build pages` writes FBNeo-compatible launch
-zips against the `puzzledp` driver by adjusting unused padding bytes in the
-generated ROM chips and null BIOS aliases. The public Pages/download zip names
-are still `doomgeo-aes.zip` and `doomgeo-aes-asm.zip`; `puzzledp` remains only
-the private FBNeo driver/chip compatibility identity. The raw build artifacts
-under `build/rom/` are not rewritten this way; this compatibility package is
-only for the browser player.
+zips against the `magdrop2` driver by adjusting unused padding bytes in the
+generated ROM chips and null BIOS aliases. `magdrop2` is used because its FBNeo
+driver has 4 MiB C1/C2 graphics ROM windows, matching the generated web sprite
+bank without cutting assets back to the smaller `puzzledp` shape. The browser
+player launches `magdrop2.zip` and sets `EJS_gameName = "magdrop2"` because
+FBNeo identifies arcade games by driver/romset name. The bundle also writes
+project-named copies
+(`doomgeo-aes.zip` and `doomgeo-aes-asm.zip`) for download links, but those are
+not the files passed to the emulator. The raw build artifacts under
+`build/rom/` are not rewritten this way; this compatibility package is only for
+the browser player.
 
 The deployed Pages ROM is built separately from the normal native artifact. CI
-uses the redistributable Freedoom IWAD and `DOOM_CROM_FILE_BYTES=2097152` for
+uses the redistributable Freedoom IWAD and `DOOM_CROM_FILE_BYTES=4194304` for
 that job so the browser package does not embed proprietary Doom assets and still
-matches the fixed C-ROM chip sizes expected by FBNeo's `puzzledp` driver. The
+matches the fixed C-ROM chip sizes expected by FBNeo's `magdrop2` driver. The
 regular Linux, Windows, and local ROM artifacts are left on the normal build
 path.
 
@@ -395,8 +400,10 @@ The Pages job consumes the Freedoom web ROM artifact and writes:
 ```text
 dist/pages/index.html
 dist/pages/asm.html
+dist/pages/rom/web-<hash>/magdrop2.zip
 dist/pages/rom/web-<hash>/doomgeo-aes.zip
 dist/pages/rom/web-<hash>/neogeo.zip
+dist/pages/rom/asm/web-<hash>/magdrop2.zip
 dist/pages/rom/asm/web-<hash>/doomgeo-aes-asm.zip
 ```
 

@@ -24,28 +24,21 @@ DEFAULT_LOCAL_PREFIX = Path(".tools") / "ngdevkit-local" / "usr"
 PROJECT_NAME = "DoomGeo-AES"
 PACKAGE_ROM_ZIP = "doomgeo-aes.zip"
 PACKAGE_ASM_ROM_ZIP = "doomgeo-aes-asm.zip"
-FBNEO_COMPAT_ROM_ZIP = "puzzledp.zip"
+FBNEO_COMPAT_ROM_ZIP = "magdrop2.zip"
+FBNEO_DRIVER_NAME = "magdrop2"
 ROM_ZIP = Path("build") / "rom" / FBNEO_COMPAT_ROM_ZIP
 ROM_ELF = Path("build") / "rom.elf"
 BIOS_ZIP = Path("build") / "rom" / "neogeo.zip"
 ASM_ROM_ZIP = Path("build") / "asm-rom" / FBNEO_COMPAT_ROM_ZIP
 ASM_ROM_ELF = Path("build") / "asm" / "doomgeo_asm.elf"
 ASM_BIOS_ZIP = Path("build") / "asm-rom" / "neogeo.zip"
-FBNEO_PUZZLEDP_CRC = {
-    "202-p1.p1": 0x2B61415B,
-    "202-s1.s1": 0xCD19264F,
-    "202-c1.c1": 0xCC0095EF,
-    "202-c2.c2": 0x42371307,
-    "202-m1.m1": 0x9C0291EA,
-    "202-v1.v1": 0xDEBEB8FB,
-}
-FBNEO_PUZZLEDP_SIZE = {
-    "202-p1.p1": 0x80000,
-    "202-s1.s1": 0x20000,
-    "202-c1.c1": 0x200000,
-    "202-c2.c2": 0x200000,
-    "202-m1.m1": 0x20000,
-    "202-v1.v1": 0x80000,
+FBNEO_ROM_ENTRIES = {
+    "221-p1.p1": ("202-p1.p1", 0x80000, 0x7BE82353),
+    "221-s1.s1": ("202-s1.s1", 0x20000, 0x2A4063A3),
+    "221-c1.c1": ("202-c1.c1", 0x400000, 0x1F862A14),
+    "221-c2.c2": ("202-c2.c2", 0x400000, 0x14B90536),
+    "221-m1.m1": ("202-m1.m1", 0x20000, 0xBDDAE628),
+    "221-v1.v1": ("202-v1.v1", 0x200000, 0x7E5E53E4),
 }
 FBNEO_NEOGEO_CRC = {
     "sp-s3.sp1": 0x91B64BE3,
@@ -364,11 +357,13 @@ def force_crc32(data: bytes, desired: int, patch_offset: int | None = None) -> b
     return bytes(patched)
 
 
-def write_zip_entries(path: Path, entries: dict[str, bytes]) -> None:
+def write_zip_entries(path: Path, entries: dict[str, bytes], compression: int | None = None) -> None:
     import zipfile
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    if compression is None:
+        compression = zipfile.ZIP_DEFLATED
+    with zipfile.ZipFile(path, "w", compression=compression) as archive:
         for name, data in entries.items():
             archive.writestr(name, data)
 
@@ -381,35 +376,20 @@ def web_asset_version(paths: list[Path]) -> str:
     return digest.hexdigest()[:12]
 
 
-def build_fbneo_rom_zip(source_zip: Path, out_zip: Path) -> None:
+def pad_rom_entry(data: bytes, expected_size: int, name: str) -> bytes:
+    if len(data) > expected_size:
+        raise BuildError(
+            f"ROM entry {name} is {len(data)} bytes, but the FBNeo {FBNEO_DRIVER_NAME} "
+            f"web driver expects {expected_size} bytes"
+        )
+    if len(data) < expected_size:
+        return data + (b"\xff" * (expected_size - len(data)))
+    return data
+
+
+def fbneo_bios_entries(source_zip: Path) -> dict[str, bytes]:
     import zipfile
 
-    if not source_zip.exists():
-        raise BuildError(f"ROM not found: {source_zip}")
-    entries: dict[str, bytes] = {}
-    with zipfile.ZipFile(source_zip) as archive:
-        for name, desired_crc in FBNEO_PUZZLEDP_CRC.items():
-            try:
-                data = archive.read(name)
-            except KeyError as exc:
-                raise BuildError(f"ROM entry missing for FBNeo package: {name}") from exc
-            expected_size = FBNEO_PUZZLEDP_SIZE[name]
-            if len(data) != expected_size:
-                raise BuildError(
-                    f"ROM entry {name} is {len(data)} bytes, but the FBNeo puzzledp "
-                    f"web driver expects {expected_size} bytes; rebuild the Pages ROM "
-                    "with DOOM_CROM_FILE_BYTES=2097152"
-                )
-            entries[name] = force_crc32(data, desired_crc)
-    write_zip_entries(out_zip, entries)
-    print_step(f"wrote FBNeo-compatible ROM package to {out_zip}")
-
-
-def build_fbneo_bios_zip(source_zip: Path, out_zip: Path) -> None:
-    import zipfile
-
-    if not source_zip.exists():
-        raise BuildError(f"BIOS not found: {source_zip}")
     with zipfile.ZipFile(source_zip) as archive:
         source_names = set(archive.namelist())
 
@@ -425,6 +405,33 @@ def build_fbneo_bios_zip(source_zip: Path, out_zip: Path) -> None:
             "sfix.sfix": force_crc32(read_first("sfix.sfix"), FBNEO_NEOGEO_CRC["sfix.sfix"]),
             "000-lo.lo": force_crc32(read_first("000-lo.lo"), FBNEO_NEOGEO_CRC["000-lo.lo"]),
         }
+    return entries
+
+
+def build_fbneo_rom_zip(source_zip: Path, out_zip: Path, bios_zip: Path | None = None) -> None:
+    import zipfile
+
+    if not source_zip.exists():
+        raise BuildError(f"ROM not found: {source_zip}")
+    entries: dict[str, bytes] = {}
+    with zipfile.ZipFile(source_zip) as archive:
+        for target_name, (source_name, expected_size, desired_crc) in FBNEO_ROM_ENTRIES.items():
+            try:
+                data = archive.read(source_name)
+            except KeyError as exc:
+                raise BuildError(f"ROM entry missing for FBNeo package: {source_name}") from exc
+            data = pad_rom_entry(data, expected_size, target_name)
+            entries[target_name] = force_crc32(data, desired_crc)
+    if bios_zip:
+        entries.update(fbneo_bios_entries(bios_zip))
+    write_zip_entries(out_zip, entries, compression=zipfile.ZIP_STORED)
+    print_step(f"wrote FBNeo-compatible ROM package to {out_zip}")
+
+
+def build_fbneo_bios_zip(source_zip: Path, out_zip: Path) -> None:
+    if not source_zip.exists():
+        raise BuildError(f"BIOS not found: {source_zip}")
+    entries = fbneo_bios_entries(source_zip)
     write_zip_entries(out_zip, entries)
     print_step(f"wrote FBNeo-compatible BIOS package to {out_zip}")
 
@@ -432,6 +439,7 @@ def build_fbneo_bios_zip(source_zip: Path, out_zip: Path) -> None:
 def html_page(
     game_name: str,
     subtitle: str,
+    emulator_game_name: str,
     game_url: str,
     download_url: str,
     bios_url: str,
@@ -530,7 +538,7 @@ def html_page(
   <script>
     window.EJS_player = "#game";
     window.EJS_core = "fbneo";
-    window.EJS_gameName = "__GAME_NAME__";
+    window.EJS_gameName = "__EMULATOR_GAME_NAME__";
     window.EJS_gameUrl = "__GAME_URL__";
     window.EJS_biosUrl = "__BIOS_URL__";
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
@@ -542,6 +550,7 @@ def html_page(
 """
     return (
         template.replace("__GAME_NAME__", game_name)
+        .replace("__EMULATOR_GAME_NAME__", emulator_game_name)
         .replace("__SUBTITLE__", subtitle)
         .replace("__GAME_URL__", game_url)
         .replace("__DOWNLOAD_URL__", download_url)
@@ -570,16 +579,19 @@ def build_pages(
     rom_out = out_dir / "rom" / f"web-{version}"
     rom_out.mkdir(parents=True, exist_ok=True)
     main_rom_url = f"rom/web-{version}/{PACKAGE_ROM_ZIP}"
+    main_launch_rom_url = f"rom/web-{version}/{FBNEO_COMPAT_ROM_ZIP}"
     bios_url = f"rom/web-{version}/neogeo.zip"
-    build_fbneo_rom_zip(rom, rom_out / PACKAGE_ROM_ZIP)
+    build_fbneo_rom_zip(rom, rom_out / FBNEO_COMPAT_ROM_ZIP, bios)
+    shutil.copy2(rom_out / FBNEO_COMPAT_ROM_ZIP, rom_out / PACKAGE_ROM_ZIP)
     build_fbneo_bios_zip(bios, rom_out / "neogeo.zip")
     # FBNeo still matches the internal Neo Geo chip filenames and CRCs against
-    # the Puzzle De Pon driver. The public zip name can be project-specific.
+    # a known driver. The public page title and download copy stay project-specific.
     (out_dir / "index.html").write_text(
         html_page(
             PROJECT_NAME,
             "Neo Geo AES Doom prototype running in a browser through the EmulatorJS FBNeo WebAssembly core.",
-            main_rom_url,
+            FBNEO_DRIVER_NAME,
+            main_launch_rom_url,
             main_rom_url,
             bios_url,
             "asm.html" if asm_rom_source else None,
@@ -593,12 +605,15 @@ def build_pages(
         asm_out = out_dir / "rom" / "asm" / f"web-{version}"
         asm_out.mkdir(parents=True, exist_ok=True)
         asm_rom_url = f"rom/asm/web-{version}/{PACKAGE_ASM_ROM_ZIP}"
-        build_fbneo_rom_zip(asm_rom, asm_out / PACKAGE_ASM_ROM_ZIP)
+        asm_launch_rom_url = f"rom/asm/web-{version}/{FBNEO_COMPAT_ROM_ZIP}"
+        build_fbneo_rom_zip(asm_rom, asm_out / FBNEO_COMPAT_ROM_ZIP, bios)
+        shutil.copy2(asm_out / FBNEO_COMPAT_ROM_ZIP, asm_out / PACKAGE_ASM_ROM_ZIP)
         (out_dir / "asm.html").write_text(
             html_page(
                 f"{PROJECT_NAME} ASM",
                 "A separate 68000 assembly cartridge build with a controller-driven Neo Geo sprite scene.",
-                asm_rom_url,
+                FBNEO_DRIVER_NAME,
+                asm_launch_rom_url,
                 asm_rom_url,
                 bios_url,
             ),

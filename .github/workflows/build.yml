@@ -16,7 +16,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PAGES_DOOM_IWAD: .tools/assets/freedoom-0.13.0.zip
-  PAGES_DOOM_CROM_FILE_BYTES: "2097152"
+  PAGES_DOOM_CROM_FILE_BYTES: "4194304"
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -258,12 +258,12 @@ jobs:
           import zipfile
 
           expected_rom = {
-              "202-p1.p1": 0x2B61415B,
-              "202-s1.s1": 0xCD19264F,
-              "202-c1.c1": 0xCC0095EF,
-              "202-c2.c2": 0x42371307,
-              "202-m1.m1": 0x9C0291EA,
-              "202-v1.v1": 0xDEBEB8FB,
+              "221-p1.p1": 0x7BE82353,
+              "221-s1.s1": 0x2A4063A3,
+              "221-c1.c1": 0x1F862A14,
+              "221-c2.c2": 0x14B90536,
+              "221-m1.m1": 0xBDDAE628,
+              "221-v1.v1": 0x7E5E53E4,
           }
           expected_bios = {
               "sp-s3.sp1": 0x91B64BE3,
@@ -281,12 +281,23 @@ jobs:
                           raise SystemExit(f"{path}:{name} CRC {actual:08x} != {crc:08x}")
 
           main_rom = glob.glob("dist/pages/rom/web-*/doomgeo-aes.zip")
+          main_launch_rom = glob.glob("dist/pages/rom/web-*/magdrop2.zip")
           main_bios = glob.glob("dist/pages/rom/web-*/neogeo.zip")
           asm_rom = glob.glob("dist/pages/rom/asm/web-*/doomgeo-aes-asm.zip")
-          if len(main_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1:
-              raise SystemExit(f"unexpected web package layout: {main_rom=} {main_bios=} {asm_rom=}")
+          asm_launch_rom = glob.glob("dist/pages/rom/asm/web-*/magdrop2.zip")
+          if len(main_rom) != 1 or len(main_launch_rom) != 1 or len(main_bios) != 1 or len(asm_rom) != 1 or len(asm_launch_rom) != 1:
+              raise SystemExit(
+                  "unexpected web package layout: "
+                  f"{main_rom=} {main_launch_rom=} {main_bios=} {asm_rom=} {asm_launch_rom=}"
+              )
           check(main_rom[0], expected_rom)
+          check(main_rom[0], expected_bios)
+          check(main_launch_rom[0], expected_rom)
+          check(main_launch_rom[0], expected_bios)
           check(asm_rom[0], expected_rom)
+          check(asm_rom[0], expected_bios)
+          check(asm_launch_rom[0], expected_rom)
+          check(asm_launch_rom[0], expected_bios)
           check(main_bios[0], expected_bios)
           PY
 
