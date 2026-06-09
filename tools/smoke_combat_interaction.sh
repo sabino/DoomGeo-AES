@@ -6,7 +6,7 @@ cd "$ROOT"
 
 DISPLAY_VALUE="${SMOKE_DISPLAY:-:1}"
 WORKSPACE="${SMOKE_WORKSPACE:-4}"
-WAIT_SECS="${SMOKE_WAIT_SECS:-10}"
+WAIT_SECS="${SMOKE_WAIT_SECS:-5}"
 DEATH_WAIT_SECS="${COMBAT_DEATH_WAIT_SECS:-2.5}"
 REVEAL_STEP_SECS="${COMBAT_DEATH_REVEAL_STEP_SECS:-0.45}"
 OUT_DIR="${SMOKE_OUTPUT_DIR:-.tools/screens/latest}"
@@ -19,6 +19,10 @@ require_cmd() {
         echo "missing required command: $1" >&2
         exit 1
     fi
+}
+
+cleanup_gngeo() {
+    pkill -9 -x ngdevkit-gngeo >/dev/null 2>&1 || true
 }
 
 window_for_gngeo() {
@@ -54,12 +58,14 @@ require_cmd xwininfo
 require_cmd xwd
 require_cmd convert
 
+trap cleanup_gngeo EXIT INT TERM
 mkdir -p "$OUT_DIR"
 
 SMOKE_BUILD_TARGET=combat-test-rom \
 SMOKE_RUN_TARGET=combat-test-gngeo \
 SMOKE_OUTPUT="$INITIAL_OUT" \
 SMOKE_WAIT_SECS="$WAIT_SECS" \
+SMOKE_KEEP_RUNNING=1 \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null

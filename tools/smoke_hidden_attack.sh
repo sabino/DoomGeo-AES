@@ -19,6 +19,10 @@ require_cmd() {
     fi
 }
 
+cleanup_gngeo() {
+    pkill -9 -x ngdevkit-gngeo >/dev/null 2>&1 || true
+}
+
 window_for_gngeo() {
     local wid=""
     for _ in $(seq 1 100); do
@@ -46,12 +50,14 @@ require_cmd xwininfo
 require_cmd xwd
 require_cmd convert
 
+trap cleanup_gngeo EXIT INT TERM
 mkdir -p "$OUT_DIR"
 
 SMOKE_BUILD_TARGET=hidden-attack-test-rom \
 SMOKE_RUN_TARGET=hidden-attack-test-gngeo \
 SMOKE_OUTPUT="$INITIAL_OUT" \
 SMOKE_WAIT_SECS="$WAIT_SECS" \
+SMOKE_KEEP_RUNNING=1 \
 SMOKE_DISPLAY="$DISPLAY_VALUE" \
 SMOKE_WORKSPACE="$WORKSPACE" \
 tools/smoke_capture.sh >/dev/null

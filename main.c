@@ -2382,6 +2382,42 @@ static u8 monster_view_angle_bucket(int thing_index, int px, int py) {
     return cross >= 0 ? 4 : 6;
 }
 
+static u8 sprite_angle_distance(u8 a, u8 b) {
+    u8 d;
+    if (a < 1 || a > 8 || b < 1 || b > 8) return 255;
+    d = (a > b) ? (u8)(a - b) : (u8)(b - a);
+    return d > 4 ? (u8)(8 - d) : d;
+}
+
+static int nearest_enemy_walk_sprite_def(u16 thing_type, u8 wanted_angle, u8 wanted_anim) {
+    u8 best_angle = 0;
+    u8 best_distance = 255;
+    int first_angle = -1;
+    u8 angle_hits = 0;
+
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        u8 angle;
+        u8 distance;
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        angle = g_enemy_sprite_defs[i].angle;
+        if (angle < 1 || angle > 8) continue;
+        distance = sprite_angle_distance(wanted_angle, angle);
+        if (distance < best_distance) {
+            best_distance = distance;
+            best_angle = angle;
+        }
+    }
+    if (!best_angle) return -1;
+    for (int i = 0; i < ENEMY_SPRITE_COUNT; i++) {
+        if (g_enemy_sprite_defs[i].thing_type != thing_type) continue;
+        if (g_enemy_sprite_defs[i].angle != best_angle) continue;
+        if (first_angle < 0) first_angle = i;
+        if (angle_hits == wanted_anim) return i;
+        angle_hits++;
+    }
+    return first_angle;
+}
+
 static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_px, int view_py) {
     int first = -1;
     int first_walk_angle = -1;
@@ -2426,6 +2462,10 @@ static int enemy_sprite_def_for_type(u16 thing_type, int thing_index, int view_p
             int fallback = first_sprite_def_for_type(fallback_type);
             if (fallback >= 0) return fallback;
         }
+    }
+    if (is_monster) {
+        int nearest = nearest_enemy_walk_sprite_def(thing_type, walk_angle, wanted_anim);
+        if (nearest >= 0) return nearest;
     }
     if (first_walk_angle >= 0) return first_walk_angle;
     return first >= 0 ? first : -1;
@@ -3546,7 +3586,7 @@ static void seed_simple_map_things(void) {
 }
 #endif
 
-#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_E1M8_BOSS_TEST)
+#if defined(DOOM_COMBAT_TEST) || defined(DOOM_MELEE_TEST) || defined(DOOM_MONSTER_GALLERY_TEST) || defined(DOOM_ARSENAL_TEST) || defined(DOOM_DEATH_TEST) || defined(DOOM_POWERUP_TEST) || defined(DOOM_KEY_DOOR_TEST) || defined(DOOM_HIDDEN_ATTACK_TEST) || defined(DOOM_E1M1_ENCOUNTER_TEST) || defined(DOOM_E1M1_SCOUT_TEST) || defined(DOOM_E1M8_BOSS_TEST)
 static u8 test_position(short *out_x, short *out_y, short forward, short lateral) {
     int px, py;
     int dir_x, dir_y, plane_x, plane_y;
@@ -3764,6 +3804,9 @@ static void configure_combat_test(void) {
     player_has_shotgun = 1;
     player_shells = 24;
     current_weapon = WEAPON_SHOTGUN;
+#if DOOM_SIMPLE_MAP
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((13 << 8) + 128), 0, -256);
+#endif
     place_test_imp();
 }
 #endif
@@ -3791,6 +3834,16 @@ static void configure_hidden_attack_test(void) {
 
 #ifdef DOOM_E1M1_ENCOUNTER_TEST
 static void configure_e1m1_encounter_test(void) {
+#if DOOM_SIMPLE_MAP
+    player_ammo = 50;
+    current_weapon = WEAPON_PISTOL;
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((12 << 8) + 128), 0, -256);
+    place_test_imp();
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#else
 #if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((17 << 8) + 128), (short)((18 << 8) + 128), 0, 256);
@@ -3809,11 +3862,33 @@ static void configure_e1m1_encounter_test(void) {
     reset_enemy_slot_cache();
     hide_enemies();
 #endif
+#endif
 }
 #endif
 
 #ifdef DOOM_E1M1_SCOUT_TEST
 static void configure_e1m1_scout_test(void) {
+#if DOOM_SIMPLE_MAP
+    player_ammo = 50;
+    current_weapon = WEAPON_PISTOL;
+    rc_set_pose_q8((short)((9 << 8) + 128), (short)((13 << 8) + 128), 181, -181);
+    if (place_test_thing(0, 3001, WORLD_Q8(760), -WORLD_Q8(160))) {
+        int px;
+        int py;
+        rc_player_q8(&px, &py);
+        enemy_hp[0] = monster_start_hp(3001);
+        enemy_awake[0] = 1;
+        enemy_attack_cooldown[0] = 72;
+        enemy_hit_flash[0] = 0;
+        enemy_attack_anim[0] = 0;
+        enemy_ranged_readable_ticks[0] = 0;
+        set_monster_facing_from_delta(0, px - thing_x_q8[0], py - thing_y_q8[0]);
+    }
+    shown_ammo = 0xFFFF;
+    shown_weapon_status = 0xFFFF;
+    reset_enemy_slot_cache();
+    hide_enemies();
+#else
 #if DOOM_ACTIVE_THING_COUNT > 13
     int px, py;
     rc_set_pose_q8((short)((23 << 8) + 128), (short)((20 << 8) + 128), -243, 81);
@@ -3831,6 +3906,7 @@ static void configure_e1m1_scout_test(void) {
     shown_weapon_status = 0xFFFF;
     reset_enemy_slot_cache();
     hide_enemies();
+#endif
 #endif
 }
 #endif
@@ -3949,6 +4025,10 @@ static void configure_monster_gallery_test(void) {
     current_weapon = WEAPON_PISTOL;
     shown_ammo = 0xFFFF;
     shown_weapon_status = 0xFFFF;
+#if DOOM_SIMPLE_MAP
+    rc_set_pose_q8((short)((8 << 8) + 128), (short)((13 << 8) + 128), 0, -256);
+    rc_player_q8(&px, &py);
+#endif
 
     for (u8 i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
         if (!place_test_thing(i, types[i], WORLD_Q8(880), laterals[i])) continue;
@@ -6296,7 +6376,7 @@ static int world_sprite_origin_y(u16 thing_type, int h) {
 
     if (thing_is_corpse(thing_type)) return origin_y + 2;
     if (thing_is_pickup(thing_type)) {
-        if (origin_y > GAME_H - 10) origin_y = GAME_H - 10;
+        if (origin_y > GAME_H - 8) origin_y = GAME_H - 8;
         return origin_y + 1;
     }
     if (thing_is_barrel(thing_type)) return origin_y + 1;
@@ -6378,6 +6458,47 @@ static int thing_adjusted_screen_height(u16 thing_type, int h) {
     return h;
 }
 
+static u16 sprite_zoom_q8_for_projected_height(const DoomSpriteScale *meta, int h, u8 hardware_scale) {
+    long zoom;
+    if (!hardware_scale || meta->height == 0) return 256;
+    zoom = ((long)h * 256L) / meta->height;
+    if (zoom < 48) zoom = 48;
+    if (zoom > 256) zoom = 256;
+    return (u16)zoom;
+}
+
+static u16 pickup_zoom_q8_for_distance(int dist_q8) {
+    enum {
+        PICKUP_FULL_DIST_Q8 = WORLD_Q8(256),
+        PICKUP_FAR_DIST_Q8 = WORLD_Q8(1280),
+        PICKUP_FAR_ZOOM_Q8 = 48
+    };
+    long span;
+    long t;
+    long zoom;
+    if (dist_q8 <= PICKUP_FULL_DIST_Q8) return 256;
+    if (dist_q8 >= PICKUP_FAR_DIST_Q8) return PICKUP_FAR_ZOOM_Q8;
+    span = (long)PICKUP_FAR_DIST_Q8 - PICKUP_FULL_DIST_Q8;
+    t = (long)dist_q8 - PICKUP_FULL_DIST_Q8;
+    zoom = 256L - (t * (256L - PICKUP_FAR_ZOOM_Q8)) / span;
+    if (zoom < PICKUP_FAR_ZOOM_Q8) zoom = PICKUP_FAR_ZOOM_Q8;
+    if (zoom > 256) zoom = 256;
+    return (u16)zoom;
+}
+
+static u16 sprite_hshrink_for_zoom(u16 zoom_q8) {
+    int width = (int)((16L * zoom_q8 + 255L) >> 8);
+    if (width < 1) width = 1;
+    if (width > 16) width = 16;
+    return (u16)(width - 1);
+}
+
+static u16 sprite_vshrink_for_zoom(u16 zoom_q8) {
+    if (zoom_q8 >= 256) return 0xFF;
+    if (zoom_q8 < 1) return 0;
+    return (u16)(zoom_q8 - 1);
+}
+
 static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short world_x_q8, short world_y_q8,
                            int sx, int h, int dist_q8,
                            u8 flash, u8 fallback_projection, int view_px, int view_py) {
@@ -6387,6 +6508,7 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     u8 is_pickup = thing_is_pickup(thing_type);
     u8 is_projectile = thing_is_projectile(thing_type);
     u8 is_explosion = thing_is_explosion(thing_type);
+    u8 hardware_scale = is_pickup;
     int def_idx = enemy_sprite_def_for_type(thing_type, thing_index, view_px, view_py);
     const DoomEnemySpriteDef *def;
     const DoomSpriteScale *meta;
@@ -6426,7 +6548,9 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     else if (h > 24) idx = 3;
     else idx = 4;
     if (is_monster && idx > 1) idx = 1;
-#if !DOOM_SIMPLE_MAP
+#if DOOM_SIMPLE_MAP
+    if (is_pickup) idx = 0;
+#else
     if (is_pickup && idx > 1) idx = 1;
 #endif
     if (is_projectile && idx > 3) idx = 3;
@@ -6442,30 +6566,40 @@ static u8 render_type_slot(u16 slot, int thing_index, u16 thing_type, short worl
     }
     {
         u8 rendered = 0;
-        int sprite_x = sx - meta->origin_x;
+        u16 zoom_q8 = is_pickup
+            ? pickup_zoom_q8_for_distance(dist_q8)
+            : sprite_zoom_q8_for_projected_height(meta, h, hardware_scale);
+        u16 hshrink = sprite_hshrink_for_zoom(zoom_q8);
+        u16 vshrink = sprite_vshrink_for_zoom(zoom_q8);
+        int strip_step = hardware_scale ? (int)hshrink + 1 : 16;
+        int scaled_origin_x = hardware_scale ? (int)(((long)meta->origin_x * zoom_q8 + 128L) >> 8) : meta->origin_x;
+        int scaled_origin_y = hardware_scale ? (int)(((long)meta->origin_y * zoom_q8 + 128L) >> 8) : meta->origin_y;
+        int scaled_width = hardware_scale ? (int)(((long)meta->width * zoom_q8 + 128L) >> 8) : meta->width;
+        int scaled_height = hardware_scale ? (int)(((long)meta->height * zoom_q8 + 128L) >> 8) : meta->height;
+        int sprite_x = sx - scaled_origin_x;
         int visible_left = SCRW;
         int visible_right = 0;
         int top;
         enemies[slot].screen_x = sprite_x;
-        enemies[slot].screen_w = meta->width;
+        enemies[slot].screen_w = scaled_width;
+        if (hardware_scale) enemies[slot].screen_h = scaled_height;
         if ((is_explosion && thing_index < 0) || is_projectile) {
-            top = (GAME_H - meta->height) / 2;
+            top = (GAME_H - scaled_height) / 2;
         } else {
             top = world_sprite_origin_y(thing_type, h)
                 - projected_floor_screen_offset(world_x_q8, world_y_q8, h, view_px, view_py)
-                - meta->origin_y + ENEMY_GROUND_LIFT;
-            if (is_pickup) top += pickup_floor_distance_bias(dist_q8);
+                - scaled_origin_y + ENEMY_GROUND_LIFT;
         }
         if (top < 0) top = 0;
         for (u16 j = 0; j < ENEMY_STRIPS; j++) {
             u16 spr = ENEMY_BASE + slot * ENEMY_STRIPS + j;
-            int strip_x = sprite_x + j * 16;
+            int strip_x = sprite_x + j * strip_step;
             if (j < meta->strips && strip_x > -16 && strip_x < SCRW
-                && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + 15, dist_q8))) {
+                && (fallback_projection || rc_sprite_strip_visible(strip_x, strip_x + strip_step - 1, dist_q8))) {
                 int strip_left = strip_x < 0 ? 0 : strip_x;
-                int strip_right = strip_x + 16;
+                int strip_right = strip_x + strip_step;
                 if (strip_right > SCRW) strip_right = SCRW;
-                scb2(spr, 0x0F, 0xFF);
+                scb2(spr, hshrink, vshrink);
                 scb3(spr, top, 0, meta->rows);
                 scb4(spr, (u16)strip_x);
                 if (strip_left < visible_left) visible_left = strip_left;

@@ -15,6 +15,7 @@ WAIT_SECS="${SMOKE_WAIT_SECS:-8}"
 START_GAME="${SMOKE_START_GAME:-0}"
 EXTRAOPTS_VALUE="${SMOKE_EXTRAOPTS:-}"
 DIRECT_ROM="${SMOKE_DIRECT_ROM:-}"
+CAPTURE_P1CONTROL="${SMOKE_P1CONTROL:-A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79}"
 OUT="${SMOKE_OUTPUT:-.tools/screens/latest/smoke.png}"
 LOG="${SMOKE_LOG:-.tools/logs/smoke-gngeo.log}"
 XWD_OUT="${OUT%.png}.xwd"
@@ -30,6 +31,7 @@ MAKE_ROM_DIR=""
 MAKE_BUILD_DIR=""
 BIOS_SOURCE=".tools/ngdevkit-local/usr/share/ngdevkit/neogeo.zip"
 KILL_OLD_GNGEO="${SMOKE_KILL_OLD_GNGEO:-1}"
+KEEP_RUNNING="${SMOKE_KEEP_RUNNING:-0}"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -108,7 +110,7 @@ if [ "$USE_XVFB" = "1" ]; then
 fi
 
 cleanup() {
-    if [ -n "$RUN_PID" ]; then
+    if [ -n "$RUN_PID" ] && [ "$KEEP_RUNNING" != "1" ]; then
         kill -TERM "-$RUN_PID" >/dev/null 2>&1 || kill "$RUN_PID" >/dev/null 2>&1 || true
         sleep 0.2
         if kill -0 "$RUN_PID" >/dev/null 2>&1; then
@@ -181,11 +183,12 @@ if [ -n "$DIRECT_ROM" ]; then
     setsid env DISPLAY="$DISPLAY_VALUE" SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=x11 \
         "$ROOT/.tools/ngdevkit-local/usr/bin/ngdevkit-gngeo" \
         --datafile="$ROOT/.tools/ngdevkit-local/usr/share/ngdevkit-gngeo/gngeo_data.zip" \
-        --p1control="A=K122,B=K120,C=K97,D=K115,START=K49,COIN=K51,UP=K82,DOWN=K81,LEFT=K80,RIGHT=K79,MENU=K27" \
+        --p1control="$CAPTURE_P1CONTROL" \
         $EXTRAOPTS_VALUE --screen320 --scale 3 --no-resize -i "$DIRECT_ROM" puzzledp >"$LOG" 2>&1 < /dev/null &
     RUN_PID="$!"
 else
     run_args=("$RUN_TARGET")
+    run_args+=("GNGEO_P1CONTROL=$CAPTURE_P1CONTROL")
     if [ -n "$EXTRAOPTS_VALUE" ]; then
         run_args+=("EXTRAOPTS=$EXTRAOPTS_VALUE")
     fi
@@ -229,7 +232,24 @@ if [ "$USE_XVFB" = "1" ]; then
         convert "$XWD_OUT" "$OUT"
     fi
 else
-    DISPLAY="$DISPLAY_VALUE" xwd -silent -id "$wid" -out "$XWD_OUT"
-    convert "$XWD_OUT" "$OUT"
+    captured=0
+    for _ in $(seq 1 5); do
+        if [ -z "$wid" ] || ! DISPLAY="$DISPLAY_VALUE" xwininfo -id "$wid" >/dev/null 2>&1; then
+            wid="$(window_for_gngeo)"
+        fi
+        rm -f "$XWD_OUT"
+        if DISPLAY="$DISPLAY_VALUE" xwd -silent -id "$wid" -out "$XWD_OUT" >/dev/null 2>&1 && [ -s "$XWD_OUT" ]; then
+            if convert "$XWD_OUT" "$OUT"; then
+                captured=1
+                break
+            fi
+        fi
+        wid=""
+        sleep 0.2
+    done
+    if [ "$captured" != "1" ]; then
+        echo "could not capture ngdevkit-gngeo window" >&2
+        exit 1
+    fi
 fi
 echo "$OUT"
